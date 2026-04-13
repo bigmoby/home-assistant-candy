@@ -40,7 +40,7 @@ def auto_enable_custom_integrations(  # noqa: PT004
 # notifications. These calls would fail without this fixture since the persistent_notification
 # integration is never loaded during a test.
 @pytest.fixture(name="skip_notifications", autouse=True)
-def _skip_notifications_fixture() -> Generator[None, None, None]:
+def _skip_notifications_fixture() -> Generator[None]:
     """Skip notification calls."""
     with (
         patch("homeassistant.components.persistent_notification.async_create"),
@@ -50,7 +50,7 @@ def _skip_notifications_fixture() -> Generator[None, None, None]:
 
 
 @pytest.fixture(name="disable_api_rate_limiter", autouse=True)
-def disable_api_rate_limiter() -> Generator[AsyncLimiter, None, None]:
+def disable_api_rate_limiter() -> Generator[AsyncLimiter]:
     """Disable API rate limiter for tests."""
     with patch("custom_components.candy.client._LIMITER"):
         yield AsyncLimiter(max_rate=1000, time_period=1)

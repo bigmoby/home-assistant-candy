@@ -12,6 +12,13 @@
         "data": {
           "ip_address": "Indirizzo IP del dispositivo"
         }
+      },
+      "select": {
+        "title": "Dispositivi Candy trovati nella tua rete",
+        "description": "Seleziona un dispositivo da configurare, oppure scegli \"Inserisci IP manualmente\".",
+        "data": {
+          "ip_address": "Dispositivo"
+        }
       }
     }
   },

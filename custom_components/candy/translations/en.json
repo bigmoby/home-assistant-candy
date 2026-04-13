@@ -12,6 +12,13 @@
         "data": {
           "ip_address": "Device IP address"
         }
+      },
+      "select": {
+        "title": "Candy devices found on your network",
+        "description": "Select a device to configure, or choose \"Enter IP address manually\" to type it.",
+        "data": {
+          "ip_address": "Device"
+        }
       }
     }
   },

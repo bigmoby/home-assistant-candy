@@ -1,3 +1,4 @@
+import asyncio
 import json
 from json import JSONDecodeError
 import logging
@@ -126,3 +127,47 @@ async def detect_encryption(
 
 def _status_url(device_ip: str, use_encryption: bool) -> str:
     return f"http://{device_ip}/http-read.json?encrypted={1 if use_encryption else 0}"
+
+
+# Maps JSON root keys to human-readable device type labels
+_DEVICE_TYPE_LABELS: dict[str, str] = {
+    "statusLavatrice": "Washing Machine",
+    "statusTD": "Tumble Dryer",
+    "statusDWash": "Dishwasher",
+    "statusForno": "Oven",
+}
+
+
+async def discover_devices(
+    session: aiohttp.ClientSession, subnet: str, timeout: float = 1.0
+) -> dict[str, str]:
+    """Scan a /24 subnet for Candy Simply-Fi devices.
+
+    Returns a dict mapping IP address -> device type label for each device found.
+    """
+
+    async def _probe(ip: str) -> tuple[str, str] | None:
+        url = f"http://{ip}/http-read.json?encrypted=0"
+        try:
+            async with session.get(
+                url, timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+                for key, label in _DEVICE_TYPE_LABELS.items():
+                    if key in data:
+                        return ip, label
+        except Exception:  # pylint: disable=broad-except
+            pass
+        return None
+
+    base = ".".join(subnet.split(".")[:3])
+    tasks = [_probe(f"{base}.{i}") for i in range(1, 255)]
+    results = await asyncio.gather(*tasks)
+
+    return {
+        ip: label
+        for result in results
+        if result and (ip := result[0]) and (label := result[1])
+    }
