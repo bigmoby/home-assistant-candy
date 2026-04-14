@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     name: "Create GitHub Release"
@@ -14,7 +17,7 @@ jobs:
 
     steps:
       - name: "Checkout the repository"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5.0.0"
         with:
           fetch-depth: 0 # full history for changelog
 

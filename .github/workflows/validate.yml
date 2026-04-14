@@ -11,13 +11,16 @@ on:
     branches:
       - "main"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   hassfest:
     name: "Hassfest Validation"
     runs-on: "ubuntu-latest"
     steps:
       - name: "Checkout the repository"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5.0.0"
 
       - name: "Run hassfest validation"
         uses: "home-assistant/actions/hassfest@master"
@@ -27,7 +30,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name: "Checkout the repository"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5.0.0"
 
       - name: "Run HACS validation"
         uses: "hacs/action@main"

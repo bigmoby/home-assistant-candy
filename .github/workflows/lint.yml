@@ -8,13 +8,16 @@ on:
     branches:
       - "main"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lint:
     name: "Lint, Format and Test"
     runs-on: "ubuntu-latest"
     steps:
       - name: "Checkout the repository"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5.0.0"
 
       - name: "Set up Python"
         uses: actions/setup-python@v5
