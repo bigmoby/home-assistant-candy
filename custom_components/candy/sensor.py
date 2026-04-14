@@ -259,7 +259,7 @@ class CandyWashTemperatureSensor(CandyBaseSensor):
         return UnitOfTemperature.CELSIUS
 
     @property
-    def device_class(self) -> str:
+    def device_class(self) -> SensorDeviceClass:
         return SensorDeviceClass.TEMPERATURE
 
     @property
@@ -703,7 +703,7 @@ class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
-        status: DishwasherStatus = self.coordinator.data
+        status = cast(DishwasherStatus, self.coordinator.data)
         if status.machine_state in [DishwasherState.IDLE, DishwasherState.FINISHED]:
             return 0
         return status.remaining_minutes
