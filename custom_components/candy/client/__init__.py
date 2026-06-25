@@ -36,9 +36,9 @@ class CandyClient:
         self.use_encryption = use_encryption
 
     @backoff.on_exception(
-        backoff.expo, aiohttp.ClientError, max_tries=10, logger=__name__
+        backoff.expo, aiohttp.ClientError, max_tries=3, logger=__name__
     )
-    @backoff.on_exception(backoff.expo, TimeoutError, max_tries=10, logger=__name__)
+    @backoff.on_exception(backoff.expo, TimeoutError, max_tries=3, logger=__name__)
     async def status_with_retry(
         self,
     ) -> Union[WashingMachineStatus, TumbleDryerStatus, DishwasherStatus, OvenStatus]:

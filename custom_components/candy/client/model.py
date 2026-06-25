@@ -19,6 +19,10 @@ class StatusCode(Enum):
 
 
 class MachineState(StatusCode):
+    # Synthetic state: not returned by the device API, but used internally when the
+    # device is unreachable and the last known state was Finished or Idle.
+    # This allows sensors to display "Off" instead of "unavailable".
+    OFF = (0, "Off")
     IDLE = (1, "Idle")
     RUNNING = (2, "Running")
     PAUSED = (3, "Paused")
