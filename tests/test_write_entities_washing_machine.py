@@ -29,6 +29,7 @@ from custom_components.candy.const import (
     MODE_FULL_CONTROL,
     MODE_READ_ONLY,
     UNIQUE_ID_WASH_DELAY_NUMBER,
+    UNIQUE_ID_WASH_DRY_SELECT,
     UNIQUE_ID_WASH_ESTIMATED_DURATION,
     UNIQUE_ID_WASH_FULL_CHECKUP_BUTTON,
     UNIQUE_ID_WASH_LIMESCALE_BUTTON,
@@ -73,6 +74,7 @@ _COTTON = {
             {"command_parameter": {"name": "default_soil_level", "validation": "2"}},
             {"command_parameter": {"name": "steam", "validation": "5"}},
             {"command_parameter": {"name": "steam_type", "validation": "C"}},
+            {"command_parameter": {"name": "selector_position_dry", "validation": "1"}},
             {"command_parameter": {"name": "default_duration", "validation": "90"}},
             {
                 "command_parameter": {
@@ -407,6 +409,55 @@ async def test_soil_select_unavailable_when_running(
 
 
 # ---------------------------------------------------------------------------
+# Dry select (attach a drying phase to a compatible wash program, issue #9)
+# ---------------------------------------------------------------------------
+
+
+async def test_dry_select_available_for_cotton_idle(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    # Cotton has selector_position_dry=1, so the entity should be usable and
+    # default to "off" (never attaches a drying phase unless explicitly set).
+    entry = await _init_full_control(hass, aioclient_mock, _IDLE_JSON)
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_DRY_SELECT)
+    assert state is not None
+    assert state.state == "off"
+    assert state.attributes["options"] == [
+        "off",
+        "extra_dry",
+        "iron_dry",
+        "cupboard_dry",
+        "time_120",
+        "time_90",
+        "time_60",
+        "time_30",
+    ]
+
+
+async def test_dry_select_unavailable_for_rapid_idle(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    # Rapid has no selector_position_dry in its fixture catalog entry, so the
+    # entity must stay unavailable rather than assume it works there too.
+    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "2"').replace(
+        '"PrCode": "136"', '"PrCode": "5"'
+    )
+    entry = await _init_full_control(hass, aioclient_mock, rapid_idle)
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_DRY_SELECT)
+    assert state is not None
+    assert state.state == "unavailable"
+
+
+async def test_dry_select_unavailable_when_running(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await _init_full_control(hass, aioclient_mock, _RUNNING_JSON)
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_DRY_SELECT)
+    assert state is not None
+    assert state.state == "unavailable"
+
+
+# ---------------------------------------------------------------------------
 # Delay number
 # ---------------------------------------------------------------------------
 
@@ -694,6 +745,59 @@ async def test_start_button_no_steam_by_default(
 
     query_string: str = mock_send.call_args[0][0]
     assert "Stm=0" in query_string
+
+
+async def test_start_button_sends_dry_value_when_selected(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await _init_full_control(hass, aioclient_mock, _IDLE_JSON)
+    registry = er.async_get(hass)
+
+    dry_entity_id = registry.async_get_entity_id(
+        "select", DOMAIN, UNIQUE_ID_WASH_DRY_SELECT.format(entry.entry_id)
+    )
+    assert dry_entity_id is not None
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": dry_entity_id, "option": "cupboard_dry"},
+        blocking=True,
+    )
+
+    start_entity_id = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_entity_id}, blocking=True
+        )
+
+    query_string: str = mock_send.call_args[0][0]
+    assert "Dry=3" in query_string
+
+
+async def test_start_button_no_dry_by_default(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await _init_full_control(hass, aioclient_mock, _IDLE_JSON)
+    registry = er.async_get(hass)
+    start_entity_id = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_entity_id}, blocking=True
+        )
+
+    query_string: str = mock_send.call_args[0][0]
+    assert "Dry=0" in query_string
 
 
 # ---------------------------------------------------------------------------

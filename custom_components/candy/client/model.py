@@ -98,6 +98,7 @@ class WashingMachineStatus:
     dis_test_res: CheckUpResult | None  # DisTestRes — result of last diagnostic
     soil_level: int | None  # SLevel — 0–4 soil level setting
     recipe_id: str | None  # RecipeId — downloadable program (e.g. "D_33")
+    dry_type: int | None  # DryT — attached drying-phase option index, 0 if none
 
     @classmethod
     def from_json(cls, json):
@@ -127,6 +128,7 @@ class WashingMachineStatus:
             recipe_id=str(json["RecipeId"]).strip()
             if json.get("RecipeId") is not None
             else None,
+            dry_type=int(json["DryT"]) if "DryT" in json else None,
         )
 
 
@@ -288,6 +290,7 @@ class WashingMachineWashProgram:
     powder_detergent_dose: int | None  # 1–4 dose level, or None if not applicable
     max_cycle_capacity: int | None  # kg
     available_options: int  # OptMsk1 bitmask of valid options for this program
+    selector_position_dry: int | None  # program accepts an attached drying phase if set
 
     @classmethod
     def from_dict(cls, program_dict: dict) -> "WashingMachineWashProgram":
@@ -342,6 +345,7 @@ class WashingMachineWashProgram:
             powder_detergent_dose=_int_or_none("powder_detergent_dose"),
             max_cycle_capacity=_int_or_none("max_cycle_capacity"),
             available_options=_int("available_options"),
+            selector_position_dry=_int_or_none("selector_position_dry"),
         )
 
     @property

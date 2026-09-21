@@ -51,6 +51,7 @@ def _make_wm_status(state: MachineState) -> WashingMachineStatus:
         dis_test_res=None,
         soil_level=None,
         recipe_id=None,
+        dry_type=None,
     )
 
 

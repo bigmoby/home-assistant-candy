@@ -52,11 +52,13 @@ from .const import (
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WRITE_PENDING,
     DOMAIN,
+    DRY_LABELS_REVERSE,
     MODE_FULL_CONTROL,
     NOTIF_ID_FULL_CHECKUP,
     NOTIF_ID_LIMESCALE,
     SOIL_LABELS_REVERSE,
     UNIQUE_ID_WASH_DELAY_NUMBER,
+    UNIQUE_ID_WASH_DRY_SELECT,
     UNIQUE_ID_WASH_FULL_CHECKUP_BUTTON,
     UNIQUE_ID_WASH_LIMESCALE_BUTTON,
     UNIQUE_ID_WASH_MAINT_FILTER_BUTTON,
@@ -361,6 +363,7 @@ class WashStartButton(CandyWashButtonBase):
         temp_str = _get_state(UNIQUE_ID_WASH_TEMP_SELECT)
         spin_str = _get_state(UNIQUE_ID_WASH_SPIN_SELECT)
         soil_str = _get_state(UNIQUE_ID_WASH_SOIL_SELECT)
+        dry_str = _get_state(UNIQUE_ID_WASH_DRY_SELECT)
         delay = int(_get_number(UNIQUE_ID_WASH_DELAY_NUMBER))
 
         try:
@@ -392,6 +395,15 @@ class WashStartButton(CandyWashButtonBase):
                 soil = program.default_soil_level
         else:
             soil = program.default_soil_level
+
+        dry = 0
+        if program.selector_position_dry is not None and dry_str not in (
+            None,
+            "unavailable",
+            "unknown",
+            "off",
+        ):
+            dry = DRY_LABELS_REVERSE.get(dry_str, 0)
 
         steam_entity_id = registry.async_get_entity_id(
             "switch", DOMAIN, UNIQUE_ID_WASH_STEAM_SWITCH.format(self.config_id)
@@ -425,7 +437,7 @@ class WashStartButton(CandyWashButtonBase):
             "OptMsk2": 0,
             "Lang": 0,
             "Stm": 1 if steam else 0,
-            "Dry": 0,
+            "Dry": dry,
             "ED": 0,
             "RecipeId": 0,
             "StartCheckUp": checkup,

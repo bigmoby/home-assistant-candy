@@ -533,6 +533,43 @@ async def test_soil_level_sensor_running(
     assert state.state == "normal"  # SLevel=2
 
 
+async def test_dry_phase_sensor_idle(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    await init_integration(
+        hass, aioclient_mock, load_fixture("washing_machine/idle.json")
+    )
+
+    state = hass.states.get("sensor.wash_drying_phase")
+
+    assert state
+    assert state.state == "off"  # DryT=0
+    assert state.attributes["options"] == [
+        "off",
+        "extra_dry",
+        "iron_dry",
+        "cupboard_dry",
+        "time_120",
+        "time_90",
+        "time_60",
+        "time_30",
+    ]
+
+
+async def test_dry_phase_sensor_running_with_drying_attached(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    running_with_dry = load_fixture("washing_machine/running_wash.json").replace(
+        '"DryT": "0"', '"DryT": "3"'
+    )
+    await init_integration(hass, aioclient_mock, running_with_dry)
+
+    state = hass.states.get("sensor.wash_drying_phase")
+
+    assert state
+    assert state.state == "cupboard_dry"
+
+
 async def test_statistics_not_fetched_when_machine_is_off(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):

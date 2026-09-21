@@ -48,6 +48,7 @@ def test_display_name_returns_english_localized_name():
         powder_detergent_dose=None,
         max_cycle_capacity=None,
         available_options=0,
+        selector_position_dry=None,
     )
     assert program.display_name == program.localized_name("en")
 
@@ -75,6 +76,7 @@ def test_display_name_falls_back_to_title_case_for_unknown_program():
         powder_detergent_dose=None,
         max_cycle_capacity=None,
         available_options=0,
+        selector_position_dry=None,
     )
     assert program.display_name == "Totally Unknown Program"
 
@@ -172,3 +174,52 @@ def test_load_downloadable_programs_invalid_spin_speed_becomes_none():
     ]
     result = load_downloadable_programs(raw)
     assert result[0].spin_speed is None
+
+
+# ---------------------------------------------------------------------------
+# WashingMachineWashProgram.from_dict - selector_position_dry
+# ---------------------------------------------------------------------------
+
+
+def test_from_dict_parses_selector_position_dry_when_present():
+    raw = {
+        "program": {
+            "position": 1,
+            "name": "DUAL_WM_WD_PROGRAM_NAME_RESISTANT_COTTONS",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "9",
+                    }
+                },
+                {
+                    "command_parameter": {
+                        "name": "selector_position_dry",
+                        "validation": "1",
+                    }
+                },
+            ],
+        }
+    }
+    program = WashingMachineWashProgram.from_dict(raw)
+    assert program.selector_position_dry == 1
+
+
+def test_from_dict_selector_position_dry_none_when_absent():
+    raw = {
+        "program": {
+            "position": 2,
+            "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_30_MIN",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+            ],
+        }
+    }
+    program = WashingMachineWashProgram.from_dict(raw)
+    assert program.selector_position_dry is None

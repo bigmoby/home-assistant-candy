@@ -31,8 +31,10 @@ from .const import (
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
     DOMAIN,
+    DRY_LABELS,
     MODE_FULL_CONTROL,
     SOIL_LABELS,
+    UNIQUE_ID_WASH_DRY_SELECT,
     UNIQUE_ID_WASH_NFC_SWITCH,
     UNIQUE_ID_WASH_PROGRAM_DESCRIPTION,
     UNIQUE_ID_WASH_PROGRAM_SELECT,
@@ -71,6 +73,7 @@ async def async_setup_entry(
     temp_select = WashTempSelect(coordinator, config_entry, client, programs)
     spin_select = WashSpinSelect(coordinator, config_entry, client, programs)
     soil_select = WashSoilSelect(coordinator, config_entry, client, programs)
+    dry_select = WashDrySelect(coordinator, config_entry, client, programs)
     description_sensor = CandyWashProgramDescriptionSensor(coordinator, config_entry)
     program_select = WashProgramSelect(
         coordinator,
@@ -80,12 +83,20 @@ async def async_setup_entry(
         temp_select,
         spin_select,
         soil_select,
+        dry_select,
         description_sensor,
         nfc_entries,
     )
 
     async_add_entities(
-        [program_select, temp_select, spin_select, soil_select, description_sensor]
+        [
+            program_select,
+            temp_select,
+            spin_select,
+            soil_select,
+            dry_select,
+            description_sensor,
+        ]
     )
 
 
@@ -142,6 +153,7 @@ class WashProgramSelect(CandyWashSelectBase):
         temp_select: WashTempSelect,
         spin_select: WashSpinSelect,
         soil_select: WashSoilSelect,
+        dry_select: WashDrySelect,
         description_sensor: CandyWashProgramDescriptionSensor,
         nfc_entries: list[tuple[DownloadableProgram, WashingMachineWashProgram]],
     ) -> None:
@@ -149,6 +161,7 @@ class WashProgramSelect(CandyWashSelectBase):
         self._temp_select = temp_select
         self._spin_select = spin_select
         self._soil_select = soil_select
+        self._dry_select = dry_select
         self._description_sensor = description_sensor
         self._nfc_entries = nfc_entries
         self._current_option: str | None = None
@@ -239,6 +252,7 @@ class WashProgramSelect(CandyWashSelectBase):
             self._temp_select.update_for_program(nfc_match)
             self._spin_select.update_for_program(None)
             self._soil_select.update_for_program(None)
+            self._dry_select.update_for_program(None)
             self._description_sensor.update_for_program(nfc_match)
         else:
             selected = next(
@@ -248,13 +262,16 @@ class WashProgramSelect(CandyWashSelectBase):
                 self._temp_select.reset_for_standard_program(selected)
                 self._spin_select.update_for_program(selected)
                 self._soil_select.update_for_program(selected)
+                self._dry_select.update_for_program(selected)
                 self._description_sensor.reset_for_standard_program(selected)
             else:
+                self._dry_select.update_for_program(None)
                 self._description_sensor.reset_for_standard_program(None)
         self.async_write_ha_state()
         self._temp_select.async_write_ha_state()
         self._spin_select.async_write_ha_state()
         self._soil_select.async_write_ha_state()
+        self._dry_select.async_write_ha_state()
         self._description_sensor.async_write_ha_state()
 
 
@@ -476,6 +493,68 @@ class WashSpinSelect(CandyWashSelectBase):
         self._current_option = (
             str(program.default_spin_speed) if program is not None else None
         )
+
+    def _active_program(self) -> WashingMachineWashProgram | None:
+        if self._current_program is not None:
+            return self._current_program
+        status = cast(WashingMachineStatus, self.coordinator.data)
+        for p in self._programs:
+            if p.selector_position == status.program:
+                return p
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        self._current_option = option
+        self.async_write_ha_state()
+
+
+class WashDrySelect(CandyWashSelectBase):
+    _attr_name = "Wash drying"
+    _attr_translation_key = "wash_dry_select"
+    _current_option: str | None = None
+    _current_program: WashingMachineWashProgram | None = None  # type: ignore[assignment]
+    _nfc_active: bool = False
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_WASH_DRY_SELECT.format(self.config_id)
+
+    @property
+    def icon(self) -> str:
+        return "mdi:tumble-dryer"
+
+    @property
+    def available(self) -> bool:
+        if self._nfc_active:
+            return False
+        prog = self._active_program()
+        return (
+            super().available
+            and self._machine_is_idle()
+            and prog is not None
+            and prog.selector_position_dry is not None
+        )
+
+    @property
+    def options(self) -> list[str]:
+        prog = self._active_program()
+        if prog is None or prog.selector_position_dry is None:
+            return []
+        return ["off", *DRY_LABELS.values()]
+
+    @property
+    def current_option(self) -> str | None:
+        if self._current_option is not None:
+            return self._current_option
+        prog = self._active_program()
+        if prog is None or prog.selector_position_dry is None:
+            return None
+        return "off"
+
+    def update_for_program(self, program: WashingMachineWashProgram | None) -> None:
+        self._nfc_active = program is None
+        self._current_program = program
+        self._current_option = "off" if program is not None else None
 
     def _active_program(self) -> WashingMachineWashProgram | None:
         if self._current_program is not None:

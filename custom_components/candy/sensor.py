@@ -74,6 +74,7 @@ from .const import (
     DEVICE_NAME_WASHING_MACHINE,
     DEVICE_NAME_WINE_COOLER,
     DOMAIN,
+    DRY_LABELS,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MAINTENANCE_HARDNESS_THRESHOLDS,
@@ -98,6 +99,7 @@ from .const import (
     UNIQUE_ID_WASH_CYCLE_STATUS,
     UNIQUE_ID_WASH_DELAY,
     UNIQUE_ID_WASH_DELAY_NUMBER,
+    UNIQUE_ID_WASH_DRY_PHASE,
     UNIQUE_ID_WASH_ERROR,
     UNIQUE_ID_WASH_ESTIMATED_DURATION,
     UNIQUE_ID_WASH_FILL_PERCENT,
@@ -183,6 +185,8 @@ async def async_setup_entry(
             entities.append(CandyWashMotorFreqSensor(coordinator, config_entry))
         if status.soil_level is not None or _was_registered(UNIQUE_ID_WASH_SOIL_LEVEL):
             entities.append(CandyWashSoilLevelSensor(coordinator, config_entry))
+        if status.dry_type is not None or _was_registered(UNIQUE_ID_WASH_DRY_PHASE):
+            entities.append(CandyWashDryPhaseSensor(coordinator, config_entry))
         if programs:
             entities.append(
                 CandyWashEstimatedDurationSensor(coordinator, config_entry, programs)
@@ -783,6 +787,36 @@ class CandyWashSoilLevelSensor(CandyBaseSensor):
     @property
     def icon(self) -> str:
         return "mdi:water-opacity"
+
+
+class CandyWashDryPhaseSensor(CandyBaseSensor):
+    """Drying phase currently attached to the running wash program, if any."""
+
+    _attr_translation_key = "wash_dry_phase"
+    _attr_name = "Wash drying phase"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["off", *DRY_LABELS.values()]
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_WASHING_MACHINE
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_BATHROOM
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_WASH_DRY_PHASE.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        dry_type = cast(WashingMachineStatus, self.coordinator.data).dry_type
+        if not dry_type:
+            return "off"
+        return DRY_LABELS.get(dry_type)
+
+    @property
+    def icon(self) -> str:
+        return "mdi:tumble-dryer"
 
 
 class CandyWashCheckUpResultSensor(CandyBaseSensor, RestoreSensor):

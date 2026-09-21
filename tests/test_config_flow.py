@@ -66,6 +66,7 @@ _IDLE_WASHING_MACHINE = WashingMachineStatus(
     dis_test_res=None,
     soil_level=None,
     recipe_id=None,
+    dry_type=None,
 )
 
 # ---------------------------------------------------------------------------

@@ -248,6 +248,19 @@
           "high": "High"
         }
       },
+      "wash_dry_phase": {
+        "name": "Drying phase",
+        "state": {
+          "off": "Off",
+          "extra_dry": "Extra dry",
+          "iron_dry": "Iron dry",
+          "cupboard_dry": "Cupboard dry",
+          "time_120": "120 minutes",
+          "time_90": "90 minutes",
+          "time_60": "60 minutes",
+          "time_30": "30 minutes"
+        }
+      },
       "wash_estimated_duration": {
         "name": "Estimated cycle duration"
       },
@@ -318,6 +331,19 @@
           "low": "Low",
           "normal": "Normal",
           "high": "High"
+        }
+      },
+      "wash_dry_select": {
+        "name": "Drying",
+        "state": {
+          "off": "Off",
+          "extra_dry": "Extra dry",
+          "iron_dry": "Iron dry",
+          "cupboard_dry": "Cupboard dry",
+          "time_120": "120 minutes",
+          "time_90": "90 minutes",
+          "time_60": "60 minutes",
+          "time_30": "30 minutes"
         }
       }
     },

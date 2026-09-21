@@ -63,12 +63,25 @@ UNIQUE_ID_WASH_NTC_DRUM = "{0}-wash_ntc_drum"
 UNIQUE_ID_WASH_MOTOR_FREQ = "{0}-wash_motor_freq"
 UNIQUE_ID_WASH_TOTAL_CYCLES = "{0}-wash_total_cycles"
 UNIQUE_ID_WASH_SOIL_LEVEL = "{0}-wash_soil_level"
+UNIQUE_ID_WASH_DRY_PHASE = "{0}-wash_dry_phase"
 UNIQUE_ID_WASH_CHECKUP_RESULT = "{0}-wash_checkup_result"
 UNIQUE_ID_WASH_LAST_CHECKUP = "{0}-wash_last_checkup"
 UNIQUE_ID_WASH_REMOTE_CONTROL = "{0}-wash_remote_control"
 
 SOIL_LABELS: dict[int, str] = {1: "low", 2: "normal", 3: "high"}
 SOIL_LABELS_REVERSE: dict[str, int] = {v: k for k, v in SOIL_LABELS.items()}
+
+# Raw values for the "Dry"/"DryT" field; index 4 is intentionally absent (see PR description).
+DRY_LABELS: dict[int, str] = {
+    1: "extra_dry",
+    2: "iron_dry",
+    3: "cupboard_dry",
+    5: "time_120",
+    6: "time_90",
+    7: "time_60",
+    8: "time_30",
+}
+DRY_LABELS_REVERSE: dict[str, int] = {v: k for k, v in DRY_LABELS.items()}
 
 # Additive minutes when steam (steam=5) is enabled, keyed by program steam_type.
 # Source: APK assets/assisted/full_remaining_time_value_v11.json, programType "Wash + Steam".
@@ -135,6 +148,7 @@ UNIQUE_ID_WASH_PROGRAM_DESCRIPTION = "{0}-wash_program_description"
 UNIQUE_ID_WASH_TEMP_SELECT = "{0}-wash_temp_select"
 UNIQUE_ID_WASH_SPIN_SELECT = "{0}-wash_spin_select"
 UNIQUE_ID_WASH_SOIL_SELECT = "{0}-wash_soil_select"
+UNIQUE_ID_WASH_DRY_SELECT = "{0}-wash_dry_select"
 UNIQUE_ID_WASH_DELAY_NUMBER = "{0}-wash_delay_number"
 UNIQUE_ID_WASH_START_BUTTON = "{0}-wash_start_button"
 UNIQUE_ID_WASH_PAUSE_BUTTON = "{0}-wash_pause_button"
