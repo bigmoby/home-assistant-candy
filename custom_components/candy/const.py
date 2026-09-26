@@ -173,6 +173,8 @@ UNIQUE_ID_OVEN_TEMP = "{0}-oven-temp"
 UNIQUE_ID_DISHWASHER = "{0}-dishwasher"
 UNIQUE_ID_DISHWASHER_PROGRAM = "{0}-dishwasher_program"
 UNIQUE_ID_DISHWASHER_REMAINING_TIME = "{0}-dishwasher_remaining_time"
+UNIQUE_ID_DISHWASHER_START_BUTTON = "{0}-dishwasher_start_button"
+UNIQUE_ID_DISHWASHER_STOP_BUTTON = "{0}-dishwasher_stop_button"
 
 UNIQUE_ID_WINE_COOLER = "{0}-wine_cooler"
 UNIQUE_ID_WINE_COOLER_PROGRAM = "{0}-wine_cooler_program"

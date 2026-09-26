@@ -201,10 +201,19 @@ class DishwasherStatus:
     remote_control: bool
     salt_empty: bool
     rinse_aid_empty: bool
+    running: bool = False
+    # Panel options, sent back unchanged with a remote start command
+    half_load: bool = False
+    extra_dry: bool = False
+    three_in_one: bool = False
 
     @classmethod
     def from_json(cls, json):
         return cls(
+            running=json.get("StartStop") == "1",
+            half_load=json.get("MetaCarico") == "1",
+            extra_dry=json.get("ExtraDry") == "1",
+            three_in_one=json.get("TreinUno") == "1",
             machine_state=DishwasherState.from_code(int(json["StatoDWash"])),
             program=DishwasherStatus.parse_program(json),
             remaining_minutes=int(json["RemTime"]),

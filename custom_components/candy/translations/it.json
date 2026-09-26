@@ -162,6 +162,12 @@
       },
       "wash_stop_button": {
         "name": "Ferma lavaggio"
+      },
+      "dishwasher_start_button": {
+        "name": "Avvia lavastoviglie"
+      },
+      "dishwasher_stop_button": {
+        "name": "Ferma lavastoviglie"
       }
     },
     "light": {

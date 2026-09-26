@@ -368,6 +368,12 @@
       "wash_stop_button": {
         "name": "Stop wash"
       },
+      "dishwasher_start_button": {
+        "name": "Start dishwasher"
+      },
+      "dishwasher_stop_button": {
+        "name": "Stop dishwasher"
+      },
       "wash_full_checkup": {
         "name": "Full check-up"
       },
