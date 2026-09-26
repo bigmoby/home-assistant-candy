@@ -8,8 +8,9 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .client.model import WashingMachineStatus
+from .client.model import DishwasherStatus, WashingMachineStatus
 from .const import DATA_KEY_COORDINATOR, DOMAIN, UNIQUE_ID_WASH_REMOTE_CONTROL
+from .dishwasher import dishwasher_binary_sensors
 from .helpers import wash_device_info
 
 
@@ -21,7 +22,9 @@ async def async_setup_entry(
     config_id = config_entry.entry_id
     coordinator = hass.data[DOMAIN][config_id][DATA_KEY_COORDINATOR]
 
-    if isinstance(coordinator.data, WashingMachineStatus):
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_binary_sensors(coordinator, config_entry))
+    elif isinstance(coordinator.data, WashingMachineStatus):
         async_add_entities(
             [CandyWashRemoteControlBinarySensor(coordinator, config_entry)]
         )

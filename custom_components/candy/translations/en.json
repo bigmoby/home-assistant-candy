@@ -172,6 +172,15 @@
     "binary_sensor": {
       "remote_control": {
         "name": "Remote control"
+      },
+      "dishwasher_salt_empty": {
+        "name": "Dishwasher salt empty"
+      },
+      "dishwasher_rinse_aid_empty": {
+        "name": "Dishwasher rinse aid empty"
+      },
+      "dishwasher_door": {
+        "name": "Dishwasher door"
       }
     },
     "sensor": {
@@ -313,6 +322,9 @@
       },
       "wine_cooler_error_code": {
         "name": "Wine cooler error code"
+      },
+      "dishwasher_error_code": {
+        "name": "Dishwasher error code"
       }
     },
     "light": {
@@ -337,11 +349,29 @@
           "normal": "Normal",
           "high": "High"
         }
+      },
+      "dishwasher_program_select": {
+        "name": "Dishwasher program to start",
+        "state": {
+          "panel": "As set on the panel",
+          "eco_45": "ECO 45°C",
+          "intensive_75": "Intensive 75°C",
+          "night_55": "Night 55°C",
+          "universal_60": "Universal 60°C",
+          "auto": "Auto 55-65°C",
+          "glass_45": "Glass 45°C",
+          "zoom_39": "Zoom 39' 60°C",
+          "rapid_24": "Rapid 24' 50°C",
+          "prewash": "Prewash"
+        }
       }
     },
     "number": {
       "wash_delay_number": {
         "name": "Delay"
+      },
+      "dishwasher_delay_number": {
+        "name": "Dishwasher start delay"
       }
     },
     "switch": {
@@ -374,6 +404,12 @@
       },
       "wash_option_acquaplus": {
         "name": "AquaPlus"
+      },
+      "dishwasher_eco_switch": {
+        "name": "Dishwasher eco option"
+      },
+      "dishwasher_three_in_one_switch": {
+        "name": "Dishwasher 3in1 tablets"
       }
     },
     "button": {

@@ -206,6 +206,7 @@ class DishwasherStatus:
     half_load: bool = False
     extra_dry: bool = False
     three_in_one: bool = False
+    error_code: str | None = None
 
     @classmethod
     def from_json(cls, json):
@@ -214,6 +215,7 @@ class DishwasherStatus:
             half_load=json.get("MetaCarico") == "1",
             extra_dry=json.get("ExtraDry") == "1",
             three_in_one=json.get("TreinUno") == "1",
+            error_code=json.get("CodiceErrore"),
             machine_state=DishwasherState.from_code(int(json["StatoDWash"])),
             program=DishwasherStatus.parse_program(json),
             remaining_minutes=int(json["RemTime"]),

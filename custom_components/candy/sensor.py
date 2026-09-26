@@ -84,6 +84,7 @@ from .const import (
     SUGGESTED_AREA_BATHROOM,
     SUGGESTED_AREA_KITCHEN,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_ERROR,
     UNIQUE_ID_DISHWASHER_PROGRAM,
     UNIQUE_ID_DISHWASHER_REMAINING_TIME,
     UNIQUE_ID_OVEN,
@@ -246,6 +247,7 @@ async def async_setup_entry(
                 CandyDishwasherSensor(coordinator, config_entry),
                 CandyDishwasherProgramSensor(coordinator, config_entry),
                 CandyDishwasherRemainingTimeSensor(coordinator, config_entry),
+                CandyDishwasherErrorSensor(coordinator, config_entry),
             ]
         )
     elif isinstance(coordinator.data, WineCoolerStatus):
@@ -1880,6 +1882,32 @@ class CandyDishwasherProgramSensor(CandyBaseSensor):
     @property
     def icon(self) -> str:
         return "mdi:glass-wine"
+
+
+class CandyDishwasherErrorSensor(CandyBaseSensor):
+    """Error code reported by the dishwasher (E0 = no error)."""
+
+    _attr_translation_key = "dishwasher_error_code"
+    _attr_name = "Dishwasher error code"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_ERROR.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        return cast(DishwasherStatus, self.coordinator.data).error_code
+
+    @property
+    def icon(self) -> str:
+        return "mdi:alert-circle-outline"
 
 
 class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):

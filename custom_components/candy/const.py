@@ -175,6 +175,34 @@ UNIQUE_ID_DISHWASHER_PROGRAM = "{0}-dishwasher_program"
 UNIQUE_ID_DISHWASHER_REMAINING_TIME = "{0}-dishwasher_remaining_time"
 UNIQUE_ID_DISHWASHER_START_BUTTON = "{0}-dishwasher_start_button"
 UNIQUE_ID_DISHWASHER_STOP_BUTTON = "{0}-dishwasher_stop_button"
+UNIQUE_ID_DISHWASHER_PROGRAM_SELECT = "{0}-dishwasher_program_select"
+UNIQUE_ID_DISHWASHER_ECO_SWITCH = "{0}-dishwasher_eco_switch"
+UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH = "{0}-dishwasher_three_in_one_switch"
+UNIQUE_ID_DISHWASHER_DELAY_NUMBER = "{0}-dishwasher_delay_number"
+UNIQUE_ID_DISHWASHER_SALT_EMPTY = "{0}-dishwasher_salt_empty"
+UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY = "{0}-dishwasher_rinse_aid_empty"
+UNIQUE_ID_DISHWASHER_DOOR = "{0}-dishwasher_door"
+UNIQUE_ID_DISHWASHER_REMOTE_CONTROL = "{0}-dishwasher_remote_control"
+UNIQUE_ID_DISHWASHER_ERROR = "{0}-dishwasher_error"
+
+DATA_KEY_DISHWASHER_START_OPTIONS = "dishwasher_start_options"
+
+# Select option that keeps the program chosen on the machine panel
+DISHWASHER_PROGRAM_PANEL = "panel"
+# Select option -> program code used by the local API, in panel order.
+# Mapped on a Candy CDIN 1D360PB (panel P1..P9); the codes differ from the
+# numbers printed on the panel. P2/P5/P8/P12 match reports for Hoover models.
+DISHWASHER_PROGRAMS: dict[str, str] = {
+    "eco_45": "P8",
+    "intensive_75": "P2",
+    "night_55": "P17",
+    "universal_60": "P5",
+    "auto": "P16",
+    "glass_45": "P9",
+    "zoom_39": "P19",
+    "rapid_24": "P20",
+    "prewash": "P12",
+}
 
 UNIQUE_ID_WINE_COOLER = "{0}-wine_cooler"
 UNIQUE_ID_WINE_COOLER_PROGRAM = "{0}-wine_cooler_program"

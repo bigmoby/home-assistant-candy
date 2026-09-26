@@ -56,8 +56,6 @@ from .const import (
     NOTIF_ID_FULL_CHECKUP,
     NOTIF_ID_LIMESCALE,
     SOIL_LABELS_REVERSE,
-    UNIQUE_ID_DISHWASHER_START_BUTTON,
-    UNIQUE_ID_DISHWASHER_STOP_BUTTON,
     UNIQUE_ID_WASH_DELAY_NUMBER,
     UNIQUE_ID_WASH_FULL_CHECKUP_BUTTON,
     UNIQUE_ID_WASH_LIMESCALE_BUTTON,
@@ -75,8 +73,8 @@ from .const import (
     UNIQUE_ID_WASH_TEMP_SELECT,
     WASH_OPTIONS,
 )
+from .dishwasher import dishwasher_buttons
 from .helpers import (
-    dishwasher_device_info,
     localized_notification_text,
     remote_control_enabled,
     wash_device_info,
@@ -112,12 +110,7 @@ async def async_setup_entry(
     # Dishwashers need no cloud data: remote start/stop only requires the local
     # key, and the machine itself gates commands with its remote control switch.
     if isinstance(coordinator.data, DishwasherStatus):
-        async_add_entities(
-            [
-                DishwasherStartButton(coordinator, config_entry, client),
-                DishwasherStopButton(coordinator, config_entry, client),
-            ]
-        )
+        async_add_entities(dishwasher_buttons(coordinator, config_entry, client))
         return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
@@ -640,93 +633,3 @@ class WashLimescaleCleanButton(CandyWashButtonBase):
             title=localized_notification_text("limescale_title", lang),
             notification_id=NOTIF_ID_LIMESCALE.format(self.config_id),
         )
-
-
-def dishwasher_start_command(status: DishwasherStatus) -> str:
-    """Build the start command for the program and options set on the panel.
-
-    Program and options are applied only together with StartStop=1: sending
-    them alone is acknowledged by the machine but ignored.
-    """
-    option = "0"
-    if status.program.endswith("+"):
-        option = "p"
-    elif status.program.endswith("-"):
-        option = "m"
-    params = {
-        "DelayStart": 0,
-        "ExtraDry": int(status.extra_dry),
-        "OpenDoorOpt": int(bool(status.door_open_allowed)),
-        "TreinUno": int(status.three_in_one),
-        "Program": status.program.rstrip("+-"),
-        "MetaCarico": int(status.half_load),
-        "OpzProg": option,
-        "w1": 1,
-        "StartStop": 1,
-    }
-    return urlencode(params, quote_via=quote)
-
-
-class CandyDishwasherButtonBase(CandyWashButtonBase):
-    @property
-    def available(self) -> bool:
-        status = cast(DishwasherStatus, self.coordinator.data)
-        return (
-            self.hass.data[DOMAIN][self.config_id].get(DATA_KEY_WRITE_PENDING, 0) == 0
-            and status.remote_control
-        )
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return dishwasher_device_info(self.config_entry)
-
-
-class DishwasherStartButton(CandyDishwasherButtonBase):
-    _attr_name = "Start dishwasher"
-    _attr_translation_key = "dishwasher_start_button"
-
-    @property
-    def unique_id(self) -> str:
-        return UNIQUE_ID_DISHWASHER_START_BUTTON.format(self.config_id)
-
-    @property
-    def icon(self) -> str:
-        return "mdi:play-circle-outline"
-
-    @property
-    def available(self) -> bool:
-        if not super().available:
-            return False
-        status = cast(DishwasherStatus, self.coordinator.data)
-        return (
-            not status.running
-            and not status.door_open
-            and status.delayed_start_hours is None
-        )
-
-    async def async_press(self) -> None:
-        status = cast(DishwasherStatus, self.coordinator.data)
-        await self._send_command_and_refresh(dishwasher_start_command(status))
-
-
-class DishwasherStopButton(CandyDishwasherButtonBase):
-    _attr_name = "Stop dishwasher"
-    _attr_translation_key = "dishwasher_stop_button"
-
-    @property
-    def unique_id(self) -> str:
-        return UNIQUE_ID_DISHWASHER_STOP_BUTTON.format(self.config_id)
-
-    @property
-    def icon(self) -> str:
-        return "mdi:stop-circle-outline"
-
-    @property
-    def available(self) -> bool:
-        if not super().available:
-            return False
-        status = cast(DishwasherStatus, self.coordinator.data)
-        return status.running or status.delayed_start_hours is not None
-
-    async def async_press(self) -> None:
-        await self._send_command_and_refresh("Reset=1")

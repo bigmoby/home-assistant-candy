@@ -22,7 +22,7 @@ from .client import (
     parse_wash_programs,
     resolve_downloadable_programs,
 )
-from .client.model import MachineState
+from .client.model import DishwasherStatus, MachineState
 from .const import (
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_MODE,
@@ -40,6 +40,7 @@ from .const import (
     UNIQUE_ID_WASH_SPIN_SELECT,
     UNIQUE_ID_WASH_TEMP_SELECT,
 )
+from .dishwasher import dishwasher_selects
 from .helpers import remote_control_enabled, wash_device_info
 
 _TEMP_STEPS = [0, 20, 30, 40, 60, 90]
@@ -50,13 +51,17 @@ async def async_setup_entry(
     hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities
 ) -> None:
     config_id = config_entry.entry_id
+    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
+        DATA_KEY_COORDINATOR
+    ]
+
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_selects(coordinator, config_entry))
+        return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
-        DATA_KEY_COORDINATOR
-    ]
     if not isinstance(coordinator.data, WashingMachineStatus):
         return
 
