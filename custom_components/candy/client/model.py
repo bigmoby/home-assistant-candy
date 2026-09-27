@@ -187,6 +187,8 @@ class DishwasherState(StatusCode):
     RINSE = (3, "Rinse")
     DRYING = (4, "Drying")
     FINISHED = (5, "Finished")
+    # Not reported as such by the machine: derived from the phase in r2
+    DELAYED_START = (6, "Delayed start programmed")
 
 
 @dataclass
@@ -210,13 +212,15 @@ class DishwasherStatus:
 
     @classmethod
     def from_json(cls, json):
+        machine_state = DishwasherStatus.parse_machine_state(json)
         return cls(
-            running=json.get("StartStop") == "1",
+            running=json.get("StartStop") == "1"
+            and machine_state is not DishwasherState.FINISHED,
             half_load=json.get("MetaCarico") == "1",
             extra_dry=json.get("ExtraDry") == "1",
             three_in_one=json.get("TreinUno") == "1",
             error_code=json.get("CodiceErrore"),
-            machine_state=DishwasherState.from_code(int(json["StatoDWash"])),
+            machine_state=machine_state,
             program=DishwasherStatus.parse_program(json),
             remaining_minutes=int(json["RemTime"]),
             delayed_start_hours=int(json["DelayStart"])
@@ -231,6 +235,28 @@ class DishwasherStatus:
             salt_empty=json["MissSalt"] == "1",
             rinse_aid_empty=json["MissRinse"] == "1",
         )
+
+    @staticmethod
+    def parse_machine_state(json) -> DishwasherState:
+        """Parse the cycle state.
+
+        Firmwares reporting r2 (e.g. CDIN 1D360PB) use StatoDWash for the
+        machine state (2 ready, 3 running, 5 finished) and r2 for the phase,
+        with the usual codes (0 waiting for a delayed start). StartStop stays 1
+        after the end of a remotely started cycle, until the next command.
+        """
+        if "r2" not in json:
+            return DishwasherState.from_code(int(json["StatoDWash"]))
+        if json["StatoDWash"] == "5" or json["r2"] == "5":
+            return DishwasherState.FINISHED
+        if json.get("StartStop") != "1":
+            return DishwasherState.IDLE
+        if json["r2"] == "0":
+            return DishwasherState.DELAYED_START
+        try:
+            return DishwasherState.from_code(int(json["r2"]))
+        except ValueError:
+            return DishwasherState.WASH
 
     @staticmethod
     def parse_program(json) -> str:

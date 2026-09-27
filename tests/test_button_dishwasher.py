@@ -7,11 +7,12 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_fixture
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import DOMAIN
-from custom_components.candy.client.model import DishwasherStatus
+from custom_components.candy.client.model import DishwasherState, DishwasherStatus
 from custom_components.candy.const import (
     UNIQUE_ID_DISHWASHER_DELAY_NUMBER,
     UNIQUE_ID_DISHWASHER_DOOR,
@@ -307,3 +308,81 @@ def test_start_command_delay_rounds_to_steps():
     options = DishwasherStartOptions(delay_minutes=45)
 
     assert "DelayStart=1&" in dishwasher_start_command(_status(_READY), options)
+
+
+# ---------------------------------------------------------------------------
+# State, from a full cycle logged on a CDIN 1D360PB (phase in r2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("overrides", "state", "running"),
+    [
+        ({}, DishwasherState.IDLE, False),
+        ({"StatoDWash": "1", "Reset": "1"}, DishwasherState.IDLE, False),
+        ({"StartStop": "1", "StatoDWash": "3", "r2": "2"}, DishwasherState.WASH, True),
+        ({"StartStop": "1", "StatoDWash": "3", "r2": "3"}, DishwasherState.RINSE, True),
+        (
+            {"StartStop": "1", "StatoDWash": "3", "r2": "4"},
+            DishwasherState.DRYING,
+            True,
+        ),
+        (
+            {"StartStop": "1", "StatoDWash": "3", "r2": "0", "DelayStart": "60"},
+            DishwasherState.DELAYED_START,
+            True,
+        ),
+        (
+            {"StartStop": "1", "StatoDWash": "5", "r2": "5", "RemTime": "95"},
+            DishwasherState.FINISHED,
+            False,
+        ),
+    ],
+)
+def test_state_from_phase(overrides: dict, state: DishwasherState, running: bool):
+    status = _status(_READY, **overrides)
+
+    assert status.machine_state is state
+    assert status.running is running
+
+
+def test_state_without_phase_uses_stato_dwash():
+    data = json.loads(load_fixture(_READY))["statusDWash"]
+    del data["r2"]
+
+    assert DishwasherStatus.from_json(data).machine_state is DishwasherState.WASH
+
+
+async def test_finished_cycle(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
+    """StartStop stays 1 after the end: the machine is not running any more."""
+    await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_RUNNING, StatoDWash="5", r2="5", RemTime="95"),
+    )
+
+    assert hass.states.get("sensor.dishwasher").state == "Finished"
+    assert hass.states.get("sensor.dishwasher_remaining_time").state == "0"
+    assert hass.states.get("button.start_dishwasher").state != "unavailable"
+    assert hass.states.get("button.stop_dishwasher").state == "unavailable"
+
+
+async def test_running_cycle_sensors(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    await init_integration(
+        hass, aioclient_mock, _fixture(_RUNNING, r2="3", RemTime="55")
+    )
+
+    assert hass.states.get("sensor.dishwasher").state == "Rinse"
+    assert hass.states.get("sensor.dishwasher_remaining_time").state == "55"
+
+
+async def test_ready_remaining_time(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """RemTime is the program duration while ready, not a remaining time."""
+    await init_integration(hass, aioclient_mock, load_fixture(_READY))
+
+    assert hass.states.get("sensor.dishwasher").state == "Idle"
+    assert hass.states.get("sensor.dishwasher_remaining_time").state == "0"

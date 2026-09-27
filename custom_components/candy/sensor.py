@@ -1812,6 +1812,14 @@ class CandyOvenTempSensor(CandyBaseSensor):
         return "mdi:thermometer"
 
 
+# While waiting for a delayed start RemTime is a placeholder, not the cycle time
+_DISHWASHER_NOT_WASHING = [
+    DishwasherState.IDLE,
+    DishwasherState.FINISHED,
+    DishwasherState.DELAYED_START,
+]
+
+
 class CandyDishwasherSensor(CandyBaseSensor):
     _attr_translation_key = "dishwasher"
     _attr_name = "Dishwasher"
@@ -1842,7 +1850,7 @@ class CandyDishwasherSensor(CandyBaseSensor):
         attributes = {
             "program": status.program,
             "remaining_minutes": 0
-            if status.machine_state in [DishwasherState.IDLE, DishwasherState.FINISHED]
+            if status.machine_state in _DISHWASHER_NOT_WASHING
             else status.remaining_minutes,
             "remote_control": status.remote_control,
             "door_open": status.door_open,
@@ -1927,7 +1935,7 @@ class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
     @property
     def native_value(self) -> StateType:
         status = cast(DishwasherStatus, self.coordinator.data)
-        if status.machine_state in [DishwasherState.IDLE, DishwasherState.FINISHED]:
+        if status.machine_state in _DISHWASHER_NOT_WASHING:
             return 0
         return status.remaining_minutes
 
