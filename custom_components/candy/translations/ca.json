@@ -36,8 +36,8 @@
         }
       },
       "language": {
-        "title": "Idioma dels programes",
-        "description": "Trieu l'idioma per als noms dels programes a la interfície. Pot ser diferent de l'idioma de Home Assistant.",
+        "title": "Idioma de l'aparell",
+        "description": "Trieu l'idioma per als noms dels programes i els missatges de l'aparell (recordatoris, errors i resultats de comprovació). Pot ser diferent de l'idioma de Home Assistant.",
         "data": {
           "program_language": "Idioma"
         }

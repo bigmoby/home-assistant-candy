@@ -12,6 +12,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    EVENT_STATE_CHANGED,
     PERCENTAGE,
     EntityCategory,
     UnitOfFrequency,
@@ -1106,36 +1107,25 @@ class CandyWashEstimatedDurationSensor(CandyBaseSensor):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         registry = er.async_get(self.hass)
-        watch_ids = []
-        for uid in (UNIQUE_ID_WASH_PROGRAM_SELECT, UNIQUE_ID_WASH_SOIL_SELECT):
-            eid = registry.async_get_entity_id(
-                "select", DOMAIN, uid.format(self.config_id)
-            )
-            if eid:
-                watch_ids.append(eid)
-        if watch_ids:
-            self.async_on_remove(
-                async_track_state_change_event(
-                    self.hass, watch_ids, self._on_select_changed
-                )
-            )
+        target_unique_ids = {
+            UNIQUE_ID_WASH_PROGRAM_SELECT.format(self.config_id),
+            UNIQUE_ID_WASH_SOIL_SELECT.format(self.config_id),
+            UNIQUE_ID_WASH_STEAM_SWITCH.format(self.config_id),
+        }
 
-        async def _subscribe_steam() -> None:
-            steam_eid = registry.async_get_entity_id(
-                "switch", DOMAIN, UNIQUE_ID_WASH_STEAM_SWITCH.format(self.config_id)
-            )
-            if steam_eid:
-                self.async_on_remove(
-                    async_track_state_change_event(
-                        self.hass, [steam_eid], self._on_select_changed
-                    )
-                )
+        @callback
+        def _on_state_changed(event: Any) -> None:
+            entity_id: str = event.data.get("entity_id", "")
+            if not entity_id.startswith(("select.", "switch.")):
+                return
+            entry = registry.async_get(entity_id)
+            if entry is not None and entry.config_entry_id == self.config_id:
+                if entry.unique_id in target_unique_ids:
+                    self.async_write_ha_state()
 
-        self.hass.async_create_task(_subscribe_steam())
-
-    @callback
-    def _on_select_changed(self, event) -> None:
-        self.async_write_ha_state()
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_STATE_CHANGED, _on_state_changed)
+        )
 
     def _steam_selected(self, registry) -> bool:
         eid = registry.async_get_entity_id(
@@ -1222,12 +1212,7 @@ class CandyWashEstimatedDurationSensor(CandyBaseSensor):
                 else:
                     soil = program.default_soil_level
 
-            if soil <= 1:
-                minutes = program.duration_soil_min
-            elif soil == 2:
-                minutes = program.duration_soil_medium
-            else:
-                minutes = program.duration_soil_max
+            minutes = program.duration_for_soil(soil)
         else:
             minutes = program.default_duration
 

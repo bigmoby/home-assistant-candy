@@ -60,6 +60,12 @@ class CheckUpResult(StatusCode):
     PROBLEM = (2, "Problem detected")
 
 
+class CheckUpState(StatusCode):
+    IDLE = (0, "Idle")
+    RUNNING = (1, "Running")
+    COMPLETED = (2, "Completed")
+
+
 class WashProgramState(StatusCode):
     STOPPED = (0, "Stopped")
     PRE_WASH = (1, "Pre-wash")
@@ -96,6 +102,7 @@ class WashingMachineStatus:
     unbalance_count: int | None  # unbC — unbalance count
     fault_count: int | None  # numF — total fault count
     dis_test_res: CheckUpResult | None  # DisTestRes — result of last diagnostic
+    checkup_state: CheckUpState | None  # CheckUpState — diagnostic lifecycle
     soil_level: int | None  # SLevel — 0–4 soil level setting
     recipe_id: str | None  # RecipeId — downloadable program (e.g. "D_33")
 
@@ -122,6 +129,9 @@ class WashingMachineStatus:
             fault_count=int(json["numF"]) if "numF" in json else None,
             dis_test_res=CheckUpResult.from_code(int(json["DisTestRes"]))
             if "DisTestRes" in json
+            else None,
+            checkup_state=CheckUpState.from_code(int(json["CheckUpState"]))
+            if "CheckUpState" in json
             else None,
             soil_level=int(json["SLevel"]) if "SLevel" in json else None,
             recipe_id=str(json["RecipeId"]).strip()
@@ -365,6 +375,16 @@ class WashingMachineWashProgram:
         translations = _PROGRAM_NAMES.get(self.name + "_DESCRIPTION", {})
         return translations.get(language) or translations.get("en") or None
 
+    def duration_for_soil(self, soil: int) -> int:
+        """Return duration in minutes for the given soil level."""
+        if self.min_soil_level < self.max_soil_level:
+            if soil <= 1:
+                return self.duration_soil_min or self.default_duration
+            if soil == 2:
+                return self.duration_soil_medium or self.default_duration
+            return self.duration_soil_max or self.default_duration
+        return self.default_duration
+
 
 @dataclass
 class DownloadableProgram:
@@ -406,6 +426,25 @@ class DownloadableProgram:
             lang
         ) or self.description_translations.get("en", "")
 
+    def resolve_soil_target(self, base: WashingMachineWashProgram) -> int:
+        """Resolve effective soil level against a base program's constraints."""
+        if base.min_soil_level <= self.soil_level <= base.max_soil_level and (
+            self.soil_level > 0 or base.min_soil_level == 0
+        ):
+            return self.soil_level
+        if base.min_soil_level <= base.default_soil_level <= base.max_soil_level:
+            return base.default_soil_level
+        return base.min_soil_level
+
+
+def _safe_int(val: object, fallback: int) -> int:
+    if isinstance(val, (int, str, float, bytes)):
+        try:
+            return int(val)
+        except ValueError:
+            return fallback
+    return fallback
+
 
 def load_downloadable_programs(cloud_raw: list[dict]) -> list["DownloadableProgram"]:
     """Build DownloadableProgram list from cloud wm_wd_programs response.
@@ -438,12 +477,12 @@ def load_downloadable_programs(cloud_raw: list[dict]) -> list["DownloadableProgr
             DownloadableProgram(
                 position=position,
                 name=name,
-                parent=int(entry.get("parent", 0)),
-                temperature=int(entry.get("temperature", 0)),
+                parent=_safe_int(entry.get("parent"), 0),
+                temperature=_safe_int(entry.get("temperature"), 0),
                 spin_speed=spin,
-                soil_level=int(entry.get("soil_level", 0)),
-                options=int(entry.get("options", 0)),
-                steam=int(entry.get("steam", 0)),
+                soil_level=_safe_int(entry.get("soil_level"), 0),
+                options=_safe_int(entry.get("options"), 0),
+                steam=_safe_int(entry.get("steam"), 0),
                 translations=trans["translations"],
                 category_translations=trans["category_translations"],
                 description_translations=trans["description_translations"],

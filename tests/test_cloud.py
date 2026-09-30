@@ -52,11 +52,22 @@ def _appliance_entry(ip=None, key="secret-key", programs=None):
     appliance = {
         "mac_address": "AA:BB:CC:DD:EE:FF",
         "encryption_key": key,
-        "appliance_model": "TestModel",
+        "appliance_model": "RO41274DWMSE/1-S",
         "sixteen_digits_code": "SN12345678901234",
         "purchase_date": "2024-01-01",
-        "interface_type": "Bianca",
-        "programs": programs if programs is not None else [{"id": 1, "name": "Cotton"}],
+        "interface_type": "RAPIDO_4DIG_STM_NEL",
+        "programs": (
+            programs
+            if programs is not None
+            else [
+                {
+                    "program": {
+                        "id": "7e661414-b751-4483-b537-9bf8cf19ea00",
+                        "name": "RESISTANT_COTTONS",
+                    }
+                }
+            ]
+        ),
         "current_status_parameters": {"ip_address": ip} if ip else {},
     }
     return {"appliance": appliance}
@@ -203,17 +214,59 @@ async def test_fetch_appliances_non_list_response():
 
 
 async def test_fetch_downloadable_programs_list_response():
-    programs = [{"wm_wd_program": {"id": 1}}, {"wm_wd_program": {"id": 2}}]
+    programs = [
+        {
+            "wm_wd_program": {
+                "id": "899838a1-1d15-4d15-814e-a6894c279be6",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_BED_LINEN",
+            }
+        },
+        {
+            "wm_wd_program": {
+                "id": "e40658f7-883e-42ab-8255-5aff9bfa528c",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_NEW_CLOTHES",
+            }
+        },
+    ]
     session = _make_session(get_resps=[_make_resp(200, programs)])
     result = await _fetch_downloadable_programs(session, _TOKENS)
-    assert result == [{"id": 1}, {"id": 2}]
+    assert result == [
+        {
+            "id": "899838a1-1d15-4d15-814e-a6894c279be6",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_BED_LINEN",
+        },
+        {
+            "id": "e40658f7-883e-42ab-8255-5aff9bfa528c",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_NEW_CLOTHES",
+        },
+    ]
 
 
 async def test_fetch_downloadable_programs_dict_wrapper():
-    data = {"wm_wd_programs": [{"id": 10}, {"id": 20}]}
+    data = {
+        "wm_wd_programs": [
+            {
+                "id": "52ab9121-e1be-47db-b419-1f468e5ad830",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_CASHMERE",
+            },
+            {
+                "id": "2db4e142-ff5b-42ea-a417-10ffb6a3ce28",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_GYM_FIT",
+            },
+        ]
+    }
     session = _make_session(get_resps=[_make_resp(200, data)])
     result = await _fetch_downloadable_programs(session, _TOKENS)
-    assert result == [{"id": 10}, {"id": 20}]
+    assert result == [
+        {
+            "id": "52ab9121-e1be-47db-b419-1f468e5ad830",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_CASHMERE",
+        },
+        {
+            "id": "2db4e142-ff5b-42ea-a417-10ffb6a3ce28",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_GYM_FIT",
+        },
+    ]
 
 
 async def test_fetch_downloadable_programs_non_200():

@@ -21,8 +21,10 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
   - 🍷 Wine Cooler / Cellar
 - **Zero-Config Decryption:** Say goodbye to manually extracting encryption keys. This integration boasts a natively built-in *sliding-window/known-plaintext* algorithm that unlocks your device seamlessly in fractions of a second during setup.
 - **Strict HA Compatibility:** Follows the rigorous MyPy styling standards enforced by Home Assistant 2025.
-- Uses the local device API for real-time responsiveness.
+- Uses the local device API for real-time responsiveness. 
 - Creates dedicated, native semantic sensors (e.g., remaining time, current status, machine cycle) and exposes granular information cleanly as sensor attributes.
+- **Intelligent Fault Notifications & Error Handling:** Intercepts appliance error codes and shows persistent Home Assistant notifications with authentic vendor troubleshooting steps
+- **Automated Maintenance Notifications:** Show reminders when check-up, descaling, or filter cleaning are due, provides preparation advice on cycle start, and automatically resets baselines upon completion.
 
 ---
 
@@ -50,13 +52,18 @@ At setup, you choose between **Read-Only** (sensors only) and **Full Control**. 
 
 ### What you get
 
-**Control entities:** program selector (all localized program names), temperature, spin speed, soil level, delay start, option switches (Prewash, Hygiene, Steam, Anti-crease, Good Night, Extra Rinse, AquaPlus), and Start / Pause / Stop buttons.
+**Control entities:** program selector (with localized program names and descriptions), temperature, spin speed, soil level, delay start, extra switches (Prewash, Hygiene, Steam and so on), and Start / Pause / Stop buttons.
 
-**Maintenance & diagnostics:** mirrors the Candy app's built-in reminders — check-up, limescale, and filter counters with configurable water hardness thresholds; self-diagnostic result sensor and last check-up timestamp. Running the check-up or limescale cycle does **not** reset its counter automatically — press the matching reset button once the cycle finishes. The filter counter has no start button at all: clean the filter by hand, then reset it manually.
+**Maintenance & diagnostics:** mirrors the Candy app's built-in reminders. 
+Check-up, limescale, and filter counters with configurable water hardness thresholds; self-diagnostic result sensor and last check-up timestamp. When counters reach their thresholds, persistent notifications prompt you to perform maintenance. Starting a diagnostic or limescale routine posts preparation instructions, and completing the cycle automatically resets its counter baseline and dismisses the reminder (manual reset buttons are also available as fallback; the filter counter is cleaned manually and reset via button).
+
+**Proactive error handling:** monitors washing machine fault codes in real time and posts persistent Home Assistant notifications with localized vendor troubleshooting instructions (such as checking water taps, unblocking the pump filter, or adjusting laundry load balance). Notifications update dynamically if codes change and dismiss automatically when the appliance clears the error.
 
 **Remote Control status:** a dedicated sensor tracks whether the machine currently accepts remote commands, and disables every control entity while it doesn't. See [`docs/remote-control.md`](docs/remote-control.md) for details.
 
 ### Improvements over the official app
+
+- **Proactive troubleshooting & reminders:** Home Assistant immediately presents vendor troubleshooting guidance on errors and clears alerts when resolved, plus manages the full maintenance notification lifecycle without opening the Simply-Fi app.
 
 - **Faster feedback:** every write command locks the controls, waits for the machine to process it, then forces an immediate refresh — so the dashboard reflects the new state in a few seconds instead of waiting for the next 60-second poll.
 - **Faster wake-up:** while the machine is off, Home Assistant polls every 20 seconds instead of 60, so it notices when the machine turns back on much sooner.

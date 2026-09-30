@@ -64,6 +64,7 @@ _IDLE_WASHING_MACHINE = WashingMachineStatus(
     unbalance_count=None,
     fault_count=None,
     dis_test_res=None,
+    checkup_state=None,
     soil_level=None,
     recipe_id=None,
 )
@@ -96,11 +97,11 @@ def _device_probe_washing_machine():
 
 @pytest.fixture(autouse=True)
 def _statistics_probe():
-    """Return total_cycles=40 during config flow setup for all tests."""
+    """Return total_cycles=388 during config flow setup for all tests."""
     with patch(
         "custom_components.candy.config_flow.CandyClient.statistics_with_retry",
         new_callable=AsyncMock,
-        return_value=WashingMachineStatistics(total_cycles=40),
+        return_value=WashingMachineStatistics(total_cycles=388),
     ):
         yield
 
@@ -416,10 +417,10 @@ _MOCK_APPLIANCE = CloudApplianceData(
     programs=[
         {
             "program": {
-                "position": 1,
-                "name": "COTTON",
+                "position": 16,
+                "name": "DUAL_WM_WD_PROGRAM_NAME_RESISTANT_COTTONS",
                 "command_parameters": [
-                    {"command_parameter": {"name": "pr_code", "validation": "136"}},
+                    {"command_parameter": {"name": "pr_code", "validation": "65"}},
                     {
                         "command_parameter": {
                             "name": "maximum_temperature",
@@ -429,19 +430,19 @@ _MOCK_APPLIANCE = CloudApplianceData(
                     {
                         "command_parameter": {
                             "name": "default_temperature",
-                            "validation": "40",
+                            "validation": "60",
                         }
                     },
                     {
                         "command_parameter": {
                             "name": "maximum_spin_speed",
-                            "validation": "1400",
+                            "validation": "1200",
                         }
                     },
                     {
                         "command_parameter": {
                             "name": "default_spin_speed",
-                            "validation": "800",
+                            "validation": "1200",
                         }
                     },
                     {
@@ -459,7 +460,7 @@ _MOCK_APPLIANCE = CloudApplianceData(
                     {
                         "command_parameter": {
                             "name": "default_soil_level",
-                            "validation": "2",
+                            "validation": "3",
                         }
                     },
                 ],
@@ -670,7 +671,7 @@ async def test_read_only_with_maintenance_enabled(
 
     assert result["step_id"] == "maintenance_baselines"
 
-    # User enters remaining=17 for all (total_cycles=40 from mocked stats)
+    # User enters remaining=17 for all (total_cycles=388 from mocked stats)
     # last_reset = total - (threshold - remaining)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -686,12 +687,12 @@ async def test_read_only_with_maintenance_enabled(
     assert data[CONF_KEY_MAINTENANCE_ENABLED] is True
     assert data[CONF_KEY_WATER_HARDNESS] == 2
     # last_reset = total - (threshold - remaining)
-    # full_checkup:  40 - (100 - 17) = 40 - 83 = -43
-    # limescale:  40 - (100 - 57) = 40 - 43 = -3   (hardness=2 → threshold=100)
-    # filter:     40 - (100 - 17) = 40 - 83 = -43
-    assert data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == -43
-    assert data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == -3
-    assert data[CONF_KEY_MAINTENANCE_LAST_FILTER] == -43
+    # full_checkup:  388 - (100 - 17) = 388 - 83 = 305
+    # limescale:  388 - (100 - 57) = 388 - 43 = 345   (hardness=2 → threshold=100)
+    # filter:     388 - (100 - 17) = 388 - 83 = 305
+    assert data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 305
+    assert data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 345
+    assert data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 305
     assert data[CONF_KEY_IS_WASHING_MACHINE] is True
 
 
@@ -835,8 +836,8 @@ async def test_maintenance_only_full_checkup(hass, no_discovery, detect_no_encry
     assert CONF_KEY_WATER_HARDNESS not in data
     assert CONF_KEY_MAINTENANCE_LAST_LIMESCALE not in data
     assert CONF_KEY_MAINTENANCE_LAST_FILTER not in data
-    # total_cycles=40 from mock; full_checkup remaining=50 → last_reset = 40 - (100 - 50) = -10
-    assert data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == -10
+    # total_cycles=388 from mock; full_checkup remaining=50 → last_reset = 388 - (100 - 50) = 338
+    assert data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 338
 
 
 async def test_maintenance_limescale_only(hass, no_discovery, detect_no_encryption):  # pylint: disable=unused-argument
@@ -886,10 +887,10 @@ async def test_maintenance_limescale_only(hass, no_discovery, detect_no_encrypti
     assert data[CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED] is True
     assert data[CONF_KEY_MAINTENANCE_FILTER_ENABLED] is False
     assert CONF_KEY_MAINTENANCE_LAST_FILTER not in data
-    # selfclean:  40 - (100 - 17) = -43
-    # limescale:  40 - (100 - 57) = -3   (hardness=2 → threshold=100)
-    assert data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == -43
-    assert data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == -3
+    # selfclean:  388 - (100 - 17) = 305
+    # limescale:  388 - (100 - 57) = 345   (hardness=2 → threshold=100)
+    assert data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 305
+    assert data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 345
 
 
 # ---------------------------------------------------------------------------

@@ -36,8 +36,8 @@
         }
       },
       "language": {
-        "title": "Idioma de los programas",
-        "description": "Elige el idioma para los nombres de programas en la interfaz. Puede diferir del idioma de Home Assistant.",
+        "title": "Idioma del electrodoméstico",
+        "description": "Elige el idioma para los nombres de programas y los mensajes del electrodoméstico (recordatorios, errores y resultados de comprobación). Puede diferir del idioma de Home Assistant.",
         "data": {
           "program_language": "Idioma"
         }

@@ -1,7 +1,7 @@
 # Remote Control — Washing Machine
 
-This page documents the `binary_sensor.remote_control` entity, the maintenance
-counters, and the polling behaviour behind Full Control mode.
+This page documents the `binary_sensor.remote_control` entity, maintenance
+counters, notifications, error code handling, and the polling behaviour behind Full Control mode.
 
 ## Remote Control status
 
@@ -44,21 +44,15 @@ device's statistics endpoint — not by elapsed time.
 
 | Counter | Threshold | Cycle to run | Auto-reset? |
 |---|---|---|---|
-| Check-up | 100 cycles (fixed) | Full Check-up button | No — manual |
-| Limescale | 85–110 cycles, depends on configured water hardness | Limescale Cleaning button | No — manual |
+| Check-up | 100 cycles (fixed) | Full Check-up button | Yes — automatic on completion (manual button fallback) |
+| Limescale | 85–110 cycles, depends on configured water hardness | Limescale Cleaning button | Yes — automatic on completion (manual button fallback) |
 | Filter | 100 cycles (fixed) | none — physical cleaning | No — manual |
 
-### Manual reset is required after every maintenance operation
+### Maintenance resets and lifecycle
 
-None of the three counters resets itself. Pressing **Full Check-up** or
-**Limescale Cleaning** only sends the corresponding cycle to the machine —
-it does not touch the counter's stored baseline. After the cycle completes
-(or after physically cleaning the filter), you must press the matching
-**reset button**:
-
-- Check-up maintenance reset
-- Limescale maintenance reset
-- Filter maintenance reset
+- **Full Check-up**: Resets its counter automatically when the cycle completes successfully (`CheckUpState == 2`). Home Assistant posts a completion notification matching the Simply-Fi app, clears any active check-up reminder, commits the updated `total_cycles` baseline, and resets the appliance diagnostic register. A manual reset button is also available as a fallback.
+- **Limescale Cleaning**: Resets its counter automatically when the `AUTOCLEAN` cycle completes successfully (`MachMd` reaches `FINISHED1` or `FINISHED2` without errors). Home Assistant dismisses any active limescale reminder, posts a cycle completion notification (matching the Simply-Fi app), commits the updated `total_cycles` baseline, and refreshes statistics. A manual reset button is also available as a fallback.
+- **Filter**: Requires manual reset. Cleaning the pump filter is a physical task without machine feedback; after cleaning, press the matching **Filter maintenance reset** button.
 
 Each reset button writes the current `total_cycles` value (from the stats
 coordinator) into the config entry as the new baseline
@@ -70,6 +64,24 @@ every subsequent wash until reset, rather than silently restarting.
 The Filter counter never has an associated start button — cleaning the pump
 filter is a manual, physical task, so its only actionable entity is the
 reset button.
+
+### Maintenance notifications
+
+The integration actively manages the notification lifecycle for maintenance tasks:
+
+- **Due reminders**: When any maintenance counter reaches 0 remaining cycles (Check-up, Limescale, or Filter), Home Assistant posts a persistent notification prompting you to perform the required maintenance. The messages are fully localized in your chosen language.
+- **Start instructions**: When starting a Full Check-up or Limescale Cleaning cycle from Home Assistant, a notification is posted with official preparation instructions (e.g. running the drum empty, adding descaling solution).
+- **Completion notices & auto-dismissal**: When a Full Check-up or Limescale Cleaning cycle finishes successfully without errors, Home Assistant posts a completion notification and automatically dismisses the active maintenance due reminder.
+
+## Fault & Error Code Handling
+
+When the washing machine reports an operational fault or hardware issue (`Err` code in telemetry), Home Assistant automatically captures the error and displays a persistent notification:
+
+- **Official troubleshooting steps**: Instead of showing just a raw error code, the notification provides the authentic vendor troubleshooting steps extracted directly from the Simply-Fi app (e.g. checking water pressure and inlet tap, cleaning pump filter, checking drain hose, or balancing load).
+- **Localized guidance**: Troubleshooting instructions match your configured appliance language (or Home Assistant language).
+- **Dynamic updates**: If the machine's reported error code changes while a fault is active, the persistent notification updates in-place.
+- **Automatic dismissal**: Once the issue is resolved on the appliance and the error code clears (`Err` returns to 0), Home Assistant automatically clears and dismisses the error notification without requiring manual action.
+- **Universal availability**: Error notifications run for all washing machine setups, both in Read-Only and Full Control modes.
 
 ## Polling behaviour
 

@@ -612,7 +612,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_language(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask which language to use for program names."""
+        """Ask which language to use for program names and appliance messages."""
         if user_input is None:
             current_lang = self._pending_data.get(
                 CONF_KEY_PROGRAM_LANGUAGE,
@@ -869,7 +869,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
     async def async_step_language(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask which language to use for program names."""
+        """Ask which language to use for program names and appliance messages."""
         if user_input is None:
             existing = self._config_data.get(CONF_KEY_PROGRAM_LANGUAGE)
             default_lang = existing or (

@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 import copy
 from datetime import timedelta
 import json
 import logging
 from typing import Any, cast
+from urllib.parse import quote, urlencode
 
 import aiohttp
 import async_timeout
 from homeassistant.components.persistent_notification import (
     async_create as pn_async_create,
+    async_dismiss as pn_async_dismiss,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
@@ -20,9 +23,11 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
-from .client import CandyClient
+from .client import CandyClient, parse_wash_programs
 from .client.model import (
+    CheckUpState,
     DishwasherState,
     DishwasherStatus,
     DryerCycleState,
@@ -39,30 +44,43 @@ from .client.model import (
     WineCoolerStatus,
 )
 from .const import (
+    CHECKUP_SCHEDULE_EVERY_CYCLE,
     CONF_KEY_CHECKUP_ENABLED,
+    CONF_KEY_CHECKUP_LAST_DATE,
     CONF_KEY_CHECKUP_LAST_RESULT,
+    CONF_KEY_CHECKUP_PENDING,
+    CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FILTER,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
     CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
+    CONF_KEY_PROGRAMS,
     CONF_KEY_USE_ENCRYPTION,
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_CHECKUP_UNSUB,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DATA_KEY_FULL_CHECKUP_UNSUB,
+    DATA_KEY_LIMESCALE_UNSUB,
     DATA_KEY_MAINT_UNSUB,
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_STATS_REFRESH_UNSUB,
+    DATA_KEY_WASH_ERROR_UNSUB,
     DOMAIN,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MAINTENANCE_HARDNESS_THRESHOLDS,
+    MODE_FULL_CONTROL,
+    NOTIF_ID_FULL_CHECKUP,
+    NOTIF_ID_LIMESCALE,
     NOTIF_ID_MAINT_FILTER,
     NOTIF_ID_MAINT_FULL_CHECKUP,
     NOTIF_ID_MAINT_LIMESCALE,
+    NOTIF_ID_WASH_ERROR,
     PLATFORMS,
     UNIQUE_ID_DISHWASHER,
     UNIQUE_ID_OVEN,
@@ -71,7 +89,11 @@ from .const import (
     UNIQUE_ID_WASHING_MACHINE,
     UNIQUE_ID_WINE_COOLER,
 )
-from .helpers import cycles_remaining, localized_notification_text
+from .helpers import (
+    cycles_remaining,
+    get_wash_error_notification_strings,
+    localized_notification_text,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -232,6 +254,7 @@ def _offline_washing_machine() -> WashingMachineStatus:
         unbalance_count=None,
         fault_count=None,
         dis_test_res=None,
+        checkup_state=None,
         soil_level=None,
         recipe_id=None,
     )
@@ -450,6 +473,27 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             unsub_stats_refresh
         )
 
+        unsub_full_checkup = _register_full_checkup_listener(
+            hass, config_entry, coordinator, stats_coordinator, client
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_FULL_CHECKUP_UNSUB] = (
+            unsub_full_checkup
+        )
+
+        unsub_wash_error = _register_wash_error_listener(
+            hass, config_entry, coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_WASH_ERROR_UNSUB] = (
+            unsub_wash_error
+        )
+
+        unsub_limescale = _register_limescale_listener(
+            hass, config_entry, coordinator, stats_coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_LIMESCALE_UNSUB] = (
+            unsub_limescale
+        )
+
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
@@ -509,30 +553,79 @@ def _register_maintenance_notifications(
     return stats_coordinator.async_add_listener(_on_stats_update)
 
 
+_FINISHED_STATES = {MachineState.FINISHED1, MachineState.FINISHED2}
+
+
 def _register_checkup_listener(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
 ) -> Callable[[], None]:
-    """Register a coordinator listener that persists the timestamp when DisTestRes transitions 0→non-zero."""
+    """Register a coordinator listener that records the check-up timestamp when the cycle finishes."""
     initial = cast(WashingMachineStatus | None, coordinator.data)
     initial_code = (
         initial.dis_test_res.code
         if initial is not None and initial.dis_test_res is not None
         else None
     )
+    initial_state = initial.machine_state if initial is not None else None
+    initial_pending = config_entry.data.get(CONF_KEY_CHECKUP_PENDING, False)
+
     prev_result: list[int | None] = [initial_code]
+    prev_state: list[MachineState | None] = [initial_state]
+    finished_cycle_recorded: list[bool] = [
+        initial_state in _FINISHED_STATES and not initial_pending
+    ]
 
     def _on_status_update() -> None:
         status = cast(WashingMachineStatus | None, coordinator.data)
-        if status is None or status.dis_test_res is None:
+        if status is None:
             return
-        curr_code = status.dis_test_res.code
-        prev_code = prev_result[0]
+        curr_state = status.machine_state
+        prior_state = prev_state[0]
+        prev_state[0] = curr_state
+
+        curr_code = (
+            status.dis_test_res.code if status.dis_test_res is not None else None
+        )
+        prior_code = prev_result[0]
         prev_result[0] = curr_code
-        if prev_code is None:
+
+        if curr_state not in _FINISHED_STATES:
+            finished_cycle_recorded[0] = False
+
+        is_pending = config_entry.data.get(CONF_KEY_CHECKUP_PENDING, False)
+        schedule = config_entry.data.get(
+            CONF_KEY_CHECKUP_SCHEDULE, CHECKUP_SCHEDULE_EVERY_CYCLE
+        )
+
+        if curr_state in _FINISHED_STATES:
+            if not finished_cycle_recorded[0]:
+                should_record = is_pending or schedule == CHECKUP_SCHEDULE_EVERY_CYCLE
+                if should_record and curr_code is not None and curr_code != 0:
+                    finished_cycle_recorded[0] = True
+                    new_data = dict(config_entry.data)
+                    new_data[CONF_KEY_CHECKUP_LAST_DATE] = dt_util.utcnow().timestamp()
+                    new_data[CONF_KEY_CHECKUP_LAST_RESULT] = curr_code
+                    new_data[CONF_KEY_CHECKUP_PENDING] = False
+                    hass.config_entries.async_update_entry(config_entry, data=new_data)
+                    return
+        elif (
+            is_pending
+            and curr_state in (MachineState.IDLE, MachineState.OFF)
+            and prior_state not in (MachineState.IDLE, MachineState.OFF, None)
+        ):
+            new_data = dict(config_entry.data)
+            new_data[CONF_KEY_CHECKUP_PENDING] = False
+            hass.config_entries.async_update_entry(config_entry, data=new_data)
             return
-        if curr_code != 0 and prev_code == 0:
+
+        if (
+            curr_code is not None
+            and curr_code != 0
+            and (prior_code == 0 or prior_code is None)
+            and config_entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT) != curr_code
+        ):
             new_data = dict(config_entry.data)
             new_data[CONF_KEY_CHECKUP_LAST_RESULT] = curr_code
             hass.config_entries.async_update_entry(config_entry, data=new_data)
@@ -540,7 +633,177 @@ def _register_checkup_listener(
     return coordinator.async_add_listener(_on_status_update)
 
 
-_FINISHED_STATES = {MachineState.FINISHED1, MachineState.FINISHED2}
+def _register_full_checkup_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
+    client: CandyClient,
+) -> Callable[[], None]:
+    """Register a coordinator listener that handles Full Check-up completion."""
+    initial = cast(WashingMachineStatus | None, coordinator.data)
+    prev_state: list[CheckUpState | None] = [
+        initial.checkup_state if initial is not None else None
+    ]
+
+    def _on_status_update() -> None:
+        status = cast(WashingMachineStatus | None, coordinator.data)
+        if status is None:
+            return
+        curr_state = status.checkup_state
+        prior_state = prev_state[0]
+        prev_state[0] = curr_state
+
+        has_no_error = (status.error in (None, 0)) and (
+            status.machine_state != MachineState.ERROR
+        )
+
+        if (
+            curr_state == CheckUpState.COMPLETED
+            and prior_state == CheckUpState.RUNNING
+            and has_no_error
+        ):
+            entry_id = config_entry.entry_id
+            lang = config_entry.data.get(
+                CONF_KEY_PROGRAM_LANGUAGE, hass.config.language
+            )
+            title = localized_notification_text("full_checkup_result_title", lang)
+            message = localized_notification_text("full_checkup_result_message", lang)
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=NOTIF_ID_FULL_CHECKUP.format(entry_id),
+            )
+            pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
+
+            async def _update_baseline() -> None:
+                await stats_coordinator.async_request_refresh()
+                total: int | None = None
+                if stats_coordinator.data is not None:
+                    total = stats_coordinator.data.total_cycles
+                else:
+                    restored = _restore_last_known_statistics(hass, entry_id)
+                    if restored is not None:
+                        total = restored.total_cycles
+
+                if total is not None:
+                    new_data = dict(config_entry.data)
+                    new_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = total
+                    hass.config_entries.async_update_entry(config_entry, data=new_data)
+                    stats_coordinator.async_update_listeners()
+
+            hass.async_create_task(_update_baseline())
+
+            if (
+                config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
+                and status.remote_control
+            ):
+
+                async def _send_reset() -> None:
+                    try:
+                        await client.send_command(
+                            urlencode(
+                                {"Write": 1, "StSt": 0, "PrNm": 11}, quote_via=quote
+                            )
+                        )
+                        await asyncio.sleep(5)
+                        await coordinator.async_request_refresh()
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to reset appliance check-up state: %s", err
+                        )
+
+                hass.async_create_task(_send_reset())
+
+    return coordinator.async_add_listener(_on_status_update)
+
+
+def _register_limescale_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
+) -> Callable[[], None]:
+    """Register a coordinator listener that handles Limescale Cleaning completion."""
+    if not config_entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
+        return lambda: None
+
+    programs = parse_wash_programs(config_entry.data.get(CONF_KEY_PROGRAMS, []))
+    autoclean = next((p for p in programs if "autoclean" in p.name.lower()), None)
+    if autoclean is None:
+        return lambda: None
+
+    initial = cast(WashingMachineStatus | None, coordinator.data)
+    initial_running = (
+        initial is not None
+        and initial.machine_state in (MachineState.RUNNING, MachineState.PAUSED)
+        and (
+            initial.program == autoclean.selector_position
+            or (
+                autoclean.pr_code is not None
+                and initial.program_code == autoclean.pr_code
+            )
+        )
+    )
+    was_running_autoclean: list[bool] = [initial_running]
+
+    def _on_status_update() -> None:
+        status = cast(WashingMachineStatus | None, coordinator.data)
+        if status is None:
+            return
+
+        curr_state = status.machine_state
+        has_no_error = (status.error in (None, 0)) and (
+            curr_state != MachineState.ERROR
+        )
+
+        is_autoclean = status.program == autoclean.selector_position or (
+            autoclean.pr_code is not None and status.program_code == autoclean.pr_code
+        )
+
+        if curr_state in (MachineState.RUNNING, MachineState.PAUSED) and is_autoclean:
+            was_running_autoclean[0] = True
+        elif curr_state in _FINISHED_STATES:
+            if was_running_autoclean[0] and has_no_error:
+                was_running_autoclean[0] = False
+                entry_id = config_entry.entry_id
+                lang = config_entry.data.get(
+                    CONF_KEY_PROGRAM_LANGUAGE, hass.config.language
+                )
+                title = localized_notification_text("limescale_result_title", lang)
+                message = localized_notification_text("limescale_result_message", lang)
+                pn_async_create(
+                    hass,
+                    message,
+                    title=title,
+                    notification_id=NOTIF_ID_LIMESCALE.format(entry_id),
+                )
+                pn_async_dismiss(hass, NOTIF_ID_MAINT_LIMESCALE.format(entry_id))
+
+                async def _update_baseline() -> None:
+                    await stats_coordinator.async_request_refresh()
+                    total: int | None = None
+                    if stats_coordinator.data is not None:
+                        total = stats_coordinator.data.total_cycles
+                    else:
+                        restored = _restore_last_known_statistics(hass, entry_id)
+                        if restored is not None:
+                            total = restored.total_cycles
+
+                    if total is not None:
+                        new_data = dict(config_entry.data)
+                        new_data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] = total
+                        hass.config_entries.async_update_entry(
+                            config_entry, data=new_data
+                        )
+                        stats_coordinator.async_update_listeners()
+
+                hass.async_create_task(_update_baseline())
+        elif curr_state in (MachineState.IDLE, MachineState.OFF):
+            was_running_autoclean[0] = False
+
+    return coordinator.async_add_listener(_on_status_update)
 
 
 def _register_stats_refresh_listener(
@@ -567,6 +830,52 @@ def _register_stats_refresh_listener(
     return coordinator.async_add_listener(_on_status_update)
 
 
+def _register_wash_error_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+) -> Callable[[], None]:
+    """Register a coordinator listener that posts error notifications and dismisses them when cleared."""
+    entry_id = config_entry.entry_id
+    notif_id = NOTIF_ID_WASH_ERROR.format(entry_id)
+    lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
+
+    initial = cast(WashingMachineStatus | None, coordinator.data)
+    initial_error = initial.error if initial is not None else None
+    prev_error: list[int | None] = [initial_error]
+
+    if initial_error is not None and initial_error > 0:
+        notif_strings = get_wash_error_notification_strings(initial_error, lang)
+        if notif_strings is not None:
+            title, message = notif_strings
+            pn_async_create(hass, message, title=title, notification_id=notif_id)
+        else:
+            _LOGGER.warning("Unknown washing machine error code: %s", initial_error)
+
+    def _on_status_update() -> None:
+        status = cast(WashingMachineStatus | None, coordinator.data)
+        if status is None:
+            return
+        curr_error = status.error
+        prior_error = prev_error[0]
+        prev_error[0] = curr_error
+
+        if curr_error == prior_error:
+            return
+
+        if curr_error is not None and curr_error > 0:
+            notif_strings = get_wash_error_notification_strings(curr_error, lang)
+            if notif_strings is not None:
+                title, message = notif_strings
+                pn_async_create(hass, message, title=title, notification_id=notif_id)
+            else:
+                _LOGGER.warning("Unknown washing machine error code: %s", curr_error)
+        elif prior_error is not None and prior_error > 0:
+            pn_async_dismiss(hass, notif_id)
+
+    return coordinator.async_add_listener(_on_status_update)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -575,7 +884,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for key in (
             DATA_KEY_MAINT_UNSUB,
             DATA_KEY_CHECKUP_UNSUB,
+            DATA_KEY_FULL_CHECKUP_UNSUB,
             DATA_KEY_STATS_REFRESH_UNSUB,
+            DATA_KEY_WASH_ERROR_UNSUB,
+            DATA_KEY_LIMESCALE_UNSUB,
         ):
             unsub = entry_data.get(key)
             if unsub is not None:

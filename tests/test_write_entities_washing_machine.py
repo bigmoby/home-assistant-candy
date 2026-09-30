@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
@@ -19,6 +19,10 @@ from custom_components.candy.client import (
 )
 from custom_components.candy.client.model import DownloadableProgram, MachineState
 from custom_components.candy.const import (
+    CHECKUP_SCHEDULE_EVERY_CYCLE,
+    CONF_KEY_CHECKUP_ENABLED,
+    CONF_KEY_CHECKUP_PENDING,
+    CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_ENABLED,
@@ -49,6 +53,7 @@ from custom_components.candy.const import (
     UNIQUE_ID_WASH_STOP_BUTTON,
     UNIQUE_ID_WASH_TEMP_SELECT,
 )
+from custom_components.candy.select import CandyWashProgramDescriptionSensor
 
 from .common import TEST_IP
 
@@ -96,23 +101,23 @@ _COTTON = {
     }
 }
 
-# RAPID_30_MIN: pos=2, sel=2, temp and spin fixed (255 = not selectable), soil fixed, no steam
+# RAPID_30_MIN: pos=8, sel=7, temp and spin fixed (255 = not selectable), soil fixed, no steam
 _RAPID = {
     "program": {
-        "position": 2,
+        "position": 8,
         "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_30_MIN",
         "command_parameters": [
-            {"command_parameter": {"name": "selector_position", "validation": "2"}},
-            {"command_parameter": {"name": "pr_code", "validation": "5"}},
+            {"command_parameter": {"name": "selector_position", "validation": "7"}},
+            {"command_parameter": {"name": "pr_code", "validation": "71"}},
             {"command_parameter": {"name": "maximum_temperature", "validation": "255"}},
             {"command_parameter": {"name": "default_temperature", "validation": "30"}},
             {"command_parameter": {"name": "maximum_spin_speed", "validation": "255"}},
             {"command_parameter": {"name": "default_spin_speed", "validation": "800"}},
-            {"command_parameter": {"name": "minimum_soil_level", "validation": "0"}},
-            {"command_parameter": {"name": "maximum_soil_level", "validation": "0"}},
-            {"command_parameter": {"name": "default_soil_level", "validation": "0"}},
+            {"command_parameter": {"name": "minimum_soil_level", "validation": "2"}},
+            {"command_parameter": {"name": "maximum_soil_level", "validation": "2"}},
+            {"command_parameter": {"name": "default_soil_level", "validation": "9"}},
             {"command_parameter": {"name": "steam", "validation": "0"}},
-            {"command_parameter": {"name": "default_duration", "validation": "14"}},
+            {"command_parameter": {"name": "default_duration", "validation": "30"}},
             {
                 "command_parameter": {
                     "name": "remaining_time_soil_max",
@@ -135,7 +140,46 @@ _RAPID = {
     }
 }
 
-_PROGRAMS = [_COTTON, _RAPID]
+# RAPID_44_MIN: pos=9, sel=7, temp and spin fixed (255 = not selectable), soil fixed, no steam
+_RAPID_44 = {
+    "program": {
+        "position": 9,
+        "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_44_MIN",
+        "command_parameters": [
+            {"command_parameter": {"name": "selector_position", "validation": "7"}},
+            {"command_parameter": {"name": "pr_code", "validation": "103"}},
+            {"command_parameter": {"name": "maximum_temperature", "validation": "255"}},
+            {"command_parameter": {"name": "default_temperature", "validation": "40"}},
+            {"command_parameter": {"name": "maximum_spin_speed", "validation": "255"}},
+            {"command_parameter": {"name": "default_spin_speed", "validation": "800"}},
+            {"command_parameter": {"name": "minimum_soil_level", "validation": "3"}},
+            {"command_parameter": {"name": "maximum_soil_level", "validation": "3"}},
+            {"command_parameter": {"name": "default_soil_level", "validation": "9"}},
+            {"command_parameter": {"name": "steam", "validation": "0"}},
+            {"command_parameter": {"name": "default_duration", "validation": "44"}},
+            {
+                "command_parameter": {
+                    "name": "remaining_time_soil_max",
+                    "validation": "0",
+                }
+            },
+            {
+                "command_parameter": {
+                    "name": "remaining_time_soil_medium",
+                    "validation": "0",
+                }
+            },
+            {
+                "command_parameter": {
+                    "name": "remaining_time_soil_min",
+                    "validation": "0",
+                }
+            },
+        ],
+    }
+}
+
+_PROGRAMS = [_COTTON, _RAPID, _RAPID_44]
 
 # AUTOCLEAN: selector_position=23, pr_code=104, fixed temp/spin (255)
 _AUTOCLEAN = {
@@ -203,7 +247,9 @@ _OFF_JSON = """{
   }
 }"""
 
-_STATS_OK = '{"statusCounters": {"Temp0to30": "40"}}'
+_STATS_OK = (
+    '{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}'
+)
 
 
 def _add_stats_mocks(aioclient_mock: AiohttpClientMocker) -> None:
@@ -315,8 +361,8 @@ async def test_temp_select_available_for_cotton_idle(
 async def test_temp_select_unavailable_for_rapid_idle(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "2"').replace(
-        '"PrCode": "136"', '"PrCode": "5"'
+    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "7"').replace(
+        '"PrCode": "136"', '"PrCode": "71"'
     )
     entry = await _init_full_control(hass, aioclient_mock, rapid_idle)
     state = _state(hass, entry, "select", UNIQUE_ID_WASH_TEMP_SELECT)
@@ -388,8 +434,8 @@ async def test_soil_select_reflects_device_slevel(
 async def test_soil_select_unavailable_for_rapid_idle(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "2"').replace(
-        '"PrCode": "136"', '"PrCode": "5"'
+    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "7"').replace(
+        '"PrCode": "136"', '"PrCode": "71"'
     )
     entry = await _init_full_control(hass, aioclient_mock, rapid_idle)
     state = _state(hass, entry, "select", UNIQUE_ID_WASH_SOIL_SELECT)
@@ -628,8 +674,8 @@ async def test_steam_switch_available_for_cotton_idle(
 async def test_steam_switch_unavailable_for_rapid_idle(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "2"').replace(
-        '"PrCode": "136"', '"PrCode": "5"'
+    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "7"').replace(
+        '"PrCode": "136"', '"PrCode": "71"'
     )
     entry = await _init_full_control(hass, aioclient_mock, rapid_idle)
     state = _state(hass, entry, "switch", UNIQUE_ID_WASH_STEAM_SWITCH)
@@ -754,14 +800,14 @@ async def test_estimated_duration_cotton_light_soil(
 async def test_estimated_duration_rapid_uses_default_duration(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    # Rapid has fixed soil (min=max=0) → uses default_duration = 14
-    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "2"').replace(
-        '"PrCode": "136"', '"PrCode": "5"'
+    # Rapid has fixed soil (min=max=2) → uses default_duration = 30
+    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "7"').replace(
+        '"PrCode": "136"', '"PrCode": "71"'
     )
     entry = await _init_full_control(hass, aioclient_mock, rapid_idle)
     state = _state(hass, entry, "sensor", UNIQUE_ID_WASH_ESTIMATED_DURATION)
     assert state is not None
-    assert state.state == "14"
+    assert state.state == "30"
 
 
 async def test_estimated_duration_steam_off_no_change(
@@ -1026,15 +1072,15 @@ _NFC_BATHROBE = DownloadableProgram(
     description_translations={"en": "Wash your bathrobe."},
 )
 
-# New Clothes: parent=6 → Output 6 → RAPID_30_MIN (pos=2, selector_position=2, pr_code=5, max_spin_speed=255)
-# position=33, spin_speed=1000, soil_level=0 → sent as SLevTgt=0 (no fallback)
+# New Clothes: parent=6 → Output 6 → RAPID_30_MIN (pos=8, selector_position=7, pr_code=71, max_spin_speed=255)
+# position=33, spin_speed=1000, soil_level=2
 _NFC_NEW_CLOTHES = DownloadableProgram(
     position=33,
     name="DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_NEW_CLOTHES",
     parent=6,
     temperature=20,
     spin_speed=1000,
-    soil_level=0,
+    soil_level=2,
     options=0,
     steam=0,
     translations={"en": "New Clothes"},
@@ -1042,13 +1088,45 @@ _NFC_NEW_CLOTHES = DownloadableProgram(
     description_translations={"en": "Wash new clothes."},
 )
 
-_NFC_PROGRAMS = [_NFC_BATHROBE, _NFC_NEW_CLOTHES]
+# Gym Fit: parent=7 → Output 7 → RAPID_44_MIN (pos=9, selector_position=7, pr_code=103, max_spin_speed=255)
+# position=37, spin_speed=1000, soil_level=0 → falls back to base.min_soil_level=3 (Rapid 44')
+_NFC_GYM_FIT = DownloadableProgram(
+    position=37,
+    name="DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_GYM_FIT",
+    parent=7,
+    temperature=30,
+    spin_speed=1000,
+    soil_level=0,
+    options=0,
+    steam=0,
+    translations={"en": "Gym Fit - Fitness"},
+    category_translations={"en": "Special"},
+    description_translations={"en": "Wash gym and fitness clothes."},
+)
+
+# Tablecloths: parent=1 → Output 1 → RESISTANT_COTTONS
+# soil_level=3 → duration_soil_max=120 (distinct from default_duration=90 and medium=90)
+_NFC_TABLECLOTHS = DownloadableProgram(
+    position=58,
+    name="DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_TABLECLOTHS",
+    parent=1,
+    temperature=60,
+    spin_speed=1000,
+    soil_level=3,
+    options=0,
+    steam=0,
+    translations={"en": "Tablecloths"},
+    category_translations={"en": "Home Care"},
+    description_translations={"en": "Wash tablecloths."},
+)
+
+_NFC_PROGRAMS = [_NFC_BATHROBE, _NFC_NEW_CLOTHES, _NFC_GYM_FIT, _NFC_TABLECLOTHS]
 
 
 async def _init_full_control_nfc(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
 ) -> MockConfigEntry:
-    """Init Full Control with NFC switch turned on and two NFC test programs."""
+    """Init Full Control with NFC switch turned on and NFC test programs."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="test-full-control-nfc",
@@ -1112,6 +1190,15 @@ def test_resolve_downloadable_programs_matches_rapid():
     assert base.name == "RAPID_30_MIN"
 
 
+def test_resolve_downloadable_programs_matches_gym_fit():
+    programs = parse_wash_programs(_PROGRAMS)
+    resolved = resolve_downloadable_programs([_NFC_GYM_FIT], programs)
+    assert len(resolved) == 1
+    nfc, base = resolved[0]
+    assert nfc.name == "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_GYM_FIT"
+    assert base.name == "RAPID_44_MIN"
+
+
 def test_resolve_downloadable_programs_skips_unresolvable():
     unknown = DownloadableProgram(
         position=99,
@@ -1144,9 +1231,12 @@ async def test_nfc_program_options_appear_in_select(
     # Standard programs still present
     assert "Whites" in options
     assert "Rapid 30 Min." in options
+    assert "Rapid 44 Min." in options
     # NFC programs appended with category prefix
     assert "Home Care - Bathrobe" in options
+    assert "Home Care - Tablecloths" in options
     assert "Special - New Clothes" in options
+    assert "Special - Gym Fit - Fitness" in options
 
 
 async def test_nfc_description_sensor_seeded_from_running_special_program(
@@ -1220,6 +1310,18 @@ async def test_nfc_description_sensor_updated_on_select(
     assert state.state.startswith("This programme is developed")
 
 
+def test_nfc_description_sensor_seed_from_coordinator_none():
+    """Description sensor handles coordinator update with None status without error."""
+    mock_coord = MagicMock()
+    mock_coord.data = None
+    mock_entry = MagicMock()
+    mock_entry.data = {}
+
+    sensor = CandyWashProgramDescriptionSensor(mock_coord, mock_entry)
+    sensor._seed_from_coordinator()
+    assert sensor.native_value is None
+
+
 async def test_nfc_program_options_absent_when_toggle_off(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
@@ -1240,16 +1342,50 @@ async def test_nfc_program_duration_attribute(
         "select", DOMAIN, UNIQUE_ID_WASH_PROGRAM_SELECT.format(entry.entry_id)
     )
 
-    # Select NFC program — duration attribute should be present
+    # Select Tablecloths (soil_level=3) — duration should be 120 (duration_soil_max), not default 90
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": program_eid, "option": "Home Care - Tablecloths"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_PROGRAM_SELECT)
+    assert state is not None
+    assert state.attributes.get("duration_minutes") == 120
+    sensor_state = _state(hass, entry, "sensor", UNIQUE_ID_WASH_ESTIMATED_DURATION)
+    assert sensor_state is not None
+    assert sensor_state.state == "120"
+
+    # Select Bathrobe (soil_level=2) — duration should be 90 (duration_soil_medium)
     await hass.services.async_call(
         "select",
         "select_option",
         {"entity_id": program_eid, "option": "Home Care - Bathrobe"},
         blocking=True,
     )
+    await hass.async_block_till_done()
     state = _state(hass, entry, "select", UNIQUE_ID_WASH_PROGRAM_SELECT)
     assert state is not None
     assert state.attributes.get("duration_minutes") == 90
+    sensor_state = _state(hass, entry, "sensor", UNIQUE_ID_WASH_ESTIMATED_DURATION)
+    assert sensor_state is not None
+    assert sensor_state.state == "90"
+
+    # Select Gym Fit (soil_level=0) — falls back to base soil 3 duration 44
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": program_eid, "option": "Special - Gym Fit - Fitness"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_PROGRAM_SELECT)
+    assert state is not None
+    assert state.attributes.get("duration_minutes") == 44
+    sensor_state = _state(hass, entry, "sensor", UNIQUE_ID_WASH_ESTIMATED_DURATION)
+    assert sensor_state is not None
+    assert sensor_state.state == "44"
 
     # Switch to standard program — duration attribute should be absent
     await hass.services.async_call(
@@ -1258,6 +1394,7 @@ async def test_nfc_program_duration_attribute(
         {"entity_id": program_eid, "option": "Whites"},
         blocking=True,
     )
+    await hass.async_block_till_done()
     state = _state(hass, entry, "select", UNIQUE_ID_WASH_PROGRAM_SELECT)
     assert state is not None
     assert state.attributes.get("duration_minutes") is None
@@ -1372,11 +1509,52 @@ async def test_start_button_sends_nfc_command(
     assert "Stm=0" in qs
 
 
-async def test_start_button_nfc_zero_soil_level_sent_directly(
+async def test_start_button_nfc_zero_soil_level_falls_back_to_base_soil_level(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    # New Clothes: position=33, parent=6 → base=RAPID_30_MIN (PrCode=5)
-    # PrNm=2 (base.selector_position), soil_level=0 → sent as SLevTgt=0 (no fallback)
+    # Gym Fit: position=37, parent=7 → base=RAPID_44_MIN (PrCode=103, selector_position=7)
+    # nfc.soil_level=0 is outside RAPID_44_MIN's soil range [3, 3] → falls back to base.min_soil_level=3
+    # This ensures the machine runs the 44-minute cycle instead of defaulting to Rapid 14' (SLevTgt=0/1)
+    entry = await _init_full_control_nfc(hass, aioclient_mock, _IDLE_JSON)
+    registry = er.async_get(hass)
+
+    program_eid = registry.async_get_entity_id(
+        "select", DOMAIN, UNIQUE_ID_WASH_PROGRAM_SELECT.format(entry.entry_id)
+    )
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": program_eid, "option": "Special - Gym Fit - Fitness"},
+        blocking=True,
+    )
+
+    start_eid = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_eid}, blocking=True
+        )
+
+    qs: str = mock_send.call_args[0][0]
+    assert "PrNm=7" in qs
+    assert f"PrNm={_NFC_GYM_FIT.position}" not in qs
+    assert "PrCode=103" in qs
+    assert "PrStr=Gym%20Fit%20-%20Fitness" in qs
+    assert "TmpTgt=30" in qs
+    assert "SpdTgt=10" in qs  # 1000 // 100
+    assert "SLevTgt=3" in qs  # falls back to RAPID_44_MIN min_soil_level (3)
+    assert "RecipeId=D_37" in qs
+
+
+async def test_start_button_nfc_new_clothes(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    # New Clothes: position=33, parent=6 → base=RAPID_30_MIN (PrCode=71, selector_position=7)
+    # nfc.soil_level=2 matches RAPID_30_MIN's soil range [2, 2] → SLevTgt=2
     entry = await _init_full_control_nfc(hass, aioclient_mock, _IDLE_JSON)
     registry = er.async_get(hass)
 
@@ -1402,14 +1580,83 @@ async def test_start_button_nfc_zero_soil_level_sent_directly(
         )
 
     qs: str = mock_send.call_args[0][0]
-    assert "PrNm=2" in qs
+    assert "PrNm=7" in qs
     assert f"PrNm={_NFC_NEW_CLOTHES.position}" not in qs
-    assert "PrCode=5" in qs
+    assert "PrCode=71" in qs
     assert "PrStr=New%20Clothes" in qs
     assert "TmpTgt=20" in qs
     assert "SpdTgt=10" in qs  # 1000 // 100
-    assert "SLevTgt=0" in qs  # nfc.soil_level=0, sent directly
+    assert "SLevTgt=2" in qs  # matches base soil level
     assert "RecipeId=D_33" in qs
+
+
+async def test_start_button_nfc_with_checkup_scheduled(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """NFC start button records checkup pending when checkup is scheduled."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-full-control-nfc-checkup",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_PROGRAMS: _PROGRAMS,
+            CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_EVERY_CYCLE,
+        },
+    )
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=_IDLE_JSON)
+    _add_stats_mocks(aioclient_mock)
+    entry.add_to_hass(hass)
+    with (
+        patch(
+            "custom_components.candy.select.load_downloadable_programs",
+            return_value=_NFC_PROGRAMS,
+        ),
+        patch(
+            "custom_components.candy.button.load_downloadable_programs",
+            return_value=_NFC_PROGRAMS,
+        ),
+    ):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    nfc_switch_eid = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_NFC_SWITCH.format(entry.entry_id)
+    )
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": nfc_switch_eid}, blocking=True
+    )
+
+    program_eid = registry.async_get_entity_id(
+        "select", DOMAIN, UNIQUE_ID_WASH_PROGRAM_SELECT.format(entry.entry_id)
+    )
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": program_eid, "option": "Special - New Clothes"},
+        blocking=True,
+    )
+
+    start_eid = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_eid}, blocking=True
+        )
+
+    qs: str = mock_send.call_args[0][0]
+    assert "StartCheckUp=1" in qs
+    assert "RecipeId=D_33" in qs
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
 
 
 # ---------------------------------------------------------------------------
@@ -1544,8 +1791,8 @@ async def test_wash_option_unavailable_when_program_unsupported(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     # Start with Rapid active: it has available_options=0, so prewash must be unavailable.
-    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "2"').replace(
-        '"PrCode": "136"', '"PrCode": "5"'
+    rapid_idle = _IDLE_JSON.replace('"Pr": "1"', '"Pr": "7"').replace(
+        '"PrCode": "136"', '"PrCode": "71"'
     )
     entry = await _init_full_control_with_options(hass, aioclient_mock, rapid_idle)
     state = _state(hass, entry, "switch", UNIQUE_ID_WASH_OPTION_PREWASH)
@@ -1572,6 +1819,66 @@ async def test_wash_option_turn_on_off(
         "switch", "turn_off", {"entity_id": prewash_eid}, blocking=True
     )
     assert hass.states.get(prewash_eid).state == "off"
+
+
+async def test_steam_switch_turn_off(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Steam switch can be turned on and turned off."""
+    entry = await _init_full_control(hass, aioclient_mock, _IDLE_JSON)
+    registry = er.async_get(hass)
+    steam_eid = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_STEAM_SWITCH.format(entry.entry_id)
+    )
+    assert steam_eid is not None
+
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": steam_eid}, blocking=True
+    )
+    assert hass.states.get(steam_eid).state == "on"
+
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": steam_eid}, blocking=True
+    )
+    assert hass.states.get(steam_eid).state == "off"
+
+
+async def test_nfc_switch_turn_off(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """NFC special programs switch can be turned off."""
+    entry = await _init_full_control_nfc(hass, aioclient_mock, _IDLE_JSON)
+    registry = er.async_get(hass)
+    nfc_eid = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_NFC_SWITCH.format(entry.entry_id)
+    )
+    assert nfc_eid is not None
+    assert hass.states.get(nfc_eid).state == "on"
+
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": nfc_eid}, blocking=True
+    )
+    assert hass.states.get(nfc_eid).state == "off"
+
+
+async def test_wash_option_switch_unavailable_when_coordinator_fails(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Wash option switch reports unavailable when coordinator update fails."""
+    entry = await _init_full_control_with_options(hass, aioclient_mock, _IDLE_JSON)
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    registry = er.async_get(hass)
+    prewash_eid = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_OPTION_PREWASH.format(entry.entry_id)
+    )
+    assert prewash_eid is not None
+    assert hass.states.get(prewash_eid).state == "off"
+
+    coordinator.last_update_success = False
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+
+    assert hass.states.get(prewash_eid).state == "unavailable"
 
 
 async def test_start_button_includes_option_mask(

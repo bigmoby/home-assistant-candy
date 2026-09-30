@@ -36,8 +36,8 @@
         }
       },
       "language": {
-        "title": "Langue des programmes",
-        "description": "Choisissez la langue à utiliser pour les noms des programmes dans l'interface. Elle peut différer de la langue de Home Assistant.",
+        "title": "Langue de l'appareil",
+        "description": "Choisissez la langue pour les noms des programmes et les messages de l'appareil (rappels, erreurs et résultats de diagnostic). Elle peut différer de la langue de Home Assistant.",
         "data": {
           "program_language": "Langue"
         }

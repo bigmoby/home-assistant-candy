@@ -84,7 +84,7 @@ _TEST_PROGRAMS = [
     {
         "program": {
             "position": 1,
-            "name": "DUAL_WM_WD_PROGRAM_NAME_RESISTANT_COTTONS",
+            "name": "DUAL_WM_WD_PROGRAM_NAME_SPECIAL_39",
             "command_parameters": [
                 {"command_parameter": {"name": "selector_position", "validation": "1"}},
                 {"command_parameter": {"name": "pr_code", "validation": "136"}},
@@ -93,11 +93,11 @@ _TEST_PROGRAMS = [
     },
     {
         "program": {
-            "position": 2,
+            "position": 8,
             "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_30_MIN",
             "command_parameters": [
-                {"command_parameter": {"name": "selector_position", "validation": "2"}},
-                {"command_parameter": {"name": "pr_code", "validation": "5"}},
+                {"command_parameter": {"name": "selector_position", "validation": "7"}},
+                {"command_parameter": {"name": "pr_code", "validation": "71"}},
             ],
         }
     },
@@ -109,7 +109,7 @@ _TEST_NFC_NEW_CLOTHES = DownloadableProgram(
     parent=6,
     temperature=20,
     spin_speed=1000,
-    soil_level=0,
+    soil_level=2,
     options=0,
     steam=0,
     translations={"en": "New Clothes"},
@@ -124,7 +124,8 @@ async def test_program_sensor_standard_program(
     """Test wash program sensor displaying standard program name when RecipeId is 0."""
     status_payload = (
         load_fixture("washing_machine/idle.json")
-        .replace('"Pr": "1"', '"Pr": "2"')
+        .replace('"Pr": "1"', '"Pr": "7"')
+        .replace('"PrCode": "136"', '"PrCode": "71"')
         .replace('"RecipeId": "0"', '"RecipeId": "0"')
     )
     with patch(
@@ -135,7 +136,7 @@ async def test_program_sensor_standard_program(
             hass,
             aioclient_mock,
             status_payload,
-            statistics_response='{"statusCounters": {"Program1": "10"}}',
+            statistics_response='{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}',
             extra_config_data={
                 CONF_KEY_PROGRAMS: _TEST_PROGRAMS,
                 CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
@@ -154,7 +155,8 @@ async def test_program_sensor_special_program(
     """Test wash program sensor displaying downloadable program name when RecipeId is D_33."""
     status_payload = (
         load_fixture("washing_machine/idle.json")
-        .replace('"Pr": "1"', '"Pr": "2"')
+        .replace('"Pr": "1"', '"Pr": "7"')
+        .replace('"PrCode": "136"', '"PrCode": "71"')
         .replace('"RecipeId": "0"', '"RecipeId": "D_33"')
     )
     with patch(
@@ -165,7 +167,7 @@ async def test_program_sensor_special_program(
             hass,
             aioclient_mock,
             status_payload,
-            statistics_response='{"statusCounters": {"Program1": "10"}}',
+            statistics_response='{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}',
             extra_config_data={
                 CONF_KEY_PROGRAMS: _TEST_PROGRAMS,
                 CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
@@ -184,7 +186,8 @@ async def test_program_sensor_special_program_numeric_recipe_id(
     """Test wash program sensor matching downloadable program with numeric string RecipeId."""
     status_payload = (
         load_fixture("washing_machine/idle.json")
-        .replace('"Pr": "1"', '"Pr": "2"')
+        .replace('"Pr": "1"', '"Pr": "7"')
+        .replace('"PrCode": "136"', '"PrCode": "71"')
         .replace('"RecipeId": "0"', '"RecipeId": "33"')
     )
     with patch(
@@ -195,7 +198,7 @@ async def test_program_sensor_special_program_numeric_recipe_id(
             hass,
             aioclient_mock,
             status_payload,
-            statistics_response='{"statusCounters": {"Program1": "10"}}',
+            statistics_response='{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}',
             extra_config_data={
                 CONF_KEY_PROGRAMS: _TEST_PROGRAMS,
                 CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
@@ -214,7 +217,8 @@ async def test_program_sensor_special_program_unknown_recipe_id_fallback(
     """Test fallback to standard base program when RecipeId is not in downloadable catalog."""
     status_payload = (
         load_fixture("washing_machine/idle.json")
-        .replace('"Pr": "1"', '"Pr": "2"')
+        .replace('"Pr": "1"', '"Pr": "7"')
+        .replace('"PrCode": "136"', '"PrCode": "71"')
         .replace('"RecipeId": "0"', '"RecipeId": "D_999"')
     )
     with patch(
@@ -225,7 +229,7 @@ async def test_program_sensor_special_program_unknown_recipe_id_fallback(
             hass,
             aioclient_mock,
             status_payload,
-            statistics_response='{"statusCounters": {"Program1": "10"}}',
+            statistics_response='{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}',
             extra_config_data={
                 CONF_KEY_PROGRAMS: _TEST_PROGRAMS,
                 CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
@@ -236,6 +240,35 @@ async def test_program_sensor_special_program_unknown_recipe_id_fallback(
     assert state
     assert state.state == "Rapid 30 Min."
     assert state.attributes["recipe_id"] == "D_999"
+
+
+async def test_program_sensor_legacy_downloadable_position_match(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Test displaying downloadable program name when matched by dial position with RecipeId 0."""
+    status_payload = (
+        load_fixture("washing_machine/idle.json")
+        .replace('"Pr": "1"', '"Pr": "33"')
+        .replace('"RecipeId": "0"', '"RecipeId": "0"')
+    )
+    with patch(
+        "custom_components.candy.sensor.load_downloadable_programs",
+        return_value=[_TEST_NFC_NEW_CLOTHES],
+    ):
+        await init_integration(
+            hass,
+            aioclient_mock,
+            status_payload,
+            statistics_response='{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}',
+            extra_config_data={
+                CONF_KEY_PROGRAMS: _TEST_PROGRAMS,
+                CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
+            },
+        )
+
+    state = hass.states.get("sensor.wash_program")
+    assert state
+    assert state.state == "New Clothes"
 
 
 async def test_cycle_sensor_idle(
@@ -394,7 +427,7 @@ async def test_total_cycles_sensor(
     state = hass.states.get("sensor.total_wash_cycles")
 
     assert state
-    assert state.state == "40"
+    assert state.state == "388"
     assert state.attributes == {
         "friendly_name": "Total wash cycles",
         "icon": "mdi:counter",
@@ -580,9 +613,9 @@ _MAINTENANCE_CONFIG = {
     CONF_KEY_IS_WASHING_MACHINE: True,
     CONF_KEY_MAINTENANCE_ENABLED: True,
     CONF_KEY_WATER_HARDNESS: 2,
-    CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 0,
-    CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 0,
-    CONF_KEY_MAINTENANCE_LAST_FILTER: 0,
+    CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 348,
+    CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 348,
+    CONF_KEY_MAINTENANCE_LAST_FILTER: 348,
 }
 
 
@@ -641,7 +674,7 @@ async def test_maintenance_sensors_absent_without_statistics(
 async def test_full_checkup_sensor(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """total_cycles=40, last_full_checkup=0, threshold=100 → 60 cycles remaining."""
+    """total_cycles=388, last_full_checkup=348, threshold=100 → 60 cycles remaining."""
     await init_integration(
         hass,
         aioclient_mock,
@@ -661,7 +694,7 @@ async def test_full_checkup_sensor(
 async def test_limescale_sensor_medium_hardness(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """total_cycles=40, last_limescale=0, hardness=2 (threshold=100) → 60 remaining."""
+    """total_cycles=388, last_limescale=348, hardness=2 (threshold=100) → 60 remaining."""
     await init_integration(
         hass,
         aioclient_mock,
@@ -681,7 +714,7 @@ async def test_limescale_sensor_medium_hardness(
 async def test_limescale_sensor_very_hard_water(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """total_cycles=40, last_limescale=0, hardness=5 (threshold=85) → 45 remaining."""
+    """total_cycles=388, last_limescale=348, hardness=5 (threshold=85) → 45 remaining."""
     config = dict(_MAINTENANCE_CONFIG)
     config[CONF_KEY_WATER_HARDNESS] = 5
 
@@ -701,7 +734,7 @@ async def test_limescale_sensor_very_hard_water(
 
 
 async def test_filter_sensor(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
-    """total_cycles=40, last_filter=0, threshold=100 → 60 remaining."""
+    """total_cycles=388, last_filter=348, threshold=100 → 60 remaining."""
     await init_integration(
         hass,
         aioclient_mock,
@@ -722,9 +755,9 @@ async def test_maintenance_sensor_shows_zero_when_due(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     """When elapsed == threshold (multiple), sensor shows 0 (due now)."""
-    # total_cycles=40, threshold=100; last_full_checkup=-60 → elapsed=100 → due
+    # total_cycles=388, threshold=100; last_full_checkup=288 → elapsed=100 → due
     config = dict(_MAINTENANCE_CONFIG)
-    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = -60
+    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = 288
 
     await init_integration(
         hass,
@@ -745,9 +778,9 @@ async def test_maintenance_sensor_full_threshold_when_just_reset(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     """When last_reset == total_cycles (just reset), sensor shows the full threshold."""
-    # total_cycles=40, last_selfclean=40 → elapsed=0 → full threshold=100
+    # total_cycles=388, last_selfclean=388 → elapsed=0 → full threshold=100
     config = dict(_MAINTENANCE_CONFIG)
-    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = 40
+    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = 388
 
     await init_integration(
         hass,
@@ -771,26 +804,37 @@ async def test_maintenance_sensor_full_threshold_when_just_reset(
 _PROGRAM_NO_DOSE = [
     {
         "program": {
-            "position": 1,
-            "name": "COTTON",
+            "position": 7,
+            "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_14_MIN",
             "command_parameters": [
-                {"command_parameter": {"name": "pr_code", "validation": "136"}},
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "7",
+                    }
+                },
+                {
+                    "command_parameter": {
+                        "name": "pr_code",
+                        "validation": "39",
+                    }
+                },
                 {
                     "command_parameter": {
                         "name": "maximum_temperature",
-                        "validation": "90",
+                        "validation": "30",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "default_temperature",
-                        "validation": "40",
+                        "validation": "30",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "maximum_spin_speed",
-                        "validation": "1400",
+                        "validation": "1200",
                     }
                 },
                 {
@@ -808,13 +852,13 @@ _PROGRAM_NO_DOSE = [
                 {
                     "command_parameter": {
                         "name": "maximum_soil_level",
-                        "validation": "3",
+                        "validation": "1",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "default_soil_level",
-                        "validation": "2",
+                        "validation": "1",
                     }
                 },
             ],
@@ -825,10 +869,21 @@ _PROGRAM_NO_DOSE = [
 _PROGRAM_WITH_DOSE = [
     {
         "program": {
-            "position": 1,
-            "name": "COTTON",
+            "position": 16,
+            "name": "DUAL_WM_WD_PROGRAM_NAME_RESISTANT_COTTONS",
             "command_parameters": [
-                {"command_parameter": {"name": "pr_code", "validation": "136"}},
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "14",
+                    }
+                },
+                {
+                    "command_parameter": {
+                        "name": "pr_code",
+                        "validation": "65",
+                    }
+                },
                 {
                     "command_parameter": {
                         "name": "maximum_temperature",
@@ -838,19 +893,19 @@ _PROGRAM_WITH_DOSE = [
                 {
                     "command_parameter": {
                         "name": "default_temperature",
-                        "validation": "40",
+                        "validation": "60",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "maximum_spin_speed",
-                        "validation": "1400",
+                        "validation": "1200",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "default_spin_speed",
-                        "validation": "800",
+                        "validation": "1200",
                     }
                 },
                 {
@@ -868,19 +923,19 @@ _PROGRAM_WITH_DOSE = [
                 {
                     "command_parameter": {
                         "name": "default_soil_level",
-                        "validation": "2",
+                        "validation": "3",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "liquid_detergent_dose",
-                        "validation": "2",
+                        "validation": "4",
                     }
                 },
                 {
                     "command_parameter": {
                         "name": "powder_detergent_dose",
-                        "validation": "3",
+                        "validation": "4",
                     }
                 },
             ],

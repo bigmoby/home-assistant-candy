@@ -218,8 +218,11 @@ class WashProgramSelect(CandyWashSelectBase):
             ),
             None,
         )
-        if nfc_match is not None and nfc_match[1].default_duration:
-            return {"duration_minutes": nfc_match[1].default_duration}
+        if nfc_match is not None:
+            nfc, base = nfc_match
+            duration = base.duration_for_soil(nfc.resolve_soil_target(base))
+            if duration:
+                return {"duration_minutes": duration}
         return None
 
     async def async_select_option(self, option: str) -> None:

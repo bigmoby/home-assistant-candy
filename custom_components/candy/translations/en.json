@@ -37,8 +37,8 @@
         }
       },
       "language": {
-        "title": "Program language",
-        "description": "Choose which language to use for program names in the UI. This can differ from your Home Assistant language.",
+        "title": "Appliance language",
+        "description": "Choose the language for program names and appliance messages (reminders, errors, and check-up results). This can differ from your Home Assistant language.",
         "data": {
           "program_language": "Language"
         }
@@ -112,8 +112,8 @@
         "description": "This will remove all write controls (program select, start/stop, steam, delay). The integration will continue to monitor your device.\n\nClick Submit to confirm."
       },
       "language": {
-        "title": "Program language",
-        "description": "Choose which language to use for program names in the UI. This can differ from your Home Assistant language.",
+        "title": "Appliance language",
+        "description": "Choose the language for program names and appliance messages (reminders, errors, and check-up results). This can differ from your Home Assistant language.",
         "data": {
           "program_language": "Language"
         }

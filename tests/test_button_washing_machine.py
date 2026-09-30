@@ -35,9 +35,9 @@ _MAINTENANCE_CONFIG = {
     CONF_KEY_IS_WASHING_MACHINE: True,
     CONF_KEY_MAINTENANCE_ENABLED: True,
     CONF_KEY_WATER_HARDNESS: 2,
-    CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 0,
-    CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 0,
-    CONF_KEY_MAINTENANCE_LAST_FILTER: 0,
+    CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 348,
+    CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 348,
+    CONF_KEY_MAINTENANCE_LAST_FILTER: 348,
     CONF_KEY_MODE: MODE_FULL_CONTROL,
 }
 
@@ -121,7 +121,7 @@ async def test_reset_buttons_absent_without_statistics(
 async def test_reset_full_checkup_stores_total_cycles(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """Pressing resets last_reset to total_cycles (40)."""
+    """Pressing resets last_reset to total_cycles (388)."""
     entry = await _init(hass, aioclient_mock, _MAINTENANCE_CONFIG)
 
     await hass.services.async_call(
@@ -131,7 +131,7 @@ async def test_reset_full_checkup_stores_total_cycles(
         blocking=True,
     )
 
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 40
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 388
 
 
 async def test_reset_limescale_stores_total_cycles(
@@ -146,7 +146,7 @@ async def test_reset_limescale_stores_total_cycles(
         blocking=True,
     )
 
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 40
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 388
 
 
 async def test_reset_filter_stores_total_cycles(
@@ -161,7 +161,7 @@ async def test_reset_filter_stores_total_cycles(
         blocking=True,
     )
 
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 40
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 388
 
 
 async def test_reset_full_checkup_sensor_shows_full_threshold_after_reset(
@@ -170,7 +170,7 @@ async def test_reset_full_checkup_sensor_shows_full_threshold_after_reset(
     """After reset, sensor immediately reflects full threshold without waiting for poll."""
     await _init(hass, aioclient_mock, _MAINTENANCE_CONFIG)
 
-    # Before: total=40, last=0 → 60 remaining
+    # Before: total=388, last=348 → 60 remaining
     assert (
         hass.states.get(
             "sensor.washing_machine_check_up_maintenance_remaining_cycles"
@@ -195,9 +195,9 @@ async def test_reset_counter_that_is_overdue(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     """Counter at 0 (overdue) returns to full threshold after reset."""
-    # total=40, last=-60 → elapsed=100 → due (sensor=0)
+    # total=388, last=288 → elapsed=100 → due (sensor=0)
     config = dict(_MAINTENANCE_CONFIG)
-    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = -60
+    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = 288
 
     await _init(hass, aioclient_mock, config)
 
@@ -225,9 +225,9 @@ async def test_reset_idempotent_when_already_at_max(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     """Pressing again when counter is already at max is a no-op."""
-    # total=40, last=40 → sensor already shows full threshold
+    # total=388, last=388 → sensor already shows full threshold
     config = dict(_MAINTENANCE_CONFIG)
-    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = 40
+    config[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = 388
 
     entry = await _init(hass, aioclient_mock, config)
 
@@ -243,7 +243,7 @@ async def test_reset_idempotent_when_already_at_max(
     )
     await hass.async_block_till_done()
 
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 40
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 388
     assert hass.states.get(
         "sensor.washing_machine_check_up_maintenance_remaining_cycles"
     ).state == str(MAINTENANCE_FULL_CHECKUP_THRESHOLD)

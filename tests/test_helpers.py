@@ -13,7 +13,11 @@ from custom_components.candy.const import (
     DOMAIN,
     MODE_FULL_CONTROL,
 )
-from custom_components.candy.helpers import cycles_remaining, wash_device_info
+from custom_components.candy.helpers import (
+    cycles_remaining,
+    get_wash_error_notification_strings,
+    wash_device_info,
+)
 
 
 @pytest.mark.parametrize(
@@ -79,3 +83,29 @@ def test_wash_device_info_full_control():
     assert info["model"] == "RO41274DWMSE"
     assert info["serial_number"] == "SN123456"
     assert "hw_version" not in info
+
+
+def test_get_wash_error_notification_strings():
+    # English
+    en_result = get_wash_error_notification_strings(2, "en")
+    assert en_result is not None
+    title, message = en_result
+    assert title == "Washing machine error: E02"
+    assert message.startswith("E02-Troubles with loading water\n\n")
+
+    # Italian
+    it_result = get_wash_error_notification_strings(2, "it")
+    assert it_result is not None
+    title, message = it_result
+    assert title == "Errore lavatrice: E02"
+    assert message.startswith("E02-Problema di carico acqua\n\n")
+
+    # Fallback to English for unknown language
+    fallback_result = get_wash_error_notification_strings(2, "unknown_lang")
+    assert fallback_result is not None
+    title, message = fallback_result
+    assert title == "Washing machine error: E02"
+    assert message.startswith("E02-Troubles with loading water\n\n")
+
+    # Unknown error code returns None
+    assert get_wash_error_notification_strings(99, "en") is None

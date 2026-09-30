@@ -9,7 +9,10 @@ DATA_KEY_CLIENT = "client"
 DATA_KEY_WRITE_PENDING = "write_pending"
 DATA_KEY_MAINT_UNSUB = "maint_unsub"
 DATA_KEY_CHECKUP_UNSUB = "checkup_unsub"
+DATA_KEY_FULL_CHECKUP_UNSUB = "full_checkup_unsub"
 DATA_KEY_STATS_REFRESH_UNSUB = "stats_refresh_unsub"
+DATA_KEY_LIMESCALE_UNSUB = "limescale_unsub"
+DATA_KEY_WASH_ERROR_UNSUB = "wash_error_unsub"
 
 CONF_INTEGRATION_TITLE = "Candy"
 CONF_KEY_USE_ENCRYPTION = "use_encryption"
@@ -96,6 +99,7 @@ CONF_KEY_CHECKUP_ENABLED = "checkup_enabled"
 CONF_KEY_CHECKUP_SCHEDULE = "checkup_schedule"
 CONF_KEY_CHECKUP_LAST_DATE = "checkup_last_date"
 CONF_KEY_CHECKUP_LAST_RESULT = "checkup_last_result"
+CONF_KEY_CHECKUP_PENDING = "checkup_pending"
 
 CHECKUP_SCHEDULE_EVERY_CYCLE = 0
 CHECKUP_SCHEDULE_WEEKLY = 1
@@ -129,6 +133,7 @@ NOTIF_ID_FULL_CHECKUP = "candy_{0}_full_checkup"
 
 UNIQUE_ID_WASH_LIMESCALE_BUTTON = "{0}-wash_limescale_button"
 NOTIF_ID_LIMESCALE = "candy_{0}_limescale"
+NOTIF_ID_WASH_ERROR = "candy_{0}_wash_error"
 
 UNIQUE_ID_WASH_PROGRAM_SELECT = "{0}-wash_program_select"
 UNIQUE_ID_WASH_PROGRAM_DESCRIPTION = "{0}-wash_program_description"

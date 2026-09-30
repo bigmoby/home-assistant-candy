@@ -71,3 +71,16 @@ def wash_device_info(config_entry: ConfigEntry) -> DeviceInfo:
         if config_entry.data.get(CONF_KEY_SERIAL_NUMBER):
             info["serial_number"] = config_entry.data[CONF_KEY_SERIAL_NUMBER]
     return info
+
+
+def get_wash_error_notification_strings(
+    error_code: int, language: str
+) -> tuple[str, str] | None:
+    """Return (title, message) for washing machine error, or None if unknown code."""
+    msg_key = f"wash_error_{error_code}_message"
+    if msg_key not in _NOTIFICATION_STRINGS:
+        return None
+    base_title = localized_notification_text("wash_error_title", language)
+    title = f"{base_title}: E{error_code:02d}"
+    message = localized_notification_text(msg_key, language)
+    return title, message
