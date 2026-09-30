@@ -13,10 +13,12 @@ from .const import (
     CONF_KEY_MAC_ADDRESS,
     CONF_KEY_MODE,
     CONF_KEY_SERIAL_NUMBER,
+    DEVICE_NAME_DISHWASHER,
     DEVICE_NAME_WASHING_MACHINE,
     DOMAIN,
     MODE_FULL_CONTROL,
     SUGGESTED_AREA_BATHROOM,
+    SUGGESTED_AREA_KITCHEN,
 )
 
 _NOTIFICATION_STRINGS: dict[str, dict[str, str]] = json.loads(
@@ -52,11 +54,23 @@ def cycles_remaining(total: int, last_reset: int, threshold: int) -> int:
 
 
 def wash_device_info(config_entry: ConfigEntry) -> DeviceInfo:
+    return _device_info(
+        config_entry, DEVICE_NAME_WASHING_MACHINE, SUGGESTED_AREA_BATHROOM
+    )
+
+
+def dishwasher_device_info(config_entry: ConfigEntry) -> DeviceInfo:
+    return _device_info(config_entry, DEVICE_NAME_DISHWASHER, SUGGESTED_AREA_KITCHEN)
+
+
+def _device_info(
+    config_entry: ConfigEntry, name: str, suggested_area: str
+) -> DeviceInfo:
     info = DeviceInfo(
         identifiers={(DOMAIN, config_entry.entry_id)},
-        name=DEVICE_NAME_WASHING_MACHINE,
+        name=name,
         manufacturer="Candy",
-        suggested_area=SUGGESTED_AREA_BATHROOM,
+        suggested_area=suggested_area,
     )
     if config_entry.data.get(CONF_KEY_MAC_ADDRESS):
         info["connections"] = {

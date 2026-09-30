@@ -78,6 +78,12 @@
       },
       "wash_stop_button": {
         "name": "Зупинити прання"
+      },
+      "dishwasher_start_button": {
+        "name": "Запустити посудомийну машину"
+      },
+      "dishwasher_stop_button": {
+        "name": "Зупинити посудомийну машину"
       }
     }
   },

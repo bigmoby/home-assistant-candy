@@ -135,6 +135,9 @@
       },
       "wash_scheduled_finish": {
         "name": "Wash scheduled finish"
+      },
+      "dishwasher_error_code": {
+        "name": "Codice errore lavastoviglie"
       }
     },
     "select": {
@@ -149,11 +152,29 @@
       },
       "wash_soil_select": {
         "name": "Livello di sporco"
+      },
+      "dishwasher_program_select": {
+        "name": "Programma da avviare",
+        "state": {
+          "panel": "Come sul pannello",
+          "eco_45": "ECO 45°C",
+          "intensive_75": "Intensivo 75°C",
+          "night_55": "Notte 55°C",
+          "universal_60": "Universale 60°C",
+          "auto": "Auto 55-65°C",
+          "glass_45": "Cristalli 45°C",
+          "zoom_39": "Zoom 39' 60°C",
+          "rapid_24": "Rapido 24' 50°C",
+          "prewash": "Ammollo"
+        }
       }
     },
     "number": {
       "wash_delay_number": {
         "name": "Ritardo partenza"
+      },
+      "dishwasher_delay_number": {
+        "name": "Partenza ritardata lavastoviglie"
       }
     },
     "button": {
@@ -162,11 +183,39 @@
       },
       "wash_stop_button": {
         "name": "Ferma lavaggio"
+      },
+      "dishwasher_start_button": {
+        "name": "Avvia lavastoviglie"
+      },
+      "dishwasher_stop_button": {
+        "name": "Ferma lavastoviglie"
       }
     },
     "light": {
       "wine_cooler_light": {
         "name": "Luce"
+      }
+    },
+    "switch": {
+      "dishwasher_eco_switch": {
+        "name": "Opzione eco lavastoviglie"
+      },
+      "dishwasher_three_in_one_switch": {
+        "name": "Pastiglie 3in1"
+      }
+    },
+    "binary_sensor": {
+      "dishwasher_salt_empty": {
+        "name": "Sale esaurito"
+      },
+      "dishwasher_rinse_aid_empty": {
+        "name": "Brillantante esaurito"
+      },
+      "dishwasher_door": {
+        "name": "Sportello lavastoviglie"
+      },
+      "remote_control": {
+        "name": "Controllo remoto"
       }
     }
   },

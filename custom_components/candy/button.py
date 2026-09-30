@@ -29,7 +29,7 @@ from .client import (
     parse_wash_programs,
     resolve_downloadable_programs,
 )
-from .client.model import MachineState
+from .client.model import DishwasherStatus, MachineState
 from .const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_WEEKLY,
@@ -74,6 +74,7 @@ from .const import (
     UNIQUE_ID_WASH_TEMP_SELECT,
     WASH_OPTIONS,
 )
+from .dishwasher import dishwasher_buttons
 from .helpers import (
     localized_notification_text,
     remote_control_enabled,
@@ -102,17 +103,23 @@ async def async_setup_entry(
     hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities
 ) -> None:
     config_id = config_entry.entry_id
+    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
+        DATA_KEY_COORDINATOR
+    ]
+    client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
+
+    # Dishwashers need no cloud data: remote start/stop only requires the local
+    # key, and the machine itself gates commands with its remote control switch.
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_buttons(coordinator, config_entry, client))
+        return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
-        DATA_KEY_COORDINATOR
-    ]
     if not isinstance(coordinator.data, WashingMachineStatus):
         return
 
-    client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
     programs = parse_wash_programs(config_entry.data.get(CONF_KEY_PROGRAMS, []))
     raw_dl = config_entry.data.get(CONF_KEY_DOWNLOADABLE_PROGRAMS, [])
     nfc_entries = resolve_downloadable_programs(

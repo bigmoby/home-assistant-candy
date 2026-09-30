@@ -78,6 +78,12 @@
       },
       "wash_stop_button": {
         "name": "Parar lavagem"
+      },
+      "dishwasher_start_button": {
+        "name": "Iniciar máquina de lavar loiça"
+      },
+      "dishwasher_stop_button": {
+        "name": "Parar máquina de lavar loiça"
       }
     }
   },
