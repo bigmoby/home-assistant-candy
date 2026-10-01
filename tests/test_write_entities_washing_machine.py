@@ -237,6 +237,14 @@ _RUNNING_JSON = """{
   }
 }"""
 
+_PAUSED_JSON = """{
+  "statusLavatrice": {
+    "WiFiStatus": "1", "Err": "0", "MachMd": "3", "Pr": "1", "PrPh": "2",
+    "PrCode": "136", "SLevel": "0", "Temp": "40", "SpinSp": "8",
+    "DelVal": "0", "RemTime": "1800", "FillR": "50", "CheckUpState": "0"
+  }
+}"""
+
 # MachMd=1 (IDLE) is the closest the device returns; OFF is synthetic (unreachable).
 # Simulate it by using IDLE JSON and then patching the coordinator data to MachineState.OFF.
 _OFF_JSON = """{
@@ -551,6 +559,41 @@ async def test_start_button_sends_command(
     assert "PrNm=1" in query_string
     assert "PrCode=136" in query_string
     assert "PrStr=Whites" in query_string
+
+
+async def test_start_button_available_when_paused(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """The start button doubles as resume, so it must be usable while paused."""
+    entry = await _init_full_control(hass, aioclient_mock, _PAUSED_JSON)
+    state = _state(hass, entry, "button", UNIQUE_ID_WASH_START_BUTTON)
+    assert state is not None
+    assert state.state != "unavailable"
+
+
+async def test_start_button_sends_resume_when_paused(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """While paused the button must resume (Pa=0), not program a new cycle."""
+    entry = await _init_full_control(hass, aioclient_mock, _PAUSED_JSON)
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+    assert entity_id is not None
+
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": entity_id}, blocking=True
+        )
+
+    mock_send.assert_called_once()
+    query_string: str = mock_send.call_args[0][0]
+    assert query_string == "Pa=0"
+    assert "StSt=1" not in query_string
 
 
 # ---------------------------------------------------------------------------

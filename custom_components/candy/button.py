@@ -257,9 +257,17 @@ class WashStartButton(CandyWashButtonBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        return status.machine_state == MachineState.IDLE
+        return status.machine_state in (MachineState.IDLE, MachineState.PAUSED)
 
     async def async_press(self) -> None:
+        status = cast(WashingMachineStatus, self.coordinator.data)
+        if status.machine_state == MachineState.PAUSED:
+            # Resume the paused program rather than programming a new one.
+            # "Pa=0" is the inverse of the pause command ("Pa=1"); the device
+            # continues the current program with its remaining time intact.
+            await self._send_command_and_refresh("Pa=0")
+            return
+
         registry = er.async_get(self.hass)
 
         def _get_state(unique_id_template: str) -> str | None:
