@@ -460,8 +460,56 @@ async def test_spin_select_available_for_cotton_idle(
     state = _state(hass, entry, "select", UNIQUE_ID_WASH_SPIN_SELECT)
     assert state is not None
     assert state.state not in ("unavailable", "unknown")
-    assert "1400" in state.attributes["options"]
-    assert "400" in state.attributes["options"]
+    assert state.attributes["options"] == [
+        "0",
+        "400",
+        "600",
+        "800",
+        "1000",
+        "1200",
+        "1400",
+    ]
+
+
+async def test_spin_select_special_catalog_speeds(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Verify special catalog speeds (1300/1500) are included only when in catalog."""
+    prog_1300 = {
+        "program": {
+            "position": 1,
+            "name": "COTTONS_1300",
+            "command_parameters": [
+                {"command_parameter": {"name": "selector_position", "validation": "1"}},
+                {
+                    "command_parameter": {
+                        "name": "maximum_spin_speed",
+                        "validation": "1300",
+                    }
+                },
+                {
+                    "command_parameter": {
+                        "name": "default_spin_speed",
+                        "validation": "1300",
+                    }
+                },
+            ],
+        }
+    }
+    entry = await _init_full_control_custom(
+        hass, aioclient_mock, _IDLE_JSON, {CONF_KEY_PROGRAMS: [prog_1300]}
+    )
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_SPIN_SELECT)
+    assert state is not None
+    assert state.attributes["options"] == [
+        "0",
+        "400",
+        "600",
+        "800",
+        "1000",
+        "1200",
+        "1300",
+    ]
 
 
 async def test_spin_select_unavailable_when_running(

@@ -79,23 +79,7 @@ from .helpers import (
 )
 
 _TEMP_STEPS = [0, 20, 30, 40, 60, 90]
-# Confirmed via Simply-Fi APK CandyWasher.spinStepsForInterfaceType (CandyWasher.java)
-_SPIN_STEPS = [
-    0,
-    400,
-    500,
-    600,
-    700,
-    800,
-    900,
-    1000,
-    1100,
-    1200,
-    1300,
-    1400,
-    1500,
-    1600,
-]
+_BASE_EVEN_SPIN_STEPS: tuple[int, ...] = (0, 400, 600, 800, 1000, 1200, 1400, 1600)
 
 
 async def async_setup_entry(
@@ -835,6 +819,30 @@ class WashSpinSelect(CandyWashSelectBase):
     _selected_program: WashingMachineWashProgram | None = None
     _nfc_active: bool = False
 
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        client: CandyClient,
+        programs: list[WashingMachineWashProgram],
+    ) -> None:
+        super().__init__(coordinator, config_entry, client, programs)
+        valid_max_spins = [
+            p.max_spin_speed for p in programs if p.max_spin_speed not in (0, 255)
+        ]
+        appliance_max = max(valid_max_spins, default=1400)
+        catalog_spins = {
+            s
+            for p in programs
+            for s in (p.default_spin_speed, p.max_spin_speed)
+            if s not in (0, 255) and s <= appliance_max
+        }
+        special_catalog_spins = {s for s in catalog_spins if s % 200 != 0}
+        base_steps = {s for s in _BASE_EVEN_SPIN_STEPS if s <= appliance_max}
+        self._appliance_spin_steps: list[int] = sorted(
+            base_steps | special_catalog_spins
+        )
+
     @property
     def unique_id(self) -> str:
         return UNIQUE_ID_WASH_SPIN_SELECT.format(self.config_id)
@@ -860,7 +868,7 @@ class WashSpinSelect(CandyWashSelectBase):
         prog = self._active_program()
         if prog is None or prog.max_spin_speed == 255:
             return []
-        return [str(s) for s in _SPIN_STEPS if s <= prog.max_spin_speed]
+        return [str(s) for s in self._appliance_spin_steps if s <= prog.max_spin_speed]
 
     @property
     def current_option(self) -> str | None:
