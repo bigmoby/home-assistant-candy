@@ -6,7 +6,10 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, load_f
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy.client import TumbleDryerProgram
-from custom_components.candy.sensor import CandyTumbleErrorCodeSensor
+from custom_components.candy.sensor import (
+    CandyTumbleDelaySensor,
+    CandyTumbleErrorCodeSensor,
+)
 
 from .common import init_integration
 
@@ -288,3 +291,14 @@ def test_tumble_dryer_program_localization() -> None:
     )
     assert prog_dl.localized_name("en") == "Easy Iron Sintetics"
     assert prog_dl.localized_name("it") == "Stiro Facile - Sintetici"
+
+
+def test_candy_tumble_delay_sensor_none_data() -> None:
+    """Test tumble delay sensor returns None when coordinator data is None."""
+    coordinator = MagicMock()
+    coordinator.data = None
+    config_entry = MagicMock()
+    config_entry.entry_id = "test_entry"
+    config_entry.data = {}
+    sensor = CandyTumbleDelaySensor(coordinator, config_entry)
+    assert sensor.native_value is None

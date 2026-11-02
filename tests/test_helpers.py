@@ -21,11 +21,14 @@ from custom_components.candy.const import (
 from custom_components.candy.helpers import (
     command_settling_delay,
     cycles_remaining,
+    dryer_device_info,
     get_appliance_error_notification_strings,
     get_dryer_error_notification_strings,
     get_wash_error_notification_strings,
     is_dualtech,
     is_washer_dryer,
+    remote_control_enabled,
+    supports_autodose,
     supports_remote_pause,
     supports_scheduled_checkup,
     wash_device_info,
@@ -316,3 +319,57 @@ def test_supports_scheduled_checkup(
 )
 def test_command_settling_delay(interface_type: str | None, expected: int) -> None:
     assert command_settling_delay(interface_type) == expected
+
+
+def test_dryer_device_info():
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: "192.168.0.2",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_BRAND: "hoover",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_MAC_ADDRESS: "11:22:33:44:55:66",
+            CONF_KEY_DEVICE_MODEL: "DXOH9A2TCE",
+            CONF_KEY_SERIAL_NUMBER: "SN999888",
+        },
+    )
+    info = dryer_device_info(entry)
+    assert info["name"] == "Tumble dryer"
+    assert info["manufacturer"] == "Hoover"
+    assert (dr.CONNECTION_NETWORK_MAC, "11:22:33:44:55:66") in info["connections"]
+    assert info["model"] == "DXOH9A2TCE"
+    assert info["serial_number"] == "SN999888"
+
+
+def test_dryer_device_info_default_brand():
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_KEY_BRAND: ""},
+    )
+    info = dryer_device_info(entry)
+    assert info["manufacturer"] == "Candy"
+
+
+def test_remote_control_enabled():
+    mock_wm = MagicMock()
+    mock_wm.remote_control = True
+    # Non-status object
+    assert remote_control_enabled("not_a_status") is False
+    assert remote_control_enabled(None) is False
+
+
+def test_supports_autodose():
+    assert supports_autodose(None) is False
+    assert supports_autodose("") is False
+    assert supports_autodose("RAPIDO_4DIG_STM_AD_NEL") is True
+    assert supports_autodose("RAPIDO_4DIG_STM_NEL") is False
+
+
+def test_is_washer_dryer_corrupt_programs():
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_KEY_PROGRAMS: [{"invalid": "format"}]},
+    )
+    assert is_washer_dryer(entry, None) is False

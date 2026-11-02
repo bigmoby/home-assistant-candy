@@ -407,7 +407,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             consecutive_timeouts += 1
             if prev_state == MachineState.OFF:
                 coordinator.update_interval = SCAN_INTERVAL_RESTING
-                return _make_off_status(last_known_status)
+                last_known_status = _make_off_status(last_known_status)
+                return last_known_status
 
             if can_infer_off:
                 if (
@@ -434,7 +435,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                     prev_state,
                 )
                 coordinator.update_interval = SCAN_INTERVAL_RESTING
-                return _make_off_status(last_known_status)
+                last_known_status = _make_off_status(last_known_status)
+                return last_known_status
             raise UpdateFailed(f"Error communicating with API: {err!r}") from err
         except Exception as err:
             raise UpdateFailed(f"Error communicating with API: {err!r}") from err

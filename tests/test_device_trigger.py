@@ -25,6 +25,7 @@ from custom_components.candy.const import (
     DOMAIN,
 )
 from custom_components.candy.device_trigger import (
+    _config_entry_id_for_device,
     async_attach_trigger,
     async_get_triggers,
 )
@@ -80,6 +81,7 @@ def _trigger_config(trigger_type: str, device_id: str = "dev-1") -> dict:
 def _mock_device(entry_id: str) -> MagicMock:
     device = MagicMock()
     device.config_entries = {entry_id}
+    device.config_entry_id = entry_id
     return device
 
 
@@ -676,3 +678,114 @@ async def test_dryer_warning_trigger_water_tank_full(hass):
         coordinator.data = _make_td(True)
         listener_cb()
         assert mock_job.call_count == 1
+
+
+async def test_get_triggers_entry_none(hass):
+    """When _config_entry_id_for_device returns an ID but config entry is missing."""
+    with patch(
+        "custom_components.candy.device_trigger._config_entry_id_for_device",
+        return_value="missing_entry",
+    ):
+        result = await async_get_triggers(hass, device_id="dev-1")
+    assert result == []
+
+
+async def test_attach_trigger_entry_none(hass):
+    """When _config_entry_id_for_device returns an ID but config entry is missing."""
+    with patch(
+        "custom_components.candy.device_trigger._config_entry_id_for_device",
+        return_value="missing_entry",
+    ):
+        unsub = await async_attach_trigger(
+            hass,
+            _trigger_config("washing_started"),
+            lambda action_ctx: None,
+            {"trigger_data": {}},
+        )
+    assert callable(unsub)
+    unsub()
+
+
+async def test_dryer_warning_trigger_status_none(hass):
+    """When coordinator.data updates to None inside _attach_dryer_warning_trigger."""
+
+    def _make_td(clean_filter: bool) -> TumbleDryerStatus:
+        return TumbleDryerStatus(
+            machine_state=MachineState.IDLE,
+            program_state=DryerProgramState.STOPPED,
+            cycle_state=DryerCycleState.LEVEL_NONE,
+            program=1,
+            remaining_minutes=0,
+            remote_control=True,
+            dry_level=2,
+            dry_level_selected=1,
+            refresh=False,
+            need_clean_filter=clean_filter,
+            water_tank_full=False,
+            door_closed=True,
+            error="0",
+            delay_value=0,
+            checkup_state=None,
+            recipe_id=None,
+            time=0,
+            rapido=0,
+        )
+
+    coordinator = MagicMock()
+    coordinator.data = _make_td(False)
+    listener_cb = None
+
+    def _add_listener(cb):
+        nonlocal listener_cb
+        listener_cb = cb
+        return lambda: None
+
+    coordinator.async_add_listener = _add_listener
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="td-none-status-trig", data={})
+    entry.add_to_hass(hass)
+    hass.data[DOMAIN] = {entry.entry_id: {DATA_KEY_COORDINATOR: coordinator}}
+
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = _mock_device(entry.entry_id)
+        await async_attach_trigger(
+            hass,
+            _trigger_config("clean_filter_needed"),
+            lambda action_ctx: None,
+            {"trigger_data": {}},
+        )
+
+    assert listener_cb is not None
+    coordinator.data = None
+    listener_cb()
+
+
+async def test_config_entry_id_fallback_and_other_domain(hass):
+    """Test _config_entry_id_for_device with non-domain entry and config_entries fallback."""
+    # Entry of another domain
+    other_entry = MockConfigEntry(domain="other_domain", unique_id="other-1")
+    other_entry.add_to_hass(hass)
+
+    device_other = MagicMock()
+    device_other.config_entry_id = other_entry.entry_id
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = device_other
+        assert _config_entry_id_for_device(hass, "dev-other") is None
+
+    # Device with config_entries fallback (no config_entry_id)
+    candy_entry = MockConfigEntry(domain=DOMAIN, unique_id="candy-fb")
+    candy_entry.add_to_hass(hass)
+
+    device_fallback = MagicMock()
+    device_fallback.config_entry_id = None
+    device_fallback.config_entries = {candy_entry.entry_id}
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = device_fallback
+        assert _config_entry_id_for_device(hass, "dev-fb") == candy_entry.entry_id
+
+    # Fallback with config_entries not matching DOMAIN
+    device_fallback_other = MagicMock()
+    device_fallback_other.config_entry_id = None
+    device_fallback_other.config_entries = {other_entry.entry_id}
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = device_fallback_other
+        assert _config_entry_id_for_device(hass, "dev-other-fb") is None

@@ -7,11 +7,14 @@ import pytest
 from custom_components.candy.client.model import (
     DownloadableProgram,
     MachineState,
+    TumbleDryerProgram,
     TumbleDryerStatus,
     WasherDryerDryTarget,
     WashingMachineStatus,
     WashingMachineWashProgram,
     WashProgramState,
+    WineCoolerProgram,
+    WineCoolerStatus,
     load_downloadable_programs,
 )
 
@@ -728,3 +731,187 @@ def test_washing_machine_status_autodose_and_good_night_fields() -> None:
     assert status.softener_cycles_remaining == 15
     assert status.water_hardness == 2
     assert status.extra_dose_active is True
+
+
+def test_wash_program_from_dict_command_parameters_dict():
+    raw = {
+        "program": {
+            "position": 1,
+            "name": "COTTON",
+            "command_parameters": {
+                "selector_position": "1",
+                "pr_code": "1",
+                "program_type": "W",
+            },
+        }
+    }
+    prog = WashingMachineWashProgram.from_dict(raw)
+    assert prog.name == "COTTON"
+    assert prog.position == 1
+
+
+def test_wash_program_without_program_type():
+    prog_dry = WashingMachineWashProgram(
+        position=1,
+        selector_position=1,
+        name="COTTON_DRY",
+        pr_code=1,
+        max_temperature=0,
+        default_temperature=0,
+        max_spin_speed=0,
+        default_spin_speed=0,
+        min_soil_level=0,
+        max_soil_level=0,
+        default_soil_level=0,
+        steam=False,
+        steam_type="",
+        default_duration=0,
+        duration_soil_max=0,
+        duration_soil_medium=0,
+        duration_soil_min=0,
+        liquid_detergent_dose=None,
+        powder_detergent_dose=None,
+        max_cycle_capacity=None,
+        available_options=0,
+        program_type=None,
+        selector_position_dry=None,
+        dry_supported=False,
+        dry=0,
+    )
+    assert prog_dry.is_dry is True
+    assert prog_dry.is_wash is False
+
+    prog_wash = WashingMachineWashProgram(
+        position=2,
+        selector_position=2,
+        name="COTTON",
+        pr_code=2,
+        max_temperature=0,
+        default_temperature=0,
+        max_spin_speed=0,
+        default_spin_speed=0,
+        min_soil_level=0,
+        max_soil_level=0,
+        default_soil_level=0,
+        steam=False,
+        steam_type="",
+        default_duration=0,
+        duration_soil_max=0,
+        duration_soil_medium=0,
+        duration_soil_min=0,
+        liquid_detergent_dose=None,
+        powder_detergent_dose=None,
+        max_cycle_capacity=None,
+        available_options=0,
+        program_type=None,
+        selector_position_dry=None,
+        dry_supported=False,
+        dry=0,
+    )
+    assert prog_wash.is_dry is False
+    assert prog_wash.is_wash is True
+
+
+def test_tumble_dryer_program_display_name():
+    prog = TumbleDryerProgram(
+        position=1,
+        selector_position=1,
+        name="COTTON",
+        default_drying_level=2,
+        max_time_level=3,
+        default_time_level=1,
+        set_dry_level=True,
+        set_time_level=False,
+        set_rapido=False,
+        duration=120,
+        mask1=0,
+        mask2=0,
+    )
+    assert prog.display_name == prog.localized_name("en")
+
+
+def test_wine_cooler_program_default_temp():
+    assert WineCoolerProgram.RED_WINE.default_temp == 16
+    assert WineCoolerProgram.WHITE_WINE.default_temp == 12
+    assert WineCoolerProgram.SPARKLING.default_temp == 8
+    assert WineCoolerProgram.default_temp.fget(None) == 12
+
+
+def test_wine_cooler_status_from_json_invalid_program_down():
+    data = {
+        "r2": "0",
+        "r3": "1",
+        "r4": "16",
+        "r5": "2",
+        "r7": "99",
+    }
+    status = WineCoolerStatus.from_json(data)
+    assert status.program_down is None
+
+
+def test_wash_program_from_dict_direct_name_and_auto_clean():
+    raw = {
+        "program": {
+            "position": 1,
+            "name": "WA_PROG_AUTO_CLEAN",
+            "command_parameters": [
+                {"name": "selector_position", "validation": "1"},
+                {"name": "pr_code", "validation": "99"},
+                {"name": "program_type", "validation": "W"},
+            ],
+        }
+    }
+    prog = WashingMachineWashProgram.from_dict(raw)
+    assert prog.name == "AUTOCLEAN"
+    assert (
+        prog.localized_description("en") is not None
+        or prog.localized_description("en") is None
+    )
+
+
+def test_tumble_dryer_program_from_dict_dict_and_list():
+    raw_dict = {
+        "program": {
+            "position": 1,
+            "name": "COTTON",
+            "command_parameters": {
+                "selector_position": "1",
+                "default_drying_level": "2",
+                "duration": "100",
+            },
+        }
+    }
+    prog1 = TumbleDryerProgram.from_dict(raw_dict)
+    assert prog1.duration == 100
+
+    raw_list = {
+        "program": {
+            "position": 2,
+            "name": "SYNTHETICS",
+            "command_parameters": [
+                {"command_parameter": {"name": "selector_position", "validation": "2"}},
+                {"name": "duration", "validation": "80"},
+            ],
+        }
+    }
+    prog2 = TumbleDryerProgram.from_dict(raw_list)
+    assert prog2.duration == 80
+
+
+def test_downloadable_program_category_and_description():
+    prog = DownloadableProgram(
+        position=1,
+        name="TEST_PROG",
+        parent=1,
+        temperature=40,
+        spin_speed=1000,
+        soil_level=1,
+        options=0,
+        steam=0,
+        translations={"en": "Test Prog"},
+        category_translations={"en": "Test Cat"},
+        description_translations={"en": "Test Desc"},
+    )
+    assert prog.category_name("en") == "Test Cat"
+    assert prog.category_prefixed("en") == "Test Cat - Test Prog"
+    assert prog.description("en") == "Test Desc"

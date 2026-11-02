@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
@@ -18,7 +18,9 @@ from custom_components.candy import (
     SCAN_INTERVAL_RESTING,
     _make_off_status,
     _register_checkup_listener,
+    _register_dryer_checkup_listener,
     _register_dryer_error_listener,
+    _register_dryer_warning_listener,
     _register_stats_refresh_listener,
     _register_wash_error_listener,
     _restore_last_known_statistics,
@@ -32,18 +34,25 @@ from custom_components.candy.client.model import (
     OvenStatus,
     TumbleDryerStatus,
     WashingMachineStatus,
+    WineCoolerProgram,
+    WineCoolerState,
+    WineCoolerStatus,
 )
 from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_WATER_HARDNESS,
+    DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
     DATA_KEY_DRYER_CHECKUP_UNSUB,
     DATA_KEY_DRYER_ERROR_UNSUB,
     DATA_KEY_DRYER_WARNING_UNSUB,
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WASH_ERROR_UNSUB,
+    MODE_FULL_CONTROL,
     NOTIF_ID_DRYER_FILTER,
     NOTIF_ID_DRYER_WATER_TANK,
     UNIQUE_ID_DISHWASHER,
@@ -1085,3 +1094,151 @@ async def test_dryer_listeners_unloaded(
     await hass.async_block_till_done()
 
     assert entry.entry_id not in hass.data.get(DOMAIN, {})
+
+
+def test_make_off_status_wine_cooler():
+    wc_status = WineCoolerStatus(
+        machine_state=WineCoolerState.ON,
+        program=WineCoolerProgram.RED_WINE,
+        temp=16,
+        light=False,
+        error=None,
+        remote_control=True,
+    )
+    off_status = _make_off_status(wc_status)
+    assert off_status.machine_state == WineCoolerState.OFF
+
+
+async def test_coordinator_off_state_consecutive_timeout(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _STATUS_IDLE,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        exc=aiohttp.ClientError,
+    )
+    # 3 consecutive timeouts transition to OFF
+    for _ in range(3):
+        await coordinator.async_refresh()
+    assert coordinator.data.machine_state == MachineState.OFF
+
+    # 4th timeout while already in OFF triggers lines 408-410
+    await coordinator.async_refresh()
+    assert coordinator.data.machine_state == MachineState.OFF
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING
+
+
+async def test_stats_fetch_update_failed_when_no_prior_stats(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        text=_STATUS_IDLE,
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        exc=aiohttp.ClientError,
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Integration sets up, but stats coordinator is absent because first fetch failed without cached stats
+    assert DATA_KEY_STATS_COORDINATOR not in hass.data[DOMAIN][entry.entry_id]
+
+
+def test_dryer_warning_and_checkup_null_data(hass: HomeAssistant):
+    entry = MockConfigEntry(domain=DOMAIN, data={})
+    entry.add_to_hass(hass)
+    mock_coordinator = MagicMock()
+    mock_coordinator.data = None
+    warning_cb = None
+    checkup_cb = None
+
+    def _capture_warning(cb):
+        nonlocal warning_cb
+        warning_cb = cb
+        return MagicMock()
+
+    def _capture_checkup(cb):
+        nonlocal checkup_cb
+        checkup_cb = cb
+        return MagicMock()
+
+    mock_coordinator.async_add_listener = _capture_warning
+    _register_dryer_warning_listener(hass, entry, mock_coordinator)
+    assert warning_cb is not None
+    # Test line 1052: status is None returns early
+    warning_cb()
+
+    mock_coordinator.async_add_listener = _capture_checkup
+    mock_client = MagicMock()
+    _register_dryer_checkup_listener(hass, entry, mock_coordinator, mock_client)
+    assert checkup_cb is not None
+    # Test line 1104: status is None returns early
+    checkup_cb()
+
+
+_STATUS_TD_CHECKUP_RUNNING = """{
+  "statusTD": {
+    "StatoWiFi": "1", "StatoTD": "2", "CodiceErrore": "0", "Pr": "1", "PrPh": "0",
+    "RemTime": "0", "DryLev": "2", "Time": "0", "Rapido": "0",
+    "Refresh": "0", "CleanFilter": "0", "WaterTankFull": "0", "DryingManagerLevel": "1",
+    "DelVal": "0", "DoorState": "1", "RecipeId": "NULL", "CheckUpState": "1"
+  }
+}"""
+
+_STATUS_TD_CHECKUP_COMPLETED = """{
+  "statusTD": {
+    "StatoWiFi": "1", "StatoTD": "1", "CodiceErrore": "0", "Pr": "1", "PrPh": "0",
+    "RemTime": "0", "DryLev": "2", "Time": "0", "Rapido": "0",
+    "Refresh": "0", "CleanFilter": "0", "WaterTankFull": "0", "DryingManagerLevel": "1",
+    "DelVal": "0", "DoorState": "1", "RecipeId": "NULL", "CheckUpState": "2"
+  }
+}"""
+
+
+async def test_dryer_checkup_reset_failure_logs_warning(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _STATUS_TD_CHECKUP_RUNNING,
+        extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_INTERFACE_TYPE: "TD_DIGIT_A",
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    client = hass.data[DOMAIN][entry.entry_id][DATA_KEY_CLIENT]
+
+    with (
+        patch.object(
+            client, "send_command", side_effect=RuntimeError("Command failed")
+        ),
+        patch("custom_components.candy.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{TEST_IP}/http-read.json?encrypted=0",
+            text=_STATUS_TD_CHECKUP_COMPLETED,
+        )
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()

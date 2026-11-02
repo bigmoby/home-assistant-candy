@@ -357,3 +357,25 @@ async def test_diagnostics_dataclass_serialization(hass):
         "machine_state": "idle",
         "program_id": 3,
     }
+
+
+async def test_diagnostics_arbitrary_object_serialization(hass):
+    """Test diagnostics serializes arbitrary objects via str()."""
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="diag-str-obj", data={})
+    entry.add_to_hass(hass)
+
+    class CustomObject:
+        def __str__(self):
+            return "custom_str_representation"
+
+    coordinator = MagicMock()
+    coordinator.data = CustomObject()
+
+    hass.data[DOMAIN] = {
+        entry.entry_id: {
+            DATA_KEY_COORDINATOR: coordinator,
+        }
+    }
+
+    result = await async_get_config_entry_diagnostics(hass, entry)
+    assert result["coordinator_data"] == "custom_str_representation"
