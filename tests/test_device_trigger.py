@@ -771,20 +771,25 @@ async def test_config_entry_id_fallback_and_other_domain(hass):
         mock_reg.return_value.async_get.return_value = device_other
         assert _config_entry_id_for_device(hass, "dev-other") is None
 
-    # Device with config_entries fallback (no config_entry_id)
+    # Device with config_entry_id = None (unassigned device on modern HA)
+    device_none = MagicMock()
+    device_none.config_entry_id = None
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = device_none
+        assert _config_entry_id_for_device(hass, "dev-none") is None
+
+    # Device with config_entries fallback (pre-2026.8 HA without config_entry_id attribute)
     candy_entry = MockConfigEntry(domain=DOMAIN, unique_id="candy-fb")
     candy_entry.add_to_hass(hass)
 
-    device_fallback = MagicMock()
-    device_fallback.config_entry_id = None
+    device_fallback = MagicMock(spec=["config_entries"])
     device_fallback.config_entries = {candy_entry.entry_id}
     with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
         mock_reg.return_value.async_get.return_value = device_fallback
         assert _config_entry_id_for_device(hass, "dev-fb") == candy_entry.entry_id
 
     # Fallback with config_entries not matching DOMAIN
-    device_fallback_other = MagicMock()
-    device_fallback_other.config_entry_id = None
+    device_fallback_other = MagicMock(spec=["config_entries"])
     device_fallback_other.config_entries = {other_entry.entry_id}
     with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
         mock_reg.return_value.async_get.return_value = device_fallback_other

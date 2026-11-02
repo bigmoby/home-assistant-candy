@@ -63,11 +63,12 @@ def _config_entry_id_for_device(hass: HomeAssistant, device_id: str) -> str | No
     device = dr.async_get(hass).async_get(device_id)
     if device is None:
         return None
-    entry_id = getattr(device, "config_entry_id", None)
-    if entry_id is not None:
-        entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is not None and entry.domain == DOMAIN:
-            return entry_id
+    if hasattr(device, "config_entry_id"):
+        entry_id = device.config_entry_id
+        if entry_id is not None:
+            entry = hass.config_entries.async_get_entry(entry_id)
+            if entry is not None and entry.domain == DOMAIN:
+                return entry_id
         return None
     for eid in getattr(device, "config_entries", ()):
         entry = hass.config_entries.async_get_entry(eid)
