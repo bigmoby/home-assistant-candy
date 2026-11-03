@@ -257,7 +257,7 @@ class WashStartButton(CandyWashButtonBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        return status.machine_state == MachineState.IDLE
+        return status.machine_state in {MachineState.IDLE, MachineState.FINISHED1, MachineState.FINISHED2}
 
     async def async_press(self) -> None:
         registry = er.async_get(self.hass)
