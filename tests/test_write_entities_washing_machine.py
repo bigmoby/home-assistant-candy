@@ -289,6 +289,22 @@ _OFF_JSON = """{
   }
 }"""
 
+_FINISHED1_JSON = """{
+  "statusLavatrice": {
+    "WiFiStatus": "1", "Err": "0", "MachMd": "7", "Pr": "1", "PrPh": "6",
+    "PrCode": "136", "SLevel": "0", "Temp": "40", "SpinSp": "8",
+    "DelVal": "0", "RemTime": "0", "FillR": "0", "CheckUpState": "0"
+  }
+}"""
+
+_FINISHED2_JSON = """{
+  "statusLavatrice": {
+    "WiFiStatus": "1", "Err": "0", "MachMd": "8", "Pr": "1", "PrPh": "6",
+    "PrCode": "136", "SLevel": "0", "Temp": "40", "SpinSp": "8",
+    "DelVal": "0", "RemTime": "0", "FillR": "0", "CheckUpState": "0"
+  }
+}"""
+
 _STATS_OK = (
     '{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}'
 )
@@ -642,6 +658,84 @@ async def test_delay_number_available_when_off(
     state = _state(hass, entry, "number", UNIQUE_ID_WASH_DELAY_NUMBER)
     assert state is not None
     assert state.state not in ("unavailable", "unknown")
+
+
+@pytest.mark.parametrize("status_json", [_FINISHED1_JSON, _FINISHED2_JSON])
+async def test_start_button_available_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
+):
+    entry = await _init_full_control(hass, aioclient_mock, status_json)
+    state = _state(hass, entry, "button", UNIQUE_ID_WASH_START_BUTTON)
+    assert state is not None
+    assert state.state != "unavailable"
+
+
+async def test_start_button_sends_command_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await _init_full_control(hass, aioclient_mock, _FINISHED1_JSON)
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+    assert entity_id is not None
+
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": entity_id}, blocking=True
+        )
+
+    mock_send.assert_called_once()
+    query_string: str = mock_send.call_args[0][0]
+    assert "Write=1" in query_string
+    assert "StSt=1" in query_string
+
+
+@pytest.mark.parametrize("status_json", [_FINISHED1_JSON, _FINISHED2_JSON])
+async def test_program_select_available_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
+):
+    entry = await _init_full_control(hass, aioclient_mock, status_json)
+    state = _state(hass, entry, "select", UNIQUE_ID_WASH_PROGRAM_SELECT)
+    assert state is not None
+    assert state.state not in ("unavailable", "unknown")
+
+
+@pytest.mark.parametrize("status_json", [_FINISHED1_JSON, _FINISHED2_JSON])
+async def test_delay_number_available_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
+):
+    entry = await _init_full_control(hass, aioclient_mock, status_json)
+    state = _state(hass, entry, "number", UNIQUE_ID_WASH_DELAY_NUMBER)
+    assert state is not None
+    assert state.state not in ("unavailable", "unknown")
+
+
+@pytest.mark.parametrize("status_json", [_FINISHED1_JSON, _FINISHED2_JSON])
+async def test_steam_switch_available_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
+):
+    entry = await _init_full_control(hass, aioclient_mock, status_json)
+    steam_state = _state(hass, entry, "switch", UNIQUE_ID_WASH_STEAM_SWITCH)
+    assert steam_state is not None
+    assert steam_state.state not in ("unavailable", "unknown")
+
+
+@pytest.mark.parametrize("status_json", [_FINISHED1_JSON, _FINISHED2_JSON])
+async def test_inapplicable_buttons_unavailable_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
+):
+    entry = await _init_full_control(hass, aioclient_mock, status_json)
+    pause_state = _state(hass, entry, "button", UNIQUE_ID_WASH_PAUSE_BUTTON)
+    assert pause_state is not None
+    assert pause_state.state == "unavailable"
+
+    resume_state = _state(hass, entry, "button", UNIQUE_ID_WASH_RESUME_BUTTON)
+    assert resume_state is not None
+    assert resume_state.state == "unavailable"
 
 
 async def test_start_button_sends_command(
@@ -1977,6 +2071,16 @@ async def test_wash_option_available_cotton_idle(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     entry = await _init_full_control_with_options(hass, aioclient_mock, _IDLE_JSON)
+    state = _state(hass, entry, "switch", UNIQUE_ID_WASH_OPTION_PREWASH)
+    assert state is not None
+    assert state.state not in ("unavailable", "unknown")
+
+
+@pytest.mark.parametrize("status_json", [_FINISHED1_JSON, _FINISHED2_JSON])
+async def test_wash_option_available_when_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, status_json: str
+):
+    entry = await _init_full_control_with_options(hass, aioclient_mock, status_json)
     state = _state(hass, entry, "switch", UNIQUE_ID_WASH_OPTION_PREWASH)
     assert state is not None
     assert state.state not in ("unavailable", "unknown")

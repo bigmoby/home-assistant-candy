@@ -209,7 +209,12 @@ class WashSteamSwitch(_WashSwitchBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        if status.machine_state not in {MachineState.IDLE, MachineState.OFF}:
+        if status.machine_state not in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }:
             return False
         prog = self._active_program()
         return prog is not None and prog.steam
@@ -300,7 +305,12 @@ class WashOptionSwitch(_WashSwitchBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        if status.machine_state not in {MachineState.IDLE, MachineState.OFF}:
+        if status.machine_state not in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }:
             return False
         prog = self._active_program()
         return prog is not None and bool(prog.available_options & self._bitmask)
@@ -437,7 +447,12 @@ class WashExtraDoseSwitch(_WashSwitchBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        if status.machine_state not in {MachineState.IDLE, MachineState.OFF}:
+        if status.machine_state not in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }:
             return False
         prog = self._active_program()
         return prog is not None and bool(prog.available_options & 1)

@@ -452,7 +452,12 @@ class WashStartButton(CandyWashButtonBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        return status.machine_state == MachineState.IDLE
+        # Simply-Fi app allows cycle start in IDLE or FINISHED states (CandyWasher.updateWithStatus, credit: Cessibear)
+        return status.machine_state in {
+            MachineState.IDLE,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }
 
     def _get_dry_target(self, registry: er.EntityRegistry) -> int:
         entity_id = registry.async_get_entity_id(

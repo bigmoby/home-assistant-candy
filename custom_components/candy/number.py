@@ -86,7 +86,12 @@ class WashDelayNumber(CoordinatorEntity, NumberEntity):
         if not remote_control_enabled(self.coordinator.data):
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        return status.machine_state in {MachineState.IDLE, MachineState.OFF}
+        return status.machine_state in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }
 
     @property
     def device_info(self) -> DeviceInfo:
