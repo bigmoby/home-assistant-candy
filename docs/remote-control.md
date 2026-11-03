@@ -29,13 +29,14 @@ This guide explains how to use **Full Control mode** in Home Assistant to monito
 
 To control your appliance from Home Assistant, remote operation must be activated on the physical machine:
 
-1. **Turn on the machine.**
-2. **Turn the physical dial/knob** to the dedicated **Wi-Fi** or **Remote** position (often labeled `Wi-Fi`, `Remote Control`, or `One Touch`).
-3. **Ensure the door is firmly closed.**
+1. **Prepare the machine:** Load your laundry, add detergent, and **ensure the door is firmly closed**.
+2. **Turn on the machine.**
+3. **Turn the physical dial/knob** to the dedicated **Wi-Fi** or **Remote** position (often labeled `Wi-Fi`, `Remote Control`, or `One Touch`).
 
 Once activated:
 - The **Remote Control** status turns **On** in Home Assistant.
 - Control buttons, program selectors, and settings on your dashboard become active and ready for use.
+- Select your desired program and options (temperature, spin speed, dry level), then tap **Start**!
 
 ---
 
@@ -64,7 +65,7 @@ All appliances that support remote control share a consistent set of core contro
 | **Delay Start** | Schedule start | Sets a delay timer before the cycle begins (ideal for running during off-peak energy hours). |
 
 > [!TIP]
-> **Pause & Resume Support:** Most modern appliances support remote Pause and Resume. If your specific machine model does not support remote pausing at the hardware level (such as Candy Bianca or DualTech washing machines), Home Assistant automatically hides the Pause and Resume buttons.
+> **Pause & Resume Support:** Most modern appliances support remote Pause and Resume. If your specific machine model does not support remote pausing at the hardware level (such as Candy Bianca or older dial-only models), Home Assistant automatically hides the Pause and Resume buttons.
 
 ---
 
@@ -139,6 +140,11 @@ If an appliance encounters an operational fault or hardware issue:
 
 Pre-configured Lovelace dashboard cards using [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom) are available in the [`dashboard/`](../dashboard/) directory:
 
+<p float="left">
+  <img src="images/dashboard_washing_machine.png" width="300" alt="Washing Machine Dashboard Card" />
+  <img src="images/dashboard_maintenance.png" width="300" alt="Maintenance Dashboard Card" />
+</p>
+
 - **[Washing Machine Card](../dashboard/washing-machine.yaml):** Operational control panel for standard washing machines (program selection, spin/temp adjustments, start/pause/stop buttons, and time estimates).
 - **[Washer-Dryer Card](../dashboard/washer-dryer.yaml):** All-in-one panel featuring wash-and-dry mode selection, drying settings, and live status icons.
 - **[Tumble Dryer Card](../dashboard/tumble-dryer.yaml):** Complete dryer panel with dry level selectors, timed drying controls, filter and water alerts, and anti-crease management.
@@ -146,11 +152,27 @@ Pre-configured Lovelace dashboard cards using [Mushroom Cards](https://github.co
 
 ### Automations
 
-The integration provides native Home Assistant device triggers for automations:
+The integration provides native Home Assistant device triggers for automations. You can set them up easily via the UI (**Settings > Devices & Services > Candy > your device > Automations (+)**) or in YAML:
 
-- **Cycle Progress:** Trigger automations when cycles start or complete (e.g., send a phone notification or announce via smart speakers that the laundry is done).
-- **Maintenance Reminders:** Trigger alerts when a washing machine needs cleaning or when a dryer's lint filter or water tank requires attention.
-- **Error Alerts:** Trigger urgent notifications if a machine reports an error.
+- **Cycle Progress:** Trigger automations when cycles start or complete (e.g., `washing_completed`, `drying_completed`).
+- **Maintenance Reminders:** Trigger alerts when a washing machine needs cleaning (`maintenance_limescale_due`, `clean_filter_needed`) or when a dryer's lint filter or water tank requires attention (`water_tank_full`).
+- **Error Alerts:** Trigger urgent notifications if a machine reports an error (`error_reported`).
+
+#### Example: Notify when laundry is complete
+
+```yaml
+alias: "Laundry: Notify when cycle is finished"
+trigger:
+  - domain: candy 
+    device_id: <YOUR_CANDY_DEVICE_ID>
+    type: washing_completed
+    trigger: device   
+action:
+  - action: notify.<your_notify_target>
+    data:
+      title: "Washing Machine"
+      message: "The laundry cycle has finished! 🧺"
+```
 
 ---
 
