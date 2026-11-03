@@ -126,7 +126,7 @@ class CandyWashSelectBase(CoordinatorEntity, SelectEntity):
 
     def _machine_is_idle(self) -> bool:
         status = cast(WashingMachineStatus, self.coordinator.data)
-        return status.machine_state in {MachineState.IDLE, MachineState.OFF}
+        return status.machine_state in {MachineState.IDLE, MachineState.OFF, MachineState.FINISHED1, MachineState.FINISHED2}
 
 
 class WashProgramSelect(CandyWashSelectBase):
