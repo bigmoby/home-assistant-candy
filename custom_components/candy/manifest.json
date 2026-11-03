@@ -2,8 +2,8 @@
   "domain": "candy",
   "name": "Candy",
   "codeowners": [
-    "@ofalvai",
-    "@bigmoby"
+    "@bigmoby",
+    "@auanasgheps"
   ],
   "config_flow": true,
   "dependencies": ["network"],
