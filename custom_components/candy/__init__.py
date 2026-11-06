@@ -457,63 +457,59 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     }
 
     if isinstance(coordinator.data, WashingMachineStatus):
-        interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-        stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics] | None = None
+        last_known_statistics = _restore_last_known_statistics(
+            hass, config_entry.entry_id
+        )
 
-        if not is_dualtech(interface_type):
-            last_known_statistics = _restore_last_known_statistics(
-                hass, config_entry.entry_id
-            )
+        async def update_statistics() -> WashingMachineStatistics:
+            nonlocal last_known_statistics
+            if getattr(coordinator.data, "machine_state", None) == MachineState.OFF:
+                if last_known_statistics is not None:
+                    return last_known_statistics
+                raise UpdateFailed("Machine is OFF; statistics unavailable.")
+            try:
+                async with async_timeout.timeout(40):
+                    stats = await client.statistics_with_retry()
+                    last_known_statistics = stats
+                    return stats
+            except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
+                if last_known_statistics is not None:
+                    _LOGGER.warning(
+                        "Failed to fetch statistics (%s); returning last known value.",
+                        repr(err),
+                    )
+                    return last_known_statistics
+                raise UpdateFailed(f"Error fetching statistics: {err!r}") from err
 
-            async def update_statistics() -> WashingMachineStatistics:
-                nonlocal last_known_statistics
-                if getattr(coordinator.data, "machine_state", None) == MachineState.OFF:
-                    if last_known_statistics is not None:
-                        return last_known_statistics
-                    raise UpdateFailed("Machine is OFF; statistics unavailable.")
-                try:
-                    async with async_timeout.timeout(40):
-                        stats = await client.statistics_with_retry()
-                        last_known_statistics = stats
-                        return stats
-                except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
-                    if last_known_statistics is not None:
-                        _LOGGER.warning(
-                            "Failed to fetch statistics (%s); returning last known value.",
-                            repr(err),
-                        )
-                        return last_known_statistics
-                    raise UpdateFailed(f"Error fetching statistics: {err!r}") from err
-
-            stats_coordinator = DataUpdateCoordinator(
-                hass,
-                _LOGGER,
-                name=f"{DOMAIN}_statistics",
-                update_interval=timedelta(hours=1),
-                update_method=update_statistics,
+        stats_coordinator = DataUpdateCoordinator(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}_statistics",
+            update_interval=timedelta(hours=1),
+            update_method=update_statistics,
+        )
+        machine_is_off = (
+            getattr(coordinator.data, "machine_state", None) == MachineState.OFF
+        )
+        if last_known_statistics is not None:
+            # Seed the coordinator with the restored value so we skip the initial
+            # network fetch (which would retry 3× against an offline machine).
+            stats_coordinator.async_set_updated_data(last_known_statistics)
+        elif machine_is_off:
+            # Device is off — total_cycles cannot have changed, skip the fetch.
+            # The hourly poll will retrieve it once the device is reachable.
+            pass
+        else:
+            await stats_coordinator.async_refresh()
+        stats_entity_id = er.async_get(hass).async_get_entity_id(
+            "sensor",
+            DOMAIN,
+            UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry.entry_id),
+        )
+        if stats_coordinator.last_update_success or stats_entity_id is not None:
+            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_COORDINATOR] = (
+                stats_coordinator
             )
-            machine_is_off = (
-                getattr(coordinator.data, "machine_state", None) == MachineState.OFF
-            )
-            if last_known_statistics is not None:
-                # Seed the coordinator with the restored value so we skip the initial
-                # network fetch (which would retry 3× against an offline machine).
-                stats_coordinator.async_set_updated_data(last_known_statistics)
-            elif machine_is_off:
-                # Device is off — total_cycles cannot have changed, skip the fetch.
-                # The hourly poll will retrieve it once the device is reachable.
-                pass
-            else:
-                await stats_coordinator.async_refresh()
-            stats_entity_id = er.async_get(hass).async_get_entity_id(
-                "sensor",
-                DOMAIN,
-                UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry.entry_id),
-            )
-            if stats_coordinator.last_update_success or stats_entity_id is not None:
-                hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_COORDINATOR] = (
-                    stats_coordinator
-                )
 
         if (
             config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED)

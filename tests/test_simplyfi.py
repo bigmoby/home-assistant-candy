@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 # Ensure tools directory is accessible for simplyfi import
 sys.path.insert(0, "tools")
-import custom_components.candy  # noqa: F401
 import simplyfi  # noqa: E402
 
 import custom_components.candy  # noqa: F401

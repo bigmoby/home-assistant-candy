@@ -568,7 +568,7 @@ async def test_full_checkup_completion_dualtech(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
 ):
-    """DualTech appliances send PrNm=2 for reset and skip stats coordinator refresh."""
+    """DualTech appliances send PrNm=2 for reset and update stats baseline."""
     entry = await _setup(
         hass,
         aioclient_mock,
@@ -579,7 +579,7 @@ async def test_full_checkup_completion_dualtech(
         },
     )
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
-    assert DATA_KEY_STATS_COORDINATOR not in hass.data[DOMAIN][entry.entry_id]
+    assert DATA_KEY_STATS_COORDINATOR in hass.data[DOMAIN][entry.entry_id]
 
     with (
         patch("custom_components.candy.pn_async_create") as mock_notify,
@@ -600,8 +600,8 @@ async def test_full_checkup_completion_dualtech(
         hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry.entry_id)
     )
 
-    # 2. Stats baseline unchanged because DualTech has no statistics coordinator
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 0
+    # 2. Stats baseline updated from stats coordinator
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 51
 
     # 3. DualTech appliance reset sent with PrNm=2 (not 11)
     mock_send.assert_called_once()

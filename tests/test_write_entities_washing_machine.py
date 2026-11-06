@@ -3469,6 +3469,7 @@ async def _init_full_control_with_maintenance_dualtech(
         },
     )
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=status_json)
+    _add_stats_mocks(aioclient_mock)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -3536,21 +3537,24 @@ async def test_limescale_button_sends_command_dualtech(
     assert "PrStr=" not in qs
 
 
-async def test_dualtech_omits_maintenance_reset_buttons_and_sensors(
+async def test_dualtech_includes_maintenance_reset_buttons_and_sensors(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """DualTech omits cycle counter reset buttons and total cycles sensor."""
+    """DualTech includes cycle counter reset buttons and total cycles sensor."""
     entry = await _init_full_control_with_maintenance_dualtech(
         hass, aioclient_mock, _IDLE_JSON, _PROGRAMS_WITH_AUTOCLEAN, "3D_DUAL"
     )
     assert _state(hass, entry, "button", UNIQUE_ID_WASH_FULL_CHECKUP_BUTTON) is not None
     assert _state(hass, entry, "button", UNIQUE_ID_WASH_LIMESCALE_BUTTON) is not None
-    # Reset buttons require stats_coordinator and must not be present
+    # Reset buttons require stats_coordinator and must be present
     assert (
-        _state(hass, entry, "button", UNIQUE_ID_WASH_MAINT_FULL_CHECKUP_BUTTON) is None
+        _state(hass, entry, "button", UNIQUE_ID_WASH_MAINT_FULL_CHECKUP_BUTTON)
+        is not None
     )
-    assert _state(hass, entry, "button", UNIQUE_ID_WASH_MAINT_LIMESCALE_BUTTON) is None
-    assert _state(hass, entry, "button", UNIQUE_ID_WASH_MAINT_FILTER_BUTTON) is None
+    assert (
+        _state(hass, entry, "button", UNIQUE_ID_WASH_MAINT_LIMESCALE_BUTTON) is not None
+    )
+    assert _state(hass, entry, "button", UNIQUE_ID_WASH_MAINT_FILTER_BUTTON) is not None
 
 
 # ---------------------------------------------------------------------------
