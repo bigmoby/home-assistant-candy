@@ -88,8 +88,8 @@ python tools/simplyfi.py 192.168.1.50 stats
 # 5. Fetch network module configuration & firmware details
 python tools/simplyfi.py 192.168.1.50 config
 
-# 6. Run full diagnostic scan and generate sanitized GitHub issue report
-python tools/simplyfi.py 192.168.1.50 diagnose --sanitize
+# 6. Run full diagnostic scan and generate sanitized GitHub issue report (use --raw for unredacted)
+python tools/simplyfi.py 192.168.1.50 diagnose
 
 # 7. Send write command
 python tools/simplyfi.py 192.168.1.50 write 1234567890abcdef "Write=1&StSt=1&PrNm=11&..."

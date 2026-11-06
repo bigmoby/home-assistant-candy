@@ -1146,7 +1146,7 @@ Usage:
   simplyfi.py <ip> remote  [key]
   simplyfi.py <ip> stats   [key]
   simplyfi.py <ip> config  [key]
-  simplyfi.py <ip> diagnose [key] [--sanitize]
+  simplyfi.py <ip> diagnose [key] [--raw]
   simplyfi.py <ip> write   <key> <query_string>
 
 Commands:
@@ -1156,13 +1156,14 @@ Commands:
   remote    Check remote control preconditions, physical dial position, and command capabilities
   stats     Execute 2-step statistics handshake (prepareStatistics -> getStatistics)
   config    Fetch network module configuration and firmware details
-  diagnose  Run complete diagnostic scan and generate clean Markdown report for GitHub issues
+  diagnose  Run complete diagnostic scan and generate sanitized Markdown report (use --raw for unredacted output)
   write     Send custom query command string to /http-write.json
 
 Examples:
   simplyfi.py 192.168.1.50 getkey
   simplyfi.py 192.168.1.50 inspect
-  simplyfi.py 192.168.1.50 diagnose --sanitize
+  simplyfi.py 192.168.1.50 diagnose
+  simplyfi.py 192.168.1.50 diagnose --raw
   simplyfi.py 192.168.1.50 write 1234567890abcdef "Write=1&StSt=1&PrNm=11&..."
 """,
         file=out_stream,
@@ -1265,7 +1266,8 @@ def run_diagnose(device_ip: str, port: int, key: str, sanitize: bool, timeout_se
     root_key, family_name, appliance_dict = detect_appliance_family(telemetry_dict)
     print(f"      Identified: {family_name} ('{root_key}')")
     if resolved_key:
-        print(f"      Recovered encryption key: {resolved_key}")
+        key_display = "***REDACTED***" if sanitize else resolved_key
+        print(f"      Recovered encryption key: {key_display}")
 
     # Step 2: Statistics (Only if supported by family)
     stats_dict: dict[str, Any] = {}
@@ -1368,10 +1370,10 @@ def main() -> None:
     ip, port = parse_device_address(raw_ip)
     timeout = 10
 
-    # Default to diagnose --sanitize if no subcommand is provided
+    # Default to diagnose if no subcommand is provided
     if len(sys.argv) == 2:
         print_header(sys.stdout)
-        print("Notice: No subcommand specified. Defaulting to 'diagnose --sanitize'...")
+        print("Notice: No subcommand specified. Defaulting to 'diagnose' (sanitized)...")
         print("(Run with '--help' to see all available subcommands)\n")
         try:
             run_diagnose(ip, port, "", True, timeout)
@@ -1395,10 +1397,10 @@ def main() -> None:
     cmd_or_key = sys.argv[2].lower()
     args = sys.argv[3:]
 
-    # Direct flag shortcut: simplyfi.py <ip> --sanitize / -s
-    if cmd_or_key in ("--sanitize", "-s"):
+    # Direct flag shortcut: simplyfi.py <ip> --raw / -r
+    if cmd_or_key in ("--raw", "-r"):
         try:
-            run_diagnose(ip, port, "", True, timeout)
+            run_diagnose(ip, port, "", False, timeout)
             return
         except CandyKeyNotFoundError as err:
             print(f"Key Discovery Error: {err}", file=sys.stderr)
@@ -1442,9 +1444,9 @@ def main() -> None:
             run_config(ip, port, key, timeout)
 
         elif cmd_or_key == "diagnose":
-            sanitize = any(a in ("--sanitize", "-s") for a in args)
-            key = next((a for a in args if a not in ("--sanitize", "-s")), "")
-            run_diagnose(ip, port, key, sanitize, timeout)
+            raw_mode = any(a in ("--raw", "-r") for a in args)
+            key = next((a for a in args if a not in ("--raw", "-r")), "")
+            run_diagnose(ip, port, key, not raw_mode, timeout)
 
         elif cmd_or_key == "write":
             if len(args) < 2:
@@ -1468,8 +1470,8 @@ def main() -> None:
             elif subcmd == "remote":
                 run_remote_check(ip, port, key, timeout)
             elif subcmd == "diagnose":
-                sanitize = any(a in ("--sanitize", "-s") for a in args[1:])
-                run_diagnose(ip, port, key, sanitize, timeout)
+                raw_mode = any(a in ("--raw", "-r") for a in args[1:])
+                run_diagnose(ip, port, key, not raw_mode, timeout)
             elif subcmd == "write":
                 query = args[1] if len(args) > 1 else ""
                 run_write(ip, port, key, query, timeout)

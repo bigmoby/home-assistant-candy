@@ -115,7 +115,7 @@ python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> remote
 python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> stats
 
 # 5. Generate a complete, sanitized diagnostic report for GitHub issues
-python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose --sanitize
+python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
 ```
 
 Supports all 9 appliance families: Washing Machines, Washer-Dryers, Tumble Dryers, Dishwashers, Ovens, Wine Coolers, Refrigerators/Freezers, Kitchen Hoods, Induction/Gas Cooktops, and Robot Vacuums. For full details and command grammar, see [`tools/agents.md`](tools/agents.md).
@@ -150,11 +150,11 @@ Use that IP when configuring the integration in Home Assistant.
 
 Absolutely! If you have an appliance that is not supported yet (e.g. Refrigerator, Hood, Cooktop, or a new Dishwasher/Oven variant), or you notice odd readings, please open a new [Issue](https://github.com/bigmoby/home-assistant-candy/issues) with the following information:
 
-1. Run the diagnostic tool with sanitization enabled:
+1. Run the diagnostic tool (sanitized by default; use `--raw` if unredacted output is needed):
    ```bash
-   python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose --sanitize
+   python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
    ```
-2. Paste the generated Markdown output directly into your issue. It automatically includes sanitized device configuration, decoded telemetry registers, raw JSON payloads, and cycle counters while redacting sensitive Wi-Fi credentials and MAC addresses.
+2. Paste the generated Markdown output directly into your issue. It automatically includes sanitized device configuration, decoded telemetry registers, raw JSON payloads, and cycle counters while redacting sensitive Wi-Fi credentials, MAC addresses, and encryption keys.
 
 ---
 
