@@ -378,11 +378,11 @@ class CandyWashDrySelect(CandyWashSelectBase):
         current_type = self._active_program_type()
         if current_type == PROGRAM_TYPE_WASHING:
             return [DRY_TARGET_NO_DRY]
-        if current_type == PROGRAM_TYPE_DRYING:
-            return list(DRY_TARGET_OPTIONS_ONLY_DRY)
         prog = self._active_program()
         if prog is not None and not prog.dry_supported:
             return [DRY_TARGET_NO_DRY]
+        if current_type in (PROGRAM_TYPE_WASH_AND_DRY, PROGRAM_TYPE_DRYING):
+            return list(DRY_TARGET_OPTIONS_ONLY_DRY)
         return list(DRY_TARGET_OPTIONS_FULL)
 
     @property
@@ -406,9 +406,9 @@ class CandyWashDrySelect(CandyWashSelectBase):
             return self._current_option
 
         status = cast(WashingMachineStatus, self.coordinator.data)
-        if (
-            status.dry_target is not None
-            and status.dry_target != WasherDryerDryTarget.COOLDOWN
+        if status.dry_target is not None and status.dry_target not in (
+            WasherDryerDryTarget.COOLDOWN,
+            WasherDryerDryTarget.NO_DRY,
         ):
             if status.dry_target.label in opts:
                 return status.dry_target.label
@@ -577,8 +577,8 @@ class WashProgramSelect(CandyWashSelectBase):
             await self.async_select_option(opts[0])
         else:
             self.async_write_ha_state()
-            if self._dry_select is not None:
-                self._dry_select.update_for_program_type(program_type)
+        if self._dry_select is not None:
+            self._dry_select.update_for_program_type(program_type)
 
     @property
     def extra_state_attributes(self) -> dict | None:

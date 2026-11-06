@@ -800,6 +800,7 @@ async def test_estimated_duration_matrix_serial_33(
     catalog = _load_catalog_serial_33()
     entry, programs = await _init_catalog_appliance(hass, aioclient_mock, catalog)
     dur_eid = _entity_id(hass, entry, "sensor", UNIQUE_ID_WASH_ESTIMATED_DURATION)
+    dry_eid = _entity_id(hass, entry, "select", UNIQUE_ID_WASH_DRY_SELECT)
     interface_type = str(catalog.get("interface_type", ""))
 
     selectable_programs = [p for p in programs if _is_selectable(p, interface_type)]
@@ -807,11 +808,18 @@ async def test_estimated_duration_matrix_serial_33(
     for p in selectable_programs:
         await _select_program(hass, entry, p)
         dur_state = hass.states.get(dur_eid)
+        dry_state = hass.states.get(dry_eid) if dry_eid else None
+        active_dry = (
+            dry_state.state
+            if dry_state
+            and dry_state.state not in (DRY_TARGET_NO_DRY, "unavailable", "unknown")
+            else None
+        )
         expected = _calculate_expected_duration(
             p,
             soil_level=p.default_soil_level,
             steam_on=False,
-            dry_target=None,
+            dry_target=active_dry,
             options_mask=0,
         )
         if expected is not None:

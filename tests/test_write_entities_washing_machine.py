@@ -47,7 +47,6 @@ from custom_components.candy.const import (
     DRY_TARGET_EXTRA_DRY,
     DRY_TARGET_IRON_DRY,
     DRY_TARGET_NO_DRY,
-    DRY_TARGET_OPTIONS_FULL,
     DRY_TARGET_OPTIONS_ONLY_DRY,
     MODE_FULL_CONTROL,
     MODE_READ_ONLY,
@@ -3981,7 +3980,7 @@ async def test_dry_select_options_and_switching_across_program_types(
     dry_state = hass.states.get(dry_id)
     assert dry_state is not None
     assert dry_state.state == DRY_TARGET_CUPBOARD_DRY
-    assert dry_state.attributes["options"] == DRY_TARGET_OPTIONS_FULL
+    assert dry_state.attributes["options"] == DRY_TARGET_OPTIONS_ONLY_DRY
 
     # 3. User selects iron_dry
     await hass.services.async_call(
@@ -4116,7 +4115,7 @@ async def test_dry_select_reflects_idle_wash_and_dry_cycle(
     state = _state(hass, entry, "select", UNIQUE_ID_WASH_DRY_SELECT)
     assert state is not None
     assert state.state == DRY_TARGET_EXTRA_DRY
-    assert state.attributes["options"] == DRY_TARGET_OPTIONS_FULL
+    assert state.attributes["options"] == DRY_TARGET_OPTIONS_ONLY_DRY
 
 
 async def test_dry_select_unavailable_when_running(
@@ -4600,6 +4599,43 @@ async def test_start_button_dry_program_with_zero_dry_target_raises(
         pytest.raises(
             ValueError,
             match="Cannot start drying cycle without a valid dry target setting",
+        ),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_id}, blocking=True
+        )
+
+
+async def test_start_button_wash_and_dry_without_dry_target_raises(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """WashStartButton raises ValueError if wash_and_dry mode is selected with dry target 0."""
+    entry = await _init_full_control_wd(hass, aioclient_mock, _IDLE_JSON, _WD_PROGRAMS)
+    registry = er.async_get(hass)
+    type_id = registry.async_get_entity_id(
+        "select", DOMAIN, UNIQUE_ID_WASH_PROGRAM_TYPE_SELECT.format(entry.entry_id)
+    )
+    start_id = registry.async_get_entity_id(
+        "button", DOMAIN, UNIQUE_ID_WASH_START_BUTTON.format(entry.entry_id)
+    )
+    assert type_id is not None
+    assert start_id is not None
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": type_id, "option": PROGRAM_TYPE_WASH_AND_DRY},
+        blocking=True,
+    )
+
+    with (
+        patch(
+            "custom_components.candy.button.WashStartButton._get_dry_target",
+            return_value=0,
+        ),
+        pytest.raises(
+            ValueError,
+            match="Cannot start wash and dry cycle without a valid dry target setting",
         ),
     ):
         await hass.services.async_call(

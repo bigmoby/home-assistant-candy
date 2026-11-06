@@ -63,6 +63,7 @@ from .const import (
     MODE_FULL_CONTROL,
     NOTIF_ID_FULL_CHECKUP,
     NOTIF_ID_LIMESCALE,
+    PROGRAM_TYPE_WASH_AND_DRY,
     RAPID_LEVEL_TO_VALUE,
     SOIL_LABELS_REVERSE,
     UNIQUE_ID_TUMBLE_ANTI_CREASE_BUTTON,
@@ -88,6 +89,7 @@ from .const import (
     UNIQUE_ID_WASH_NFC_SWITCH,
     UNIQUE_ID_WASH_PAUSE_BUTTON,
     UNIQUE_ID_WASH_PROGRAM_SELECT,
+    UNIQUE_ID_WASH_PROGRAM_TYPE_SELECT,
     UNIQUE_ID_WASH_RESUME_BUTTON,
     UNIQUE_ID_WASH_RESUME_GOOD_NIGHT,
     UNIQUE_ID_WASH_SOIL_SELECT,
@@ -639,6 +641,16 @@ class WashStartButton(CandyWashButtonBase):
 
         if soil == 9 or (program.max_soil_level > 0 and soil > program.max_soil_level):
             soil = program.min_soil_level
+
+        program_type = _get_state(UNIQUE_ID_WASH_PROGRAM_TYPE_SELECT)
+        if (
+            program_type == PROGRAM_TYPE_WASH_AND_DRY
+            and program.dry_supported
+            and dry == 0
+        ):
+            raise ValueError(
+                "Cannot start wash and dry cycle without a valid dry target setting"
+            )
 
         if program.is_dry:
             if dry == 0:

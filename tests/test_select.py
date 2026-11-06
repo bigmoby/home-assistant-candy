@@ -35,6 +35,7 @@ from custom_components.candy.const import (
     DRY_LEVEL_TO_VALUE,
     DRY_TARGET_CUPBOARD_DRY,
     DRY_TARGET_NO_DRY,
+    DRY_TARGET_OPTIONS_ONLY_DRY,
     MODE_FULL_CONTROL,
     PROGRAM_TYPE_DRYING,
     PROGRAM_TYPE_WASH_AND_DRY,
@@ -417,7 +418,7 @@ async def test_wash_dry_select_branches(
 
     # Non-idle current_option with COOLDOWN (line 406)
     coord.data = replace(coord.data, dry_target=WasherDryerDryTarget.COOLDOWN)
-    assert dry_select.current_option == DRY_TARGET_NO_DRY
+    assert dry_select.current_option == dry_select.options[0]
 
     # Invalid dry target raises ValueError (line 437)
     with pytest.raises(ValueError, match="Invalid dry target: INVALID"):
@@ -449,9 +450,11 @@ async def test_wash_dry_select_branches(
         assert dry_select.current_option == "only_option"
 
     # update_for_program_type transitions (lines 459-471)
+    type_mock.current_option = PROGRAM_TYPE_WASHING
     dry_select.update_for_program_type(PROGRAM_TYPE_WASHING)
     assert dry_select.current_option == DRY_TARGET_NO_DRY
 
+    type_mock.current_option = PROGRAM_TYPE_DRYING
     dry_select.update_for_program_type(PROGRAM_TYPE_DRYING)
     assert dry_select.current_option == DRY_TARGET_CUPBOARD_DRY
 
@@ -567,6 +570,82 @@ async def test_wash_program_select_and_description_sensor_branches(
     temp_select._current_option = "40"
     await temp_select.async_select_option("60")
     assert temp_select._current_option == "40"
+
+
+async def test_wash_and_dry_transition_updates_dry_select(
+    hass: HomeAssistant, mock_client: CandyClient
+) -> None:
+    """Test switching program type to Wash and Dry updates dry select and excludes no_dry."""
+    programs = parse_wash_programs([_SAMPLE_WASH_PROGRAM, _SAMPLE_WD_PROGRAM])
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="wd_transition_test",
+        data={CONF_KEY_MODE: MODE_FULL_CONTROL, CONF_KEY_PROGRAM_LANGUAGE: "en"},
+    )
+    entry.add_to_hass(hass)
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    coord.last_update_success = True
+    coord.data = replace(
+        _BASE_WM_STATUS,
+        machine_state=MachineState.IDLE,
+        program=1,
+        program_code=100,
+        dry_target=WasherDryerDryTarget.NO_DRY,
+    )
+
+    type_select = CandyWashProgramTypeSelect(coord, entry, mock_client, programs)
+    dry_select = CandyWashDrySelect(coord, entry, mock_client, programs, type_select)
+    temp_select = WashTempSelect(coord, entry, mock_client, programs)
+    spin_select = WashSpinSelect(coord, entry, mock_client, programs)
+    soil_select = WashSoilSelect(coord, entry, mock_client, programs)
+    desc_sensor = CandyWashProgramDescriptionSensor(coord, entry)
+
+    prog_select = WashProgramSelect(
+        coord,
+        entry,
+        mock_client,
+        programs,
+        temp_select,
+        spin_select,
+        soil_select,
+        desc_sensor,
+        nfc_entries=[],
+        type_select=type_select,
+        dry_select=dry_select,
+    )
+    type_select.set_program_select(prog_select)
+    type_select.set_dry_select(dry_select)
+    dry_select.set_program_select(prog_select)
+
+    for idx, entity in enumerate(
+        (
+            type_select,
+            dry_select,
+            prog_select,
+            temp_select,
+            spin_select,
+            soil_select,
+            desc_sensor,
+        )
+    ):
+        entity.hass = hass
+        entity.entity_id = f"select.test_entity_{idx}"
+        entity.platform = MagicMock(platform_name=DOMAIN)
+
+    # Initially in washing mode: options is only [no_dry]
+    type_select._current_option = PROGRAM_TYPE_WASHING
+    dry_select.update_for_program_type(PROGRAM_TYPE_WASHING)
+    assert dry_select.options == [DRY_TARGET_NO_DRY]
+    assert dry_select.current_option == DRY_TARGET_NO_DRY
+
+    # When switching to wash_and_dry, even when current program changes:
+    prog_select._current_option = "Cotton"  # Wash-only program, not in wash_and_dry
+    await type_select.async_select_option(PROGRAM_TYPE_WASH_AND_DRY)
+
+    # Dry select options must exclude no_dry and default to cupboard_dry
+    assert dry_select.options == list(DRY_TARGET_OPTIONS_ONLY_DRY)
+    assert dry_select.current_option == DRY_TARGET_CUPBOARD_DRY
+    assert dry_select._current_option == DRY_TARGET_CUPBOARD_DRY
 
 
 async def test_tumble_dryer_select_entities_edge_branches(
