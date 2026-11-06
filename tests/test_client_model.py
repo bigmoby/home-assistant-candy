@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from custom_components.candy.client.model import (
@@ -421,6 +423,39 @@ def test_washer_dryer_dry_target_codes():
         WasherDryerDryTarget.from_code(99)
 
 
+@pytest.mark.parametrize(
+    ("raw_input", "expected_target"),
+    [
+        ("0", WasherDryerDryTarget.NO_DRY),
+        (0, WasherDryerDryTarget.NO_DRY),
+        ("1", WasherDryerDryTarget.EXTRA_DRY),
+        (1, WasherDryerDryTarget.EXTRA_DRY),
+        ("2", WasherDryerDryTarget.CUPBOARD_DRY),
+        ("3", WasherDryerDryTarget.IRON_DRY),
+        ("4", WasherDryerDryTarget.COOLDOWN),
+        ("5", WasherDryerDryTarget.TIME_120),
+        ("6", WasherDryerDryTarget.TIME_90),
+        ("7", WasherDryerDryTarget.TIME_60),
+        ("8", WasherDryerDryTarget.TIME_30),
+        ("9", WasherDryerDryTarget.WOOL_DRY),
+    ],
+)
+def test_washer_dry_target_from_raw_valid(
+    raw_input: Any, expected_target: WasherDryerDryTarget
+) -> None:
+    """Test from_raw parses string and integer codes for valid targets."""
+    assert WasherDryerDryTarget.from_raw(raw_input) is expected_target
+
+
+@pytest.mark.parametrize(
+    "invalid_raw",
+    ["", "   ", "null", "N/A", "-1", None, "255", 255, "99", 99, 45, "invalid"],
+)
+def test_washer_dry_target_from_raw_resilience(invalid_raw: Any) -> None:
+    """Test from_raw returns None for empty, non-digit, or unmapped codes."""
+    assert WasherDryerDryTarget.from_raw(invalid_raw) is None
+
+
 def test_washing_machine_status_parses_dry_target():
     payload = {
         "MachMd": "1",
@@ -445,6 +480,23 @@ def test_washing_machine_status_without_dry_target():
         "SpinSp": "10",
         "RemTime": "3600",
         "WiFiStatus": "1",
+    }
+    status = WashingMachineStatus.from_json(payload)
+    assert status.dry_target is None
+
+
+@pytest.mark.parametrize("dry_val", ["", "   ", "255", "-1", "null", "N/A"])
+def test_washing_machine_status_empty_or_sentinel_dry_target(dry_val: str) -> None:
+    """Test washing machine telemetry with empty or sentinel DryT parses as None."""
+    payload = {
+        "MachMd": "1",
+        "PrPh": "2",
+        "Pr": "1",
+        "Temp": "40",
+        "SpinSp": "10",
+        "RemTime": "3600",
+        "WiFiStatus": "1",
+        "DryT": dry_val,
     }
     status = WashingMachineStatus.from_json(payload)
     assert status.dry_target is None

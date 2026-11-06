@@ -244,6 +244,18 @@ def test_wash_parser_autodose_string_resilience() -> None:
     assert status.water_hardness is None
 
 
+@pytest.mark.parametrize(
+    "corrupted_dry_t",
+    ["", "   ", "null", "N/A", "-1", None, "255", 255, 99, 45, "invalid"],
+)
+def test_wash_parser_dry_target_resilience(corrupted_dry_t: Any) -> None:
+    """DryT register formatted as empty, non-digit, or unmapped sentinel must evaluate to None."""
+    payload = copy.deepcopy(BASE_WASH_JSON)
+    payload["DryT"] = corrupted_dry_t
+    status = WashingMachineStatus.from_json(payload)
+    assert status.dry_target is None
+
+
 # ---------------------------------------------------------------------------
 # Unit Parser Fuzzing: TumbleDryerStatus.from_json
 # ---------------------------------------------------------------------------

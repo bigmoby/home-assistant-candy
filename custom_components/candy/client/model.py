@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 import json
 from pathlib import Path
+from typing import Any
 
 _PROGRAM_NAMES: dict[str, dict[str, str]] = json.loads(
     (Path(__file__).parent / "program_names.json").read_text(encoding="utf-8")
@@ -97,6 +100,25 @@ class WasherDryerDryTarget(StatusCode):
     TIME_30 = (8, "30_minutes")
     WOOL_DRY = (9, "wool_dry")
 
+    @classmethod
+    def from_raw(cls, raw: Any) -> WasherDryerDryTarget | None:
+        """Parse a wire DryT register value safely.
+
+        Returns the matching WasherDryerDryTarget if raw is a valid digit
+        string or integer in 0..9; returns None for empty, non-digit, or
+        unrecognized codes (e.g. unequipped standalone washer sentinels).
+        """
+        if raw is None:
+            return None
+        val_str = str(raw).strip()
+        if not val_str.isdigit():
+            return None
+        code = int(val_str)
+        for target in cls:
+            if target.code == code:
+                return target
+        return None
+
 
 @dataclass
 class WashingMachineStatus:
@@ -167,9 +189,7 @@ class WashingMachineStatus:
             recipe_id=str(json["RecipeId"]).strip()
             if json.get("RecipeId") is not None
             else None,
-            dry_target=WasherDryerDryTarget.from_code(int(json["DryT"]))
-            if "DryT" in json
-            else None,
+            dry_target=WasherDryerDryTarget.from_raw(json.get("DryT")),
             detergent_on=json["Det"] == "1"
             if "Det" in json and json["Det"] != ""
             else None,
@@ -420,7 +440,7 @@ class WashingMachineWashProgram:
     dry: int
 
     @classmethod
-    def from_dict(cls, program_dict: dict) -> "WashingMachineWashProgram":
+    def from_dict(cls, program_dict: dict) -> WashingMachineWashProgram:
         """Parse a program entry from the Simply-Fi appliances JSON."""
         p = program_dict.get("program", program_dict)
         raw_params = p.get("command_parameters") or p.get("parameters") or []
@@ -583,7 +603,7 @@ class TumbleDryerProgram:
     mask2: int
 
     @classmethod
-    def from_dict(cls, program_dict: dict) -> "TumbleDryerProgram":
+    def from_dict(cls, program_dict: dict) -> TumbleDryerProgram:
         """Parse a program entry from the Simply-Fi tumble dryer appliance JSON."""
         p = program_dict.get("program", program_dict)
         raw_params = p.get("command_parameters") or p.get("parameters") or []
@@ -714,7 +734,7 @@ def _safe_int(val: object, fallback: int) -> int:
     return fallback
 
 
-def load_downloadable_programs(cloud_raw: list[dict]) -> list["DownloadableProgram"]:
+def load_downloadable_programs(cloud_raw: list[dict]) -> list[DownloadableProgram]:
     """Build DownloadableProgram list from cloud wm_wd_programs response.
 
     Only programs present in nfc_programs.json (APK allowlist) are included,
