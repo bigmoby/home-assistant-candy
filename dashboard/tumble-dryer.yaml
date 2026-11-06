@@ -58,7 +58,7 @@ cards:
       {% elif state == 'finished' %}
         Cycle complete · Empty drum
       {% elif state in ['idle', 'stopped'] and prog not in ['unknown', 'unavailable', ''] %}
-        {{ prog }}
+        {{ state_attr('sensor.<machine_name>_dryer_program', 'program_name') or ('Program ' ~ prog) }}
       {% elif state == 'error' %}
         {% set err = states('sensor.<machine_name>_dryer_error') %}
         {% set desc = state_attr('sensor.<machine_name>_dryer_error', 'description') %}

@@ -6,9 +6,11 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, load_f
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy.client import TumbleDryerProgram
+from custom_components.candy.const import CONF_KEY_PROGRAM_LANGUAGE, CONF_KEY_PROGRAMS
 from custom_components.candy.sensor import (
     CandyTumbleDelaySensor,
     CandyTumbleErrorCodeSensor,
+    CandyTumbleProgramSensor,
 )
 
 from .common import init_integration
@@ -302,3 +304,47 @@ def test_candy_tumble_delay_sensor_none_data() -> None:
     config_entry.data = {}
     sensor = CandyTumbleDelaySensor(coordinator, config_entry)
     assert sensor.native_value is None
+
+
+async def test_program_sensor_with_catalog_programs(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test dryer program sensor returns program number as state and program_name as attribute."""
+    programs_data = [
+        {
+            "position": 1,
+            "name": "NFC_TD_PROGRAM_NAME_WHITES",
+            "parameters": {"selector_position": 1},
+        },
+        {
+            "position": 2,
+            "name": "NFC_TD_PROGRAM_NAME_MIX_AND_DRY",
+            "parameters": {"selector_position": 2},
+        },
+    ]
+    await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture("tumble_dryer/idle.json"),
+        extra_config_data={
+            CONF_KEY_PROGRAMS: programs_data,
+            CONF_KEY_PROGRAM_LANGUAGE: "en",
+        },
+    )
+
+    state = hass.states.get("sensor.tumble_dryer_dryer_program")
+    assert state
+    assert state.state == "1"
+    assert state.attributes.get("program_name") == "Whites"
+
+
+def test_candy_tumble_program_sensor_none_data() -> None:
+    """Test tumble program sensor returns None and empty attributes when coordinator data is None."""
+    coordinator = MagicMock()
+    coordinator.data = None
+    config_entry = MagicMock()
+    config_entry.entry_id = "test_entry"
+    config_entry.data = {}
+    sensor = CandyTumbleProgramSensor(coordinator, config_entry, [])
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes == {}

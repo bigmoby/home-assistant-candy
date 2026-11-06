@@ -143,7 +143,7 @@ async def test_tumble_dryer_template_rendering_lifecycle(hass: HomeAssistant) ->
         {
             f"sensor.{prefix}": ("idle", {}),
             f"sensor.{prefix}_dryer_cycle_status": ("Stopped", {}),
-            f"sensor.{prefix}_dryer_program": ("Eco Cotton", {}),
+            f"sensor.{prefix}_dryer_program": ("1", {"program_name": "Eco Cotton"}),
             f"sensor.{prefix}_dry_level": ("store_dry", {}),
             f"sensor.{prefix}_dryer_cycle_remaining_time": ("0", {}),
             f"sensor.{prefix}_dryer_error": ("0", {}),
@@ -158,7 +158,7 @@ async def test_tumble_dryer_template_rendering_lifecycle(hass: HomeAssistant) ->
         {
             f"sensor.{prefix}": ("running", {}),
             f"sensor.{prefix}_dryer_cycle_status": ("Drying active", {}),
-            f"sensor.{prefix}_dryer_program": ("Synthetics", {}),
+            f"sensor.{prefix}_dryer_program": ("2", {"program_name": "Synthetics"}),
             f"sensor.{prefix}_dry_level": ("hang_dry", {}),
             f"sensor.{prefix}_dryer_cycle_remaining_time": ("85", {}),
             f"binary_sensor.{prefix}_remote_control": ("on", {}),
@@ -168,7 +168,7 @@ async def test_tumble_dryer_template_rendering_lifecycle(hass: HomeAssistant) ->
         {
             f"sensor.{prefix}": ("running", {}),
             f"sensor.{prefix}_dryer_cycle_status": ("Cooling down", {}),
-            f"sensor.{prefix}_dryer_program": ("Rapid 45'", {}),
+            f"sensor.{prefix}_dryer_program": ("3", {"program_name": "Rapid 45'"}),
             f"sensor.{prefix}_dry_level": ("iron_dry", {}),
             f"sensor.{prefix}_dryer_cycle_remaining_time": ("10", {}),
             f"binary_sensor.{prefix}_remote_control": ("on", {}),
@@ -178,7 +178,7 @@ async def test_tumble_dryer_template_rendering_lifecycle(hass: HomeAssistant) ->
         {
             f"sensor.{prefix}": ("paused", {}),
             f"sensor.{prefix}_dryer_cycle_status": ("Drying active", {}),
-            f"sensor.{prefix}_dryer_program": ("Cotton", {}),
+            f"sensor.{prefix}_dryer_program": ("4", {"program_name": "Cotton"}),
             f"sensor.{prefix}_dry_level": ("bone_dry", {}),
             f"sensor.{prefix}_dryer_cycle_remaining_time": ("40", {}),
             f"binary_sensor.{prefix}_remote_control": ("on", {}),
@@ -188,7 +188,7 @@ async def test_tumble_dryer_template_rendering_lifecycle(hass: HomeAssistant) ->
         {
             f"sensor.{prefix}": ("delayed_start", {}),
             f"sensor.{prefix}_dryer_cycle_status": ("Stopped", {}),
-            f"sensor.{prefix}_dryer_program": ("Mix & Dry", {}),
+            f"sensor.{prefix}_dryer_program": ("5", {"program_name": "Mix & Dry"}),
             f"sensor.{prefix}_dry_level": ("store_dry", {}),
             f"sensor.{prefix}_dryer_cycle_remaining_time": ("0", {}),
             f"binary_sensor.{prefix}_remote_control": ("on", {}),
@@ -198,7 +198,7 @@ async def test_tumble_dryer_template_rendering_lifecycle(hass: HomeAssistant) ->
         {
             f"sensor.{prefix}": ("finished", {}),
             f"sensor.{prefix}_dryer_cycle_status": ("Completed", {}),
-            f"sensor.{prefix}_dryer_program": ("Cotton", {}),
+            f"sensor.{prefix}_dryer_program": ("4", {"program_name": "Cotton"}),
             f"sensor.{prefix}_dry_level": ("store_dry", {}),
             f"sensor.{prefix}_dryer_cycle_remaining_time": ("0", {}),
             f"binary_sensor.{prefix}_remote_control": ("on", {}),
@@ -262,7 +262,9 @@ async def test_hero_card_template_outputs(hass: HomeAssistant) -> None:
 
     # 1. Idle
     hass.states.async_set(f"sensor.{prefix}", "Idle")
-    hass.states.async_set(f"sensor.{prefix}_dryer_program", "Eco Cotton")
+    hass.states.async_set(
+        f"sensor.{prefix}_dryer_program", "1", {"program_name": "Eco Cotton"}
+    )
     hass.states.async_set(f"sensor.{prefix}_dryer_cycle_status", "Stopped")
     assert tmpl_primary.async_render().strip() == "Ready"
     assert tmpl_secondary.async_render().strip() == "Eco Cotton"

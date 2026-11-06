@@ -1877,17 +1877,28 @@ class CandyTumbleProgramSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(TumbleDryerStatus, self.coordinator.data)
-        lang = self.config_entry.data.get(
-            CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
-        )
-        match = next(
-            (p for p in self._programs if p.selector_position == status.program),
-            None,
-        )
-        if match is not None:
-            return match.localized_name(lang)
         return status.program
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any]:
+        if self.coordinator.data is None:
+            return {}
+        status = cast(TumbleDryerStatus, self.coordinator.data)
+        attributes: dict[str, Any] = {}
+        if self._programs:
+            lang = self.config_entry.data.get(
+                CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+            )
+            match = next(
+                (p for p in self._programs if p.selector_position == status.program),
+                None,
+            )
+            if match is not None:
+                attributes["program_name"] = match.localized_name(lang)
+        return attributes
 
     @property
     def icon(self) -> str:
