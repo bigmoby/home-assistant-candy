@@ -2,8 +2,8 @@
   "domain": "candy",
   "name": "Candy",
   "codeowners": [
-    "@bigmoby",
-    "@auanasgheps"
+    "@ofalvai",
+    "@bigmoby"
   ],
   "config_flow": true,
   "dependencies": ["network"],
@@ -15,5 +15,5 @@
     "backoff~=2.2.1",
     "aiolimiter~=1.2.1"
   ],
-  "version": "1.7.0"
+  "version": "1.6.0"
 }
