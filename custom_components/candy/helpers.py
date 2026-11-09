@@ -15,6 +15,7 @@ from .client.model import (
     WashingMachineWashProgram,
 )
 from .const import (
+    CONF_KEY_APPLIANCE_TYPE,
     CONF_KEY_BRAND,
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_IS_WASHER_DRYER,
@@ -117,12 +118,20 @@ def is_washer_dryer(
     """Return True if the config entry represents a washer-dryer appliance."""
     if config_entry.data.get(CONF_KEY_IS_WASHER_DRYER, False):
         return True
+    if config_entry.data.get(CONF_KEY_APPLIANCE_TYPE) == "washer_dryer":
+        return True
     if programs is not None:
-        return any(p.is_dry for p in programs)
+        return any(
+            p.program_type in ("D", "WD") or p.selector_position_dry is not None
+            for p in programs
+        )
     raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
     if raw_programs:
         try:
-            return any(p.is_dry for p in parse_wash_programs(raw_programs))
+            return any(
+                p.program_type in ("D", "WD") or p.selector_position_dry is not None
+                for p in parse_wash_programs(raw_programs)
+            )
         except (KeyError, TypeError, ValueError):
             return False
     return False

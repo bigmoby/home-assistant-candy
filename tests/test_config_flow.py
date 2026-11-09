@@ -1226,42 +1226,26 @@ async def test_options_flow_switch_to_read_only_preserves_washer_dryer(hass):
     assert CONF_KEY_PROGRAMS not in updated.data
 
 
-async def test_full_control_cloud_detects_washer_dryer_from_programs(
+async def test_full_control_cloud_detects_washer_dryer_from_appliance_type(
     hass, no_discovery, detect_no_encryption
 ):
-    """Cloud setup sets CONF_KEY_IS_WASHER_DRYER when program catalog contains dry cycles."""
-    dry_prog = {
-        "program": {
-            "position": 16,
-            "name": "HIGH_DRY",
-            "command_parameters": [
-                {
-                    "command_parameter": {
-                        "name": "selector_position",
-                        "validation": "16",
-                    }
-                },
-                {"command_parameter": {"name": "pr_code", "validation": "45"}},
-                {"command_parameter": {"name": "program_type", "validation": "D"}},
-            ],
-        }
-    }
-    appliance_with_dry = CloudApplianceData(
+    """Cloud setup sets CONF_KEY_IS_WASHER_DRYER when appliance_type is washer_dryer."""
+    appliance_wd = CloudApplianceData(
         mac_address="AA:BB:CC:DD:EE:FF",
         encryption_key="testenckey",
         appliance_model="WD_MODEL",
         serial_number="1234567890123456",
         purchase_date="2022-01-01",
         interface_type="RAPIDO",
-        programs=[dry_prog],
+        programs=[],
         downloadable_programs=[],
         brand="candy",
-        appliance_type="washer",  # Cloud API says washer, but catalog has dry programs
+        appliance_type="washer_dryer",
     )
     with patch(
         "custom_components.candy.config_flow.fetch_appliance_data",
         new_callable=AsyncMock,
-        return_value=appliance_with_dry,
+        return_value=appliance_wd,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -1288,6 +1272,137 @@ async def test_full_control_cloud_detects_washer_dryer_from_programs(
 
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert result["data"].get(CONF_KEY_IS_WASHER_DRYER) is True
+
+
+async def test_full_control_cloud_does_not_set_washer_dryer_when_appliance_type_washer(
+    hass, no_discovery, detect_no_encryption
+):
+    """Cloud setup keeps CONF_KEY_IS_WASHER_DRYER False when appliance_type is washer even if catalog has dry program."""
+    dry_prog = {
+        "program": {
+            "position": 16,
+            "name": "HIGH_DRY",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+                {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                {"command_parameter": {"name": "program_type", "validation": "D"}},
+            ],
+        }
+    }
+    appliance_washer = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WASHER_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[dry_prog],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="washer",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=appliance_washer,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_CHECKUP_ENABLED: False}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"].get(CONF_KEY_IS_WASHER_DRYER) is not True
+
+
+async def test_full_control_cloud_detects_washer_dryer_from_hardware_parameters_fallback(
+    hass, no_discovery, detect_no_encryption
+):
+    """Cloud setup falls back to structured hardware parameters when appliance_type is blank."""
+    dry_prog = {
+        "program": {
+            "position": 16,
+            "name": "HIGH_DRY",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+                {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                {"command_parameter": {"name": "program_type", "validation": "D"}},
+            ],
+        }
+    }
+    appliance_untyped = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[dry_prog],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=appliance_untyped,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_CHECKUP_ENABLED: False}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"].get(CONF_KEY_IS_WASHER_DRYER) is True
+
+
+async def test_options_flow_full_control_checkup_disabled(hass):
     """checkup_settings → checkup_enabled=False saves and exits."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2017,7 +2132,7 @@ async def test_options_flow_update_cloud_data_exceptions_and_washer_dryer(hass):
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "language"
 
-    # 3. Programs contain dry program -> sets is_washer_dryer (line 652)
+    # 3. Programs contain dry program -> sets is_washer_dryer when appliance_type is blank
     dry_prog = {
         "program": {
             "position": 16,
@@ -2044,7 +2159,7 @@ async def test_options_flow_update_cloud_data_exceptions_and_washer_dryer(hass):
         programs=[dry_prog],
         downloadable_programs=[],
         brand="candy",
-        appliance_type="washer",
+        appliance_type="",
     )
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(

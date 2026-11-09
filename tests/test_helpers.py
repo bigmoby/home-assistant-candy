@@ -7,6 +7,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.candy import CONF_KEY_USE_ENCRYPTION
 from custom_components.candy.const import (
+    CONF_KEY_APPLIANCE_TYPE,
     CONF_KEY_BRAND,
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_IS_WASHER_DRYER,
@@ -186,19 +187,27 @@ def test_get_dryer_error_notification_strings():
 
 
 def test_is_washer_dryer_from_config():
-    entry = MockConfigEntry(
+    entry_flag = MockConfigEntry(
         domain=DOMAIN,
         data={
             CONF_KEY_IS_WASHER_DRYER: True,
         },
     )
-    assert is_washer_dryer(entry, None) is True
+    assert is_washer_dryer(entry_flag, None) is True
+
+    entry_type = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_KEY_APPLIANCE_TYPE: "washer_dryer",
+        },
+    )
+    assert is_washer_dryer(entry_type, None) is True
 
 
 def test_is_washer_dryer_from_programs_list():
     entry = MockConfigEntry(domain=DOMAIN, data={})
-    wash_prog = MagicMock(is_dry=False)
-    dry_prog = MagicMock(is_dry=True)
+    wash_prog = MagicMock(program_type="W", selector_position_dry=None)
+    dry_prog = MagicMock(program_type="D", selector_position_dry=None)
     assert is_washer_dryer(entry, [wash_prog]) is False
     assert is_washer_dryer(entry, [wash_prog, dry_prog]) is True
 

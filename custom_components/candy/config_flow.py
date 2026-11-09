@@ -647,11 +647,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             new_data[CONF_KEY_APPLIANCE_TYPE] = appliance.appliance_type
             if appliance.appliance_type == "washer_dryer":
                 new_data[CONF_KEY_IS_WASHER_DRYER] = True
-        try:
-            if any(p.is_dry for p in parse_wash_programs(appliance.programs)):
-                new_data[CONF_KEY_IS_WASHER_DRYER] = True
-        except (KeyError, TypeError, ValueError):
-            pass
+        elif appliance.programs:
+            try:
+                parsed = parse_wash_programs(appliance.programs)
+                if any(
+                    p.program_type in ("D", "WD") or p.selector_position_dry is not None
+                    for p in parsed
+                ):
+                    new_data[CONF_KEY_IS_WASHER_DRYER] = True
+            except (KeyError, TypeError, ValueError):
+                pass
 
         self._pending_data = new_data
         return await self.async_step_language()
@@ -891,8 +896,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     }
                 ),
             )
-        self._config_data[CONF_KEY_IS_WASHER_DRYER] = bool(
-            user_input[CONF_KEY_IS_WASHER_DRYER]
+        is_wd = bool(user_input[CONF_KEY_IS_WASHER_DRYER])
+        self._config_data[CONF_KEY_IS_WASHER_DRYER] = is_wd
+        self._config_data[CONF_KEY_APPLIANCE_TYPE] = (
+            "washer_dryer" if is_wd else "washer"
         )
         return await self.async_step_maintenance()
 
@@ -949,6 +956,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             self._config_data[CONF_KEY_APPLIANCE_TYPE] = appliance.appliance_type
             if appliance.appliance_type == "washer_dryer":
                 self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
+        elif not self._is_tumble_dryer and appliance.programs:
+            try:
+                parsed = parse_wash_programs(appliance.programs)
+                if any(
+                    p.program_type in ("D", "WD") or p.selector_position_dry is not None
+                    for p in parsed
+                ):
+                    self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
+            except (KeyError, TypeError, ValueError):
+                pass
         if self._is_tumble_dryer:
             if not is_dualtech_dryer(appliance.interface_type):
                 _LOGGER.warning(
@@ -956,12 +973,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     appliance.interface_type,
                 )
                 self._config_data[CONF_KEY_MODE] = MODE_READ_ONLY
-        else:
-            try:
-                if any(p.is_dry for p in parse_wash_programs(appliance.programs)):
-                    self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
-            except (KeyError, TypeError, ValueError):
-                pass
 
         return await self.async_step_language()
 

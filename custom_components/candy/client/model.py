@@ -531,6 +531,11 @@ class WashingMachineWashProgram:
 
     @property
     def is_dry(self) -> bool:
+        """Return True if this program is a standalone drying cycle.
+
+        Note: Describes individual cycle type for program selectors and options,
+        not physical appliance hardware identity.
+        """
         if self.program_type:
             return self.program_type == "D"
         name_upper = self.name.upper()
@@ -542,12 +547,14 @@ class WashingMachineWashProgram:
 
     @property
     def is_wash(self) -> bool:
+        """Return True if this program includes a wash phase."""
         if self.program_type:
             return self.program_type in ("W", "WD")
         return not self.is_dry
 
     @property
     def is_wash_and_dry(self) -> bool:
+        """Return True if this program supports combined wash and dry."""
         return (
             (self.program_type == "WD")
             or (self.is_wash and self.dry_supported)
