@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import EVENT_STATE_CHANGED
@@ -42,6 +44,7 @@ from custom_components.candy.const import (
     UNIQUE_ID_WASH_SOFTENER_AUTODOSE,
     UNIQUE_ID_WASH_STEAM_SWITCH,
 )
+from custom_components.candy.coordinator import CandyDataUpdateCoordinator
 from custom_components.candy.switch import (
     NfcSpecialProgramsSwitch,
     WashDetergentAutoDoseSwitch,
@@ -537,11 +540,19 @@ async def test_autodose_switches_detergent_and_softener(
         entry_id="autodose_entry",
         data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
-    coord = MagicMock(spec=DataUpdateCoordinator)
+    coord = CandyDataUpdateCoordinator(
+        hass,
+        logging.getLogger(__name__),
+        name=DOMAIN,
+        update_interval=timedelta(seconds=1),
+        update_method=AsyncMock(),
+        client=mock_client,
+    )
     coord.last_update_success = True
     coord.data = replace(
         _BASE_WM_STATUS, detergent_on=1, softener_on=0, remote_control=True
     )
+    coord.sync_autodose_state(coord.data)
     coord.async_request_refresh = AsyncMock()
 
     det_switch = WashDetergentAutoDoseSwitch(coord, entry, mock_client)
@@ -565,6 +576,7 @@ async def test_autodose_switches_detergent_and_softener(
     coord.data = replace(
         _BASE_WM_STATUS, detergent_on=1, softener_on=1, remote_control=True
     )
+    coord.sync_autodose_state(coord.data)
     await det_switch.async_turn_off()
     mock_client.set_autodose.assert_called_with(False, True)
     coord.async_request_refresh.assert_called_once()
@@ -572,36 +584,44 @@ async def test_autodose_switches_detergent_and_softener(
     # Test turn on detergent
     mock_client.set_autodose.reset_mock()
     coord.async_request_refresh.reset_mock()
-    coord.data = replace(coord.data, detergent_on=0)
+    coord.data = replace(coord.data, detergent_on=0, softener_on=1)
+    coord.sync_autodose_state(coord.data)
     await det_switch.async_turn_on()
     mock_client.set_autodose.assert_called_with(True, True)
 
     # Test turn on softener (lines 399-402)
     mock_client.set_autodose.reset_mock()
     coord.data = replace(coord.data, detergent_on=1, softener_on=0)
+    coord.sync_autodose_state(coord.data)
     await soft_switch.async_turn_on()
     mock_client.set_autodose.assert_called_with(True, True)
 
     # Test turn off softener
     mock_client.set_autodose.reset_mock()
-    coord.data = replace(coord.data, softener_on=1)
+    coord.data = replace(coord.data, detergent_on=1, softener_on=1)
+    coord.sync_autodose_state(coord.data)
     await soft_switch.async_turn_off()
     mock_client.set_autodose.assert_called_with(True, False)
 
     # Edge cases: status is None during turn_on / turn_off
     coord.data = None
+    coord._desired_detergent = None
+    coord._desired_softener = None
     mock_client.set_autodose.reset_mock()
     await det_switch.async_turn_on()
     mock_client.set_autodose.assert_called_with(True, False)
 
+    coord._desired_softener = None
     mock_client.set_autodose.reset_mock()
     await det_switch.async_turn_off()
     mock_client.set_autodose.assert_called_with(False, False)
 
+    coord._desired_detergent = None
     mock_client.set_autodose.reset_mock()
     await soft_switch.async_turn_on()
     mock_client.set_autodose.assert_called_with(False, True)
 
+    coord._desired_detergent = None
     mock_client.set_autodose.reset_mock()
     await soft_switch.async_turn_off()
     mock_client.set_autodose.assert_called_with(False, False)

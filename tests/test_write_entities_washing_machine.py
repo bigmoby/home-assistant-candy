@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import datetime as dt
 import json
@@ -4867,7 +4868,89 @@ async def test_autodose_switches(
             "switch", "turn_off", {"entity_id": soft_id}, blocking=True
         )
 
-    mock_send.assert_called_once_with("Write=1&SetDet=0&SetSoft=0")
+    mock_send.assert_called_once_with("Write=1&SetDet=1&SetSoft=0")
+
+
+async def test_autodose_rapid_sequential_toggles(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test that toggling both switches in rapid succession does not cancel either."""
+    raw_status = json.loads(_IDLE_JSON)
+    raw_status["statusLavatrice"]["Det"] = "0"
+    raw_status["statusLavatrice"]["Soft"] = "0"
+    status_str = json.dumps(raw_status)
+
+    extra = {CONF_KEY_INTERFACE_TYPE: "red_devil_axi_ad"}
+    entry = await _init_full_control_custom(hass, aioclient_mock, status_str, extra)
+
+    registry = er.async_get(hass)
+    det_id = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_DETERGENT_AUTODOSE.format(entry.entry_id)
+    )
+    soft_id = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_SOFTENER_AUTODOSE.format(entry.entry_id)
+    )
+    assert det_id is not None
+    assert soft_id is not None
+
+    sent_commands: list[str] = []
+
+    async def mock_send(cmd: str) -> None:
+        sent_commands.append(cmd)
+
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        side_effect=mock_send,
+    ):
+        await asyncio.gather(
+            hass.services.async_call(
+                "switch", "turn_on", {"entity_id": det_id}, blocking=True
+            ),
+            hass.services.async_call(
+                "switch", "turn_on", {"entity_id": soft_id}, blocking=True
+            ),
+        )
+
+    # Both must end up on in the final wire command
+    assert len(sent_commands) >= 1
+    assert sent_commands[-1] == "Write=1&SetDet=1&SetSoft=1"
+    det_state = hass.states.get(det_id)
+    soft_state = hass.states.get(soft_id)
+    assert det_state is not None and det_state.state == "on"
+    assert soft_state is not None and soft_state.state == "on"
+
+
+async def test_autodose_error_rollback(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test that failed write commands roll back optimistic autodose state."""
+    raw_status = json.loads(_IDLE_JSON)
+    raw_status["statusLavatrice"]["Det"] = "0"
+    raw_status["statusLavatrice"]["Soft"] = "0"
+    status_str = json.dumps(raw_status)
+
+    extra = {CONF_KEY_INTERFACE_TYPE: "red_devil_axi_ad"}
+    entry = await _init_full_control_custom(hass, aioclient_mock, status_str, extra)
+
+    registry = er.async_get(hass)
+    det_id = registry.async_get_entity_id(
+        "switch", DOMAIN, UNIQUE_ID_WASH_DETERGENT_AUTODOSE.format(entry.entry_id)
+    )
+    assert det_id is not None
+
+    with (
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            side_effect=TimeoutError("Appliance unreachable"),
+        ),
+        pytest.raises(TimeoutError),
+    ):
+        await hass.services.async_call(
+            "switch", "turn_on", {"entity_id": det_id}, blocking=True
+        )
+
+    det_state = hass.states.get(det_id)
+    assert det_state is not None and det_state.state == "off"
 
 
 # ---------------------------------------------------------------------------

@@ -96,6 +96,7 @@ from .const import (
     UNIQUE_ID_WASHING_MACHINE,
     UNIQUE_ID_WINE_COOLER,
 )
+from .coordinator import CandyDataUpdateCoordinator
 from .helpers import (
     cycles_remaining,
     get_appliance_error_notification_strings,
@@ -402,6 +403,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 last_known_status = status
                 consecutive_timeouts = 0
                 coordinator.update_interval = SCAN_INTERVAL_ACTIVE
+                coordinator.sync_autodose_state(status)
                 return status
         except (TimeoutError, aiohttp.ClientError) as err:
             consecutive_timeouts += 1
@@ -441,15 +443,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         except Exception as err:
             raise UpdateFailed(f"Error communicating with API: {err!r}") from err
 
-    coordinator = DataUpdateCoordinator(
+    coordinator = CandyDataUpdateCoordinator(
         hass,
         _LOGGER,
         name=DOMAIN,
         update_interval=SCAN_INTERVAL_ACTIVE,
         update_method=update_status,
+        client=client,
     )
 
     await coordinator.async_config_entry_first_refresh()
+    coordinator.sync_autodose_state(coordinator.data)
 
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = {
         DATA_KEY_COORDINATOR: coordinator,

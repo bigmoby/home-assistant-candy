@@ -39,6 +39,7 @@ from .const import (
     UNIQUE_ID_WASH_STEAM_SWITCH,
     WASH_OPTIONS,
 )
+from .coordinator import CandyDataUpdateCoordinator
 from .helpers import remote_control_enabled, supports_autodose, wash_device_info
 
 
@@ -50,7 +51,7 @@ async def async_setup_entry(
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
+    coordinator: CandyDataUpdateCoordinator = hass.data[DOMAIN][config_id][
         DATA_KEY_COORDINATOR
     ]
     if not isinstance(coordinator.data, WashingMachineStatus):
@@ -335,11 +336,12 @@ class WashDetergentAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
 
     def __init__(
         self,
-        coordinator: DataUpdateCoordinator,
+        coordinator: CandyDataUpdateCoordinator,
         config_entry: ConfigEntry,
         client: CandyClient,
     ) -> None:
         super().__init__(coordinator)
+        self.coordinator: CandyDataUpdateCoordinator = coordinator
         self.config_entry = config_entry
         self.config_id = config_entry.entry_id
         self._client = client
@@ -361,16 +363,10 @@ class WashDetergentAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
         return bool(status.detergent_on)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        status = cast(WashingMachineStatus, self.coordinator.data)
-        softener_on = bool(status.softener_on) if status is not None else False
-        await self._client.set_autodose(True, softener_on)
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_set_detergent_autodose(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        status = cast(WashingMachineStatus, self.coordinator.data)
-        softener_on = bool(status.softener_on) if status is not None else False
-        await self._client.set_autodose(False, softener_on)
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_set_detergent_autodose(False)
 
 
 class WashSoftenerAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
@@ -380,11 +376,12 @@ class WashSoftenerAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
 
     def __init__(
         self,
-        coordinator: DataUpdateCoordinator,
+        coordinator: CandyDataUpdateCoordinator,
         config_entry: ConfigEntry,
         client: CandyClient,
     ) -> None:
         super().__init__(coordinator)
+        self.coordinator: CandyDataUpdateCoordinator = coordinator
         self.config_entry = config_entry
         self.config_id = config_entry.entry_id
         self._client = client
@@ -406,16 +403,10 @@ class WashSoftenerAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
         return bool(status.softener_on)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        status = cast(WashingMachineStatus, self.coordinator.data)
-        detergent_on = bool(status.detergent_on) if status is not None else False
-        await self._client.set_autodose(detergent_on, True)
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_set_softener_autodose(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        status = cast(WashingMachineStatus, self.coordinator.data)
-        detergent_on = bool(status.detergent_on) if status is not None else False
-        await self._client.set_autodose(detergent_on, False)
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_set_softener_autodose(False)
 
 
 class WashExtraDoseSwitch(_WashSwitchBase):

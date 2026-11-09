@@ -1017,9 +1017,11 @@ async def test_dryer_start_button_missing_registry_entities(
         patch.object(
             registry,
             "async_get_entity_id",
-            side_effect=lambda domain, platform, unique_id: None
-            if domain == "select"
-            else orig_get_eid(domain, platform, unique_id),
+            side_effect=lambda domain, platform, unique_id: (
+                None
+                if domain == "select"
+                else orig_get_eid(domain, platform, unique_id)
+            ),
         ),
         pytest.raises(
             ValueError,
@@ -1035,9 +1037,11 @@ async def test_dryer_start_button_missing_registry_entities(
         patch.object(
             registry,
             "async_get_entity_id",
-            side_effect=lambda domain, platform, unique_id: None
-            if domain == "number"
-            else orig_get_eid(domain, platform, unique_id),
+            side_effect=lambda domain, platform, unique_id: (
+                None
+                if domain == "number"
+                else orig_get_eid(domain, platform, unique_id)
+            ),
         ),
         patch(
             "custom_components.candy.client.CandyClient.send_command",
