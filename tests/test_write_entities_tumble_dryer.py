@@ -920,10 +920,10 @@ async def test_dryer_start_button_missing_and_invalid_states(
     assert "PrNm=1" in qs
 
 
-async def test_dryer_start_button_program_fallback_and_no_programs(
+async def test_dryer_start_button_unknown_program_raises(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Test fallback to first program on unknown program name, and error if no programs."""
+    """Test unknown program name or empty programs raises ValueError."""
     entry = await _init_dryer_full_control(hass, aioclient_mock, _IDLE_JSON)
     registry = er.async_get(hass)
 
@@ -939,25 +939,23 @@ async def test_dryer_start_button_program_fallback_and_no_programs(
     # Set program to unknown name
     hass.states.async_set(prog_eid, "Unknown Program Name")
 
-    with patch(
-        "custom_components.candy.client.CandyClient.send_command",
-        new_callable=AsyncMock,
-    ) as mock_send:
+    with pytest.raises(
+        ValueError,
+        match="Cannot start: program 'Unknown Program Name' not found in catalog",
+    ):
         await hass.services.async_call(
             "button", "press", {"entity_id": start_eid}, blocking=True
         )
-
-    # Should fall back to _programs[0] (COTTON)
-    mock_send.assert_called_once()
-    qs = mock_send.call_args[0][0]
-    assert "PrNm=1" in qs
 
     # When no programs available, pressing raises ValueError
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     client = hass.data[DOMAIN][entry.entry_id]["client"]
     btn = CandyDryerStartButton(coordinator, entry, client, [])
     btn.hass = hass
-    with pytest.raises(ValueError, match="No dryer program available to start"):
+    with pytest.raises(
+        ValueError,
+        match="Cannot start: program 'Unknown Program Name' not found in catalog",
+    ):
         await btn.async_press()
 
 
@@ -1004,7 +1002,7 @@ async def test_dryer_start_button_timed_dry_default_time(
 async def test_dryer_start_button_missing_registry_entities(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Test dryer start button returns None/0.0 when select/number missing from registry."""
+    """Test dryer start button raises on missing select, and defaults to 0.0 for missing number."""
     entry = await _init_dryer_full_control(hass, aioclient_mock, _IDLE_JSON)
     registry = er.async_get(hass)
     start_eid = registry.async_get_entity_id(
@@ -1014,13 +1012,33 @@ async def test_dryer_start_button_missing_registry_entities(
 
     orig_get_eid = registry.async_get_entity_id
 
-    def custom_get_eid(domain, platform, unique_id):
-        if domain in ("select", "number"):
-            return None
-        return orig_get_eid(domain, platform, unique_id)
-
+    # When select is missing, pressing start button raises ValueError
     with (
-        patch.object(registry, "async_get_entity_id", side_effect=custom_get_eid),
+        patch.object(
+            registry,
+            "async_get_entity_id",
+            side_effect=lambda domain, platform, unique_id: None
+            if domain == "select"
+            else orig_get_eid(domain, platform, unique_id),
+        ),
+        pytest.raises(
+            ValueError,
+            match="Cannot start: program 'None' not found in catalog",
+        ),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_eid}, blocking=True
+        )
+
+    # When only number is missing, number state defaults to 0.0 and start succeeds
+    with (
+        patch.object(
+            registry,
+            "async_get_entity_id",
+            side_effect=lambda domain, platform, unique_id: None
+            if domain == "number"
+            else orig_get_eid(domain, platform, unique_id),
+        ),
         patch(
             "custom_components.candy.client.CandyClient.send_command",
             new_callable=AsyncMock,

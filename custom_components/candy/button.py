@@ -1109,10 +1109,9 @@ class CandyDryerStartButton(CandyDryerButtonBase):
             None,
         )
         if program is None:
-            if self._programs:
-                program = self._programs[0]
-            else:
-                raise ValueError("No dryer program available to start")
+            raise ValueError(
+                f"Cannot start: program '{program_name}' not found in catalog"
+            )
 
         dry_level = DRY_LEVEL_TO_VALUE.get(
             dry_level_option or "", program.default_drying_level
