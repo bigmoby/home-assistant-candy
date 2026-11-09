@@ -405,23 +405,6 @@ async def test_fetch_raw_status(hass, aioclient_mock):
     assert data == raw_payload
 
 
-async def test_fetch_raw_config(hass, aioclient_mock):
-    """Test fetch_raw_config returns device configuration dictionary."""
-    config_payload = {"SSID": "HomeWiFi", "firmware": "1.0"}
-    aioclient_mock.get(
-        f"http://{TEST_IP}/http-config.json",
-        json=config_payload,
-    )
-    client = CandyClient(
-        async_get_clientsession(hass),
-        device_ip=TEST_IP,
-        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
-        use_encryption=False,
-    )
-    data = await client.fetch_raw_config()
-    assert data == config_payload
-
-
 async def test_fetch_raw_statistics(hass, aioclient_mock):
     """Test fetch_raw_statistics returns raw statusCounters dictionary."""
     stats_payload = {"statusCounters": {"Program1": "10", "Temp40": "20"}}
@@ -443,13 +426,11 @@ async def test_fetch_raw_statistics(hass, aioclient_mock):
 
 
 async def test_fetch_all_endpoints_success(hass, aioclient_mock):
-    """Test fetch_all_endpoints aggregates telemetry, config, and statistics."""
+    """Test fetch_all_endpoints aggregates telemetry and statistics."""
     telemetry = {"statusLavatrice": {"MachMd": "2"}}
-    config = {"SSID": "WiFi", "version": "1.0"}
     stats = {"statusCounters": {"Program1": "5"}}
 
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
-    aioclient_mock.get(f"http://{TEST_IP}/http-config.json", json=config)
     aioclient_mock.get(
         f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
     )
@@ -463,7 +444,7 @@ async def test_fetch_all_endpoints_success(hass, aioclient_mock):
     )
     endpoints = await client.fetch_all_endpoints()
     assert endpoints["http-read.json"] == telemetry
-    assert endpoints["http-config.json"] == config
+    assert "http-config.json" not in endpoints
     assert endpoints["http-getStatistics.json"] == stats
 
 
@@ -479,7 +460,7 @@ async def test_fetch_all_endpoints_read_error(hass, aioclient_mock):
     )
     endpoints = await client.fetch_all_endpoints()
     assert "error" in endpoints["http-read.json"]
-    assert endpoints["http-config.json"] == {"status": "Skipped: device is unreachable"}
+    assert "http-config.json" not in endpoints
     assert endpoints["http-getStatistics.json"] == {
         "status": "Skipped: device is unreachable"
     }
@@ -501,11 +482,10 @@ async def test_client_plaintext_json_fallback_when_encrypted(hass, aioclient_moc
     assert "statusLavatrice" in data
 
 
-async def test_fetch_all_endpoints_config_and_stats_error(hass, aioclient_mock):
-    """Test fetch_all_endpoints records errors when config or statistics fetch fails."""
+async def test_fetch_all_endpoints_stats_error(hass, aioclient_mock):
+    """Test fetch_all_endpoints records errors when statistics fetch fails."""
     telemetry = {"statusLavatrice": {"MachMd": "2"}}
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
-    aioclient_mock.get(f"http://{TEST_IP}/http-config.json", status=500)
     aioclient_mock.get(f"http://{TEST_IP}/http-prepareStatistics.json", status=500)
 
     client = CandyClient(
@@ -516,16 +496,14 @@ async def test_fetch_all_endpoints_config_and_stats_error(hass, aioclient_mock):
     )
     endpoints = await client.fetch_all_endpoints()
     assert endpoints["http-read.json"] == telemetry
-    assert "error" in endpoints["http-config.json"]
+    assert "http-config.json" not in endpoints
     assert "error" in endpoints["http-getStatistics.json"]
 
 
 async def test_fetch_all_endpoints_non_stats_appliance(hass, aioclient_mock):
     """Test fetch_all_endpoints handles appliances that do not support statistics."""
     telemetry = {"statusForno": {"StatoWiFi": "1"}}
-    config = {"SSID": "WiFi"}
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
-    aioclient_mock.get(f"http://{TEST_IP}/http-config.json", json=config)
 
     client = CandyClient(
         async_get_clientsession(hass),
@@ -535,7 +513,7 @@ async def test_fetch_all_endpoints_non_stats_appliance(hass, aioclient_mock):
     )
     endpoints = await client.fetch_all_endpoints()
     assert endpoints["http-read.json"] == telemetry
-    assert endpoints["http-config.json"] == config
+    assert "http-config.json" not in endpoints
     assert "not supported" in endpoints["http-getStatistics.json"]["status"]
 
 

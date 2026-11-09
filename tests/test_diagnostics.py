@@ -128,13 +128,6 @@ async def test_diagnostics_with_client_all_endpoints(hass):
                     "FillR": "80",
                 }
             },
-            "http-config.json": {
-                "SSID": "HomeWiFi",
-                "PASSWORD": "SecretWiFiPassword",
-                "MAC": "11:22:33:44:55:66",
-                "IP": "192.168.1.100",
-                "firmware_version": "v1.2.3",
-            },
             "http-getStatistics.json": {
                 "statusCounters": {
                     "Program1": "10",
@@ -156,19 +149,18 @@ async def test_diagnostics_with_client_all_endpoints(hass):
 
     result = await async_get_config_entry_diagnostics(hass, entry)
 
-    # Verify endpoints present
+    # Verify endpoints present and http-config excluded
     endpoints = result["endpoints"]
     assert "http-read.json" in endpoints
-    assert "http-config.json" in endpoints
+    assert "http-config.json" not in endpoints
     assert "http-getStatistics.json" in endpoints
 
-    # Verify sensitive data redacted in endpoints
-    config_ep = endpoints["http-config.json"]
-    assert config_ep["PASSWORD"] == "**REDACTED**"
-    assert config_ep["SSID"] == "**REDACTED**"
-    assert config_ep["MAC"] == "**REDACTED**"
-    assert config_ep["IP"] == "**REDACTED**"
-    assert config_ep["firmware_version"] == "v1.2.3"
+    # Verify sensitive data redacted in config_entry
+    config_entry_diag = result["config_entry"]
+    assert config_entry_diag[CONF_PASSWORD] == "**REDACTED**"
+    assert config_entry_diag[CONF_IP_ADDRESS] == "**REDACTED**"
+    assert config_entry_diag[CONF_KEY_MAC_ADDRESS] == "**REDACTED**"
+    assert config_entry_diag[CONF_KEY_SERIAL_NUMBER] == "**REDACTED**"
 
     # Verify deep telemetry dissection
     dissection = result["dissection"]
@@ -208,7 +200,6 @@ async def test_diagnostics_with_tumble_dryer_dissection(hass):
                     "WaterTankFull": "0",
                 }
             },
-            "http-config.json": {"status": "Not supported"},
             "http-getStatistics.json": {
                 "status": "Statistics counters not supported for this appliance family"
             },

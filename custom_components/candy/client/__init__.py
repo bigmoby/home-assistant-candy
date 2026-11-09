@@ -162,11 +162,6 @@ class CandyClient:
         url = _status_url(self.device_ip, self.use_encryption)
         return await self._fetch_and_decode_endpoint(url)
 
-    async def fetch_raw_config(self) -> dict[str, Any]:
-        """Fetch device configuration from /http-config.json."""
-        url = _config_url(self.device_ip, self.use_encryption)
-        return await self._fetch_and_decode_endpoint(url)
-
     async def fetch_raw_statistics(self) -> dict[str, Any]:
         """Fetch statistics counters handshake (prepareStatistics -> getStatistics)."""
         prepare_url = _prepare_statistics_url(self.device_ip, self.use_encryption)
@@ -194,23 +189,12 @@ class CandyClient:
             endpoints["http-read.json"] = {
                 "error": f"Error fetching /http-read.json: {err!r}"
             }
-            endpoints["http-config.json"] = {"status": "Skipped: device is unreachable"}
             endpoints["http-getStatistics.json"] = {
                 "status": "Skipped: device is unreachable"
             }
             return endpoints
 
-        # 2. Device configuration (/http-config.json)
-        try:
-            async with async_timeout.timeout(5):
-                config_data = await self.fetch_raw_config()
-                endpoints["http-config.json"] = config_data
-        except Exception as err:
-            endpoints["http-config.json"] = {
-                "error": f"Error fetching /http-config.json: {err!r}"
-            }
-
-        # 3. Statistics counters (/http-getStatistics.json)
+        # 2. Statistics counters (/http-getStatistics.json)
         has_stats_support = any(
             k in telemetry
             for k in ("statusLavatrice", "statusWD", "statusWM", "statusTD")
@@ -402,10 +386,6 @@ async def detect_encryption(
 
 def _status_url(device_ip: str, use_encryption: bool) -> str:
     return f"http://{device_ip}/http-read.json?encrypted={1 if use_encryption else 0}"
-
-
-def _config_url(device_ip: str, use_encryption: bool) -> str:
-    return f"http://{device_ip}/http-config.json?encrypted={1 if use_encryption else 0}"
 
 
 def _write_url(device_ip: str, use_encryption: bool, data: str) -> str:
