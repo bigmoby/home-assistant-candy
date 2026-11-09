@@ -446,6 +446,9 @@ class WashExtraDoseSwitch(_WashSwitchBase):
         }:
             return False
         prog = self._active_program()
+        # In Simply-Fi APK (AbProgramOptionsFragment.addExtraDose, classes*.dex), Extra Dose
+        # is only offered if the selected program supports Prewash (available_options & 1).
+        # On AutoDose models, extra dosing dispenses via the prewash hydraulic stage.
         return prog is not None and bool(prog.available_options & 1)
 
     @property
