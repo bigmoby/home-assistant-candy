@@ -148,7 +148,15 @@ Pre-configured Lovelace dashboard cards using [Mushroom Cards](https://github.co
 - **[Washing Machine Card](../dashboard/washing-machine.yaml):** Operational control panel for standard washing machines (program selection, spin/temp adjustments, start/pause/stop buttons, and time estimates).
 - **[Washer-Dryer Card](../dashboard/washer-dryer.yaml):** All-in-one panel featuring wash-and-dry mode selection, drying settings, and live status icons.
 - **[Tumble Dryer Card](../dashboard/tumble-dryer.yaml):** Complete dryer panel with dry level selectors, timed drying controls, filter and water alerts, and anti-crease management.
-- **[Maintenance Card](../dashboard/maintenance.yaml):** Companion card for washing machines and washer-dryers featuring maintenance countdown progress bars and one-click cleaning triggers.
+- **[Maintenance Card](../dashboard/maintenance.yaml):** Companion card strictly for **washing machines** and **washer-dryers** (tracks cycle-based countdowns for Full Check-up, Limescale cleaning, and Filter care). Not needed for tumble dryers, which already include live hardware alerts directly on their card.
+
+#### Requirements & Setup
+
+1. **Install Mushroom Cards:** Install [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom) via **HACS > Frontend** (or manually). The cards require `custom:mushroom-template-card` and `custom:mushroom-chips-card`.
+2. **Add Manual Card:** Edit your dashboard, click **Add Card**, and choose **Manual** at the bottom.
+3. **Paste & Configure `<machine_name>`:** Copy the card YAML and replace every occurrence of `<machine_name>` with your device's entity prefix (e.g. `washing_machine` if your main status sensor is `sensor.washing_machine`).
+
+For complete card details and setup instructions, see the [`dashboard/`](../dashboard/README.md) directory.
 
 ### Automations
 

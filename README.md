@@ -45,7 +45,7 @@ Full Control mode turns the integration into an interactive remote panel for **w
 - **Complete Cycle Control:** Select official localized programs, adjust temperature, spin speed, soil level, or drying targets (dryness level, timed drying), and trigger Start, Pause, Resume, Stop, or Cancel Anti-Crease.
 - **Proactive Maintenance & Diagnostics:** Cycle-based reminders for washing machines (Full Check-up, Limescale cleaning, Filter care), live hardware alerts for tumble dryers (lint filter and water tank full), and electronic self check-up.
 - **Vendor Troubleshooting:** Automatic Home Assistant notifications with authentic step-by-step guidance when the appliance encounters a fault.
-- **Ready-to-Use Dashboards:** Pre-built Lovelace cards ready to control your appliance (see [`dashboard/`](dashboard/)).
+- **Ready-to-Use Dashboards:** Pre-built Lovelace cards using [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom) ready to control your appliance (see [`dashboard/`](dashboard/README.md)).
 - **Smart Safety Gating:** Automatically disables controls when manual or local operation takes precedence.
 
 📖 **For detailed instructions, appliance workflows, and safety rules, see the [Remote Control Guide](docs/remote-control.md).**
@@ -60,15 +60,15 @@ Full Control mode turns the integration into an interactive remote panel for **w
 
 ### Compatibility Note
 
-Full functionality has been tested on several physical appliances. See the table below.
+The remote control functionality has been implemented for several physical appliances. See the table below.
 
 | Appliance | Interface / Family | Tested | Notes |
 |---|---|---|---|
 | Washing Machine | Candy RapidÓ (`RAPIDO`, `RAPIDO_4DIG_STM_NEL`) | Yes | Reference hardware (`RO41274DWMSE/1-S`).|
 | Washing Machine / Washer Dryer | Hoover AXI (`red_devil_axi*`, `hwash700`) | Yes | Reference hardware (`AWMPD 410LH8/1-S` and `AWDPD4138LHR/1`). |
-| Tumble Dryer | DualTech (`TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL`) | Yes | Reference hardware (`GVS H9A2TCE-80`). Supports start/pause/resume/stop, dryness levels, timed drying, filter/tank warnings, and self check-up. |
+| Tumble Dryer | DualTech (`TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL`) | Yes | Reference hardware (`GVS H9A2TCE-80`). |
 | Washing Machine / Washer Dryer | DualTech (`3D_DUAL`, `4D_DUAL`, `DUALTECH`) | Yes | Tested on `3D_DUAL` hardware. Remote pause and stats counters are unsupported by hardware. |
-| Washer Dryer | Candy RapidÓ (`ROW` series) | No | Shares RapidÓ protocol with generic washer-dryer engine. Untested on physical hardware. |
+| Washer Dryer | Candy RapidÓ (`ROW` series) | No | Shares RapidÓ protocol with generic washer-dryer engine. |
 | Washing Machine / Washer Dryer | Candy Bianca (`BIANCA`, `BWD` series) | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by Bianca hardware. |
 | Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. |
 
@@ -118,7 +118,7 @@ python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> stats
 python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
 ```
 
-Supports all 9 appliance families: Washing Machines, Washer-Dryers, Tumble Dryers, Dishwashers, Ovens, Wine Coolers, Refrigerators/Freezers, Kitchen Hoods, Induction/Gas Cooktops, and Robot Vacuums. For full details and command grammar, see [`tools/agents.md`](tools/agents.md).
+Supports all 10 appliance families: Washing Machines, Washer-Dryers, Tumble Dryers, Dishwashers, Ovens, Wine Coolers, Refrigerators/Freezers, Kitchen Hoods, Induction/Gas Cooktops, and Robot Vacuums. For full details and command grammar, see [`tools/agents.md`](tools/agents.md).
 
 ---
 
