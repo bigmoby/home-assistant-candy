@@ -742,9 +742,10 @@ def test_stats_refresh_listener_handles_none_status(hass: HomeAssistant):
         return MagicMock()
 
     mock_coordinator.async_add_listener = _capture_listener
+    mock_entry = MagicMock()
 
     unsub = _register_stats_refresh_listener(
-        hass, mock_coordinator, mock_stats_coordinator
+        hass, mock_entry, mock_coordinator, mock_stats_coordinator
     )
     assert callable(unsub)
     assert listener_cb is not None

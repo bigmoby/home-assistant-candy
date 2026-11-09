@@ -532,7 +532,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
         if stats_coordinator is not None:
             unsub_stats_refresh = _register_stats_refresh_listener(
-                hass, coordinator, stats_coordinator
+                hass, config_entry, coordinator, stats_coordinator
             )
             hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
                 unsub_stats_refresh
@@ -781,7 +781,11 @@ def _register_full_checkup_listener(
                         )
                         stats_coordinator.async_update_listeners()
 
-                hass.async_create_task(_update_baseline())
+                config_entry.async_create_background_task(
+                    hass,
+                    _update_baseline(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_update_full_checkup_baseline",
+                )
 
             if (
                 config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
@@ -805,7 +809,11 @@ def _register_full_checkup_listener(
                             "Failed to reset appliance check-up state: %s", err
                         )
 
-                hass.async_create_task(_send_reset())
+                config_entry.async_create_background_task(
+                    hass,
+                    _send_reset(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_send_full_checkup_reset",
+                )
 
     return coordinator.async_add_listener(_on_status_update)
 
@@ -892,7 +900,11 @@ def _register_limescale_listener(
                             )
                             stats_coordinator.async_update_listeners()
 
-                    hass.async_create_task(_update_baseline())
+                    config_entry.async_create_background_task(
+                        hass,
+                        _update_baseline(),
+                        name=f"{DOMAIN}_{config_entry.entry_id}_update_limescale_baseline",
+                    )
         elif curr_state in (MachineState.IDLE, MachineState.OFF):
             was_running_autoclean[0] = False
 
@@ -901,6 +913,7 @@ def _register_limescale_listener(
 
 def _register_stats_refresh_listener(
     hass: HomeAssistant,
+    config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
     stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
 ) -> Callable[[], None]:
@@ -918,7 +931,11 @@ def _register_stats_refresh_listener(
         prev = prev_state[0]
         prev_state[0] = curr
         if curr in _FINISHED_STATES and prev not in _FINISHED_STATES:
-            hass.async_create_task(stats_coordinator.async_request_refresh())
+            config_entry.async_create_background_task(
+                hass,
+                stats_coordinator.async_request_refresh(),
+                name=f"{DOMAIN}_{config_entry.entry_id}_stats_refresh",
+            )
 
     return coordinator.async_add_listener(_on_status_update)
 
@@ -1148,7 +1165,11 @@ def _register_dryer_checkup_listener(
                             "Failed to reset tumble dryer check-up state: %s", err
                         )
 
-                hass.async_create_task(_send_reset())
+                config_entry.async_create_background_task(
+                    hass,
+                    _send_reset(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_send_dryer_checkup_reset",
+                )
 
     return coordinator.async_add_listener(_on_status_update)
 

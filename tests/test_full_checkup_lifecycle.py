@@ -400,6 +400,37 @@ async def test_full_checkup_unloads_cleanly(
     assert DOMAIN not in hass.data
 
 
+async def test_full_checkup_reset_uses_background_task(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Check-up completion schedules baseline and reset via entry.async_create_background_task."""
+    entry = await _setup(hass, aioclient_mock, _RUNNING_CHECKUP_JSON)
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch.object(
+            entry,
+            "async_create_background_task",
+            wraps=entry.async_create_background_task,
+        ) as mock_bg_task,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_51_CYCLES)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+        task_names = [call.kwargs.get("name") for call in mock_bg_task.call_args_list]
+        assert f"{DOMAIN}_{entry.entry_id}_send_full_checkup_reset" in task_names
+        assert f"{DOMAIN}_{entry.entry_id}_update_full_checkup_baseline" in task_names
+
+
 def test_full_checkup_coordinator_data_none(
     hass: HomeAssistant,
 ):
