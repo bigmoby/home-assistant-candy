@@ -1,150 +1,222 @@
+# --------------------------------------------------------------------------------------------------
+# Home Assistant Dashboard Card: Washing Machine & Washer-Dryer Maintenance & Diagnostics
+# --------------------------------------------------------------------------------------------------
+# Requirements:
+#   - piitaya/lovelace-mushroom (custom:mushroom-template-card, custom:mushroom-chips-card)
+#
+# Target Appliances:
+#   - Candy / Hoover Standard Washing Machines
+#   - Candy / Hoover Washer-Dryer Combos
+#   (For standalone Tumble Dryers, use `tumble-dryer.yaml` instead; dryers do not use cycle counters)
+#
+# Instructions:
+#   Copy the contents of this file into a Manual Card on your dashboard.
+#   Replace every occurrence of `<machine_name>` with your device's entity ID prefix
+#   (e.g. `washing_machine` or `my_washing_machine`).
+#
+# Note:
+#   This card tracks cycle-based maintenance counters (Full Check-up, Limescale Autoclean, Debris Filter).
+#   It automatically adapts for all appliance interface platforms. On platforms without
+#   statistics endpoints (such as DualTech / 3D_DUAL), cycle-based counters and baseline reset buttons
+#   are automatically hidden while diagnostic Check-up and Limescale Cleaning controls remain accessible.
+# --------------------------------------------------------------------------------------------------
 type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
     primary: Washing Machine Maintenance
     secondary: >-
-      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') |
-      int(-1) %} {% set ls =
-      states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %} {%
-      set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
-      {% set due = [] %} {% if sc == 0 %} {% set due = due + ['Full Check-up'] %}
-      {% endif %} {% if ls == 0 %} {% set due = due + ['limescale'] %} {% endif %}
-      {% if fl == 0 %} {% set due = due + ['Filter'] %} {% endif %} {% if due |
-      length > 0 %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set due = [] %}
+      {% if sc == 0 %}{% set due = due + ['Full Check-up'] %}{% endif %}
+      {% if ls == 0 %}{% set due = due + ['Limescale'] %}{% endif %}
+      {% if fl == 0 %}{% set due = due + ['Filter'] %}{% endif %}
+      {% if due | length > 0 %}
         Attention required: {{ due | join(', ') }}
+      {% elif sc == -1 and ls == -1 and fl == -1 %}
+        {% set res = states('sensor.<machine_name>_last_check_up_result') | lower %}
+        {% if 'problem' in res %}
+          Problem detected in check-up
+        {% elif 'ok' in res %}
+          System healthy
+        {% else %}
+          Diagnostics & Maintenance
+        {% endif %}
       {% else %}
         All good
       {% endif %}
     icon: mdi:washing-machine-alert
     badge_icon: >-
-      {% set sc =
-      states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') |
-      int(-1) %} {% set ls =
-      states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %} {%
-      set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
-      {% if sc == 0 or ls == 0 or fl == 0 %} mdi:alert-circle {% else %}
-      mdi:check-circle {% endif %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set res = states('sensor.<machine_name>_last_check_up_result') | lower %}
+      {% if sc == 0 or ls == 0 or fl == 0 or 'problem' in res %}
+        mdi:alert-circle
+      {% elif 'ok' in res or (sc > 0 or ls > 0 or fl > 0) %}
+        mdi:check-circle
+      {% else %}
+        mdi:stethoscope
+      {% endif %}
     badge_color: >-
-      {% set sc =
-      states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') |
-      int(-1) %} {% set ls =
-      states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %} {%
-      set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
-      {% if sc == 0 or ls == 0 or fl == 0 %} red {% else %} green {% endif %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set res = states('sensor.<machine_name>_last_check_up_result') | lower %}
+      {% if sc == 0 or ls == 0 or fl == 0 or 'problem' in res %}
+        red
+      {% elif 'ok' in res or (sc > 0 or ls > 0 or fl > 0) %}
+        green
+      {% else %}
+        blue
+      {% endif %}
     color: >-
-      {% set sc =
-      states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') |
-      int(-1) %} {% set ls =
-      states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %} {%
-      set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
-      {% if sc == 0 or ls == 0 or fl == 0 %} red {% else %} green {% endif %}
-    entity: sensor.<machine_name>_total_wash_cycles
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-chips-card
-    chips:
-      - type: template
-        icon: mdi:counter
-        content: >-
-          {% set v = states('sensor.<machine_name>_total_wash_cycles') |
-          int(-1) %} {% if v >= 0 %}{{ v }} total cycles{% else %}—{% endif %}
-        icon_color: grey
-        tap_action:
-          action: more-info
-          entity: sensor.<machine_name>_total_wash_cycles
-  - type: custom:mushroom-template-card
-    primary: Full Check-up
-    secondary: >-
-      {% set v = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') |
-      int(-1) %} {% if v == 0 %}Due now{% elif v >= 0 %}{{ v }} cycles
-      remaining{% else %}—{% endif %}
-    icon: mdi:stethoscope
-    icon_color: >-
-      {% set v = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') |
-      int(-1) %} {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set res = states('sensor.<machine_name>_last_check_up_result') | lower %}
+      {% if sc == 0 or ls == 0 or fl == 0 or 'problem' in res %}
+        red
+      {% elif 'ok' in res or (sc > 0 or ls > 0 or fl > 0) %}
+        green
+      {% else %}
+        blue
       {% endif %}
-    entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-template-card
-    primary: Limescale cleaning
-    secondary: >-
-      {% set v = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') |
-      int(-1) %} {% if v == 0 %}Due now{% elif v >= 0 %}{{ v }} cycles
-      remaining{% else %}—{% endif %}
-    icon: mdi:water-opacity
-    icon_color: >-
-      {% set v = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') |
-      int(-1) %} {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green
-      {% endif %}
-    entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-template-card
-    primary: Filter clean
-    secondary: >-
-      {% set v = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1)
-      %} {% if v == 0 %}Due now{% elif v >= 0 %}{{ v }} cycles remaining{%
-      else %}—{% endif %}
-    icon: mdi:filter-outline
-    icon_color: >-
-      {% set v = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1)
-      %} {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green {% endif
-      %}
-    entity: sensor.<machine_name>_filter_maintenance_remaining_cycles
+    entity: sensor.<machine_name>
     tap_action:
       action: more-info
   - type: conditional
     conditions:
-      - condition: or
-        conditions:
-          - condition: state
-            entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
-            state: "0"
-          - condition: state
-            entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
-            state: "0"
+      - condition: state
+        entity: sensor.<machine_name>_total_wash_cycles
+        state_not: unavailable
     card:
-      type: horizontal-stack
-      cards:
-        - type: conditional
-          conditions:
-            - condition: state
-              entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
-              state: "0"
-          card:
-            type: custom:mushroom-template-card
-            primary: Run Full Check-up
-            icon: mdi:stethoscope
-            color: red
-            tap_action:
-              action: more-info
-              entity: button.<machine_name>_full_check_up
-            vertical: true
-        - type: conditional
-          conditions:
-            - condition: state
-              entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
-              state: "0"
-          card:
-            type: custom:mushroom-template-card
-            primary: Run Limescale Cleaning
-            icon: mdi:water-remove
-            color: red
-            tap_action:
-              action: more-info
-              entity: button.<machine_name>_limescale_cleaning
-            vertical: true
+      type: custom:mushroom-chips-card
+      chips:
+        - type: template
+          icon: mdi:counter
+          content: >-
+            {% set v = states('sensor.<machine_name>_total_wash_cycles') | int(-1) %}
+            {% if v >= 0 %}{{ v }} total cycles{% else %}—{% endif %}
+          icon_color: grey
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_total_wash_cycles
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
+        state_not: unavailable
+    card:
+      type: custom:mushroom-template-card
+      primary: Full Check-up
+      secondary: >-
+        {% set v = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %}Due now{% elif v >= 0 %}{{ v }} cycles remaining{% else %}—{% endif %}
+      icon: mdi:stethoscope
+      icon_color: >-
+        {% set v = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green {% endif %}
+      entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
+      tap_action:
+        action: more-info
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
+        state_not: unavailable
+    card:
+      type: custom:mushroom-template-card
+      primary: Limescale cleaning
+      secondary: >-
+        {% set v = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %}Due now{% elif v >= 0 %}{{ v }} cycles remaining{% else %}—{% endif %}
+      icon: mdi:water-opacity
+      icon_color: >-
+        {% set v = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green {% endif %}
+      entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
+      tap_action:
+        action: more-info
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>_filter_maintenance_remaining_cycles
+        state_not: unavailable
+    card:
+      type: custom:mushroom-template-card
+      primary: Filter clean
+      secondary: >-
+        {% set v = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %}Due now{% elif v >= 0 %}{{ v }} cycles remaining{% else %}—{% endif %}
+      icon: mdi:filter-outline
+      icon_color: >-
+        {% set v = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green {% endif %}
+      entity: sensor.<machine_name>_filter_maintenance_remaining_cycles
+      tap_action:
+        action: more-info
   - type: horizontal-stack
     cards:
-      - type: custom:mushroom-template-card
-        primary: Reset Full Check-up
-        icon: mdi:restore
-        icon_color: grey
-        tap_action:
-          action: more-info
-          entity: button.<machine_name>_check_up_maintenance_reset
-        vertical: true
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_full_check_up
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          primary: Run Full Check-up
+          secondary: >-
+            {% set rem = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+            {% if rem == 0 %}Due now
+            {% elif rem > 0 %}{{ rem }} cycles left
+            {% else %}Diagnostic test{% endif %}
+          icon: mdi:stethoscope
+          color: >-
+            {% set rem = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+            {% if rem == 0 %}red{% else %}blue{% endif %}
+          tap_action:
+            action: more-info
+            entity: button.<machine_name>_full_check_up
+          vertical: true
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_limescale_cleaning
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          primary: Run Limescale Cleaning
+          secondary: >-
+            {% set rem = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+            {% if rem == 0 %}Due now
+            {% elif rem > 0 %}{{ rem }} cycles left
+            {% else %}Autoclean cycle{% endif %}
+          icon: mdi:water-remove
+          color: >-
+            {% set rem = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+            {% if rem == 0 %}red{% else %}blue{% endif %}
+          tap_action:
+            action: more-info
+            entity: button.<machine_name>_limescale_cleaning
+          vertical: true
+  - type: horizontal-stack
+    cards:
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_check_up_maintenance_reset
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          primary: Reset Full Check-up
+          icon: mdi:restore
+          icon_color: grey
+          tap_action:
+            action: more-info
+            entity: button.<machine_name>_check_up_maintenance_reset
+          vertical: true
       - type: conditional
         conditions:
           - condition: state
@@ -210,12 +282,11 @@ cards:
           entity: sensor.<machine_name>_last_check_up
           primary: Last check-up
           secondary: >-
-            {% set ts =
-            states('sensor.<machine_name>_last_check_up') |
-            as_timestamp(default=none) %} {% if ts %}{{ ts |
-            timestamp_custom('%d/%m/%Y %H:%M') }}{% else %}—{% endif %}
+            {% set ts = states('sensor.<machine_name>_last_check_up') | as_timestamp(default=none) %}
+            {% if ts %}{{ ts | timestamp_custom('%d/%m/%Y %H:%M') }}{% else %}—{% endif %}
           icon: mdi:clock-check-outline
           tap_action:
             action: more-info
           color: grey
           features_position: bottom
+

@@ -23,7 +23,9 @@
       "Iron Dry": "Pronto Stiro",
       "Hang Dry": "Asciutto No Stiro",
       "Store Dry": "Asciutto Armadio",
-      "Bone Dry": "Extra Asciutto"
+      "Bone Dry": "Extra Asciutto",
+      "Pre-heating": "Pre-riscaldamento",
+      "Completed": "Completato"
     }
   }
 }

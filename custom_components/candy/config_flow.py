@@ -21,20 +21,29 @@ from homeassistant.helpers.selector import (
 )
 import voluptuous as vol
 
-from .client import CandyClient, detect_encryption, discover_devices
+from .client import (
+    CandyClient,
+    detect_encryption,
+    discover_devices,
+    parse_wash_programs,
+)
 from .client.cloud import SimplyFiCloudError, fetch_appliance_data
 from .client.decryption import Encryption
-from .client.model import WashingMachineStatus
+from .client.model import TumbleDryerStatus, WashingMachineStatus
 from .const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_MONTHLY,
     CHECKUP_SCHEDULE_WEEKLY,
     CONF_INTEGRATION_TITLE,
+    CONF_KEY_APPLIANCE_TYPE,
+    CONF_KEY_BRAND,
     CONF_KEY_CHECKUP_ENABLED,
     CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_TUMBLE_DRYER,
+    CONF_KEY_IS_WASHER_DRYER,
     CONF_KEY_IS_WASHING_MACHINE,
     CONF_KEY_MAC_ADDRESS,
     CONF_KEY_MAINTENANCE_ENABLED,
@@ -63,7 +72,13 @@ from .const import (
     UNIQUE_ID_WASH_MAINT_FULL_CHECKUP,
     UNIQUE_ID_WASH_MAINT_LIMESCALE,
 )
-from .helpers import cycles_remaining
+from .helpers import (
+    cycles_remaining,
+    is_dualtech,
+    is_dualtech_dryer,
+    is_washer_dryer,
+    supports_scheduled_checkup,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -251,18 +266,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 if user_input["next_step"] == "checkup_settings":
                     return await self.async_step_checkup()
                 return await self.async_step_update_cloud_data()
+            options = ["update_cloud_data", "switch_to_read_only"]
+            if is_washing_machine:
+                options.append("maintenance_settings")
+            interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+            is_dryer = self.config_entry.data.get(CONF_KEY_IS_TUMBLE_DRYER, False)
+            if supports_scheduled_checkup(interface_type, is_dryer):
+                options.append("checkup_settings")
             return self.async_show_form(
                 step_id="init",
                 data_schema=vol.Schema(
                     {
                         vol.Required("next_step"): SelectSelector(
                             SelectSelectorConfig(
-                                options=[
-                                    "update_cloud_data",
-                                    "switch_to_read_only",
-                                    "maintenance_settings",
-                                    "checkup_settings",
-                                ],
+                                options=options,
                                 mode=SelectSelectorMode.LIST,
                                 translation_key="next_step",
                             )
@@ -292,8 +309,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._pending_data[CONF_KEY_MAINTENANCE_ENABLED] = user_input[
             CONF_KEY_MAINTENANCE_ENABLED
         ]
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        is_dryer = self.config_entry.data.get(CONF_KEY_IS_TUMBLE_DRYER, False)
+        can_checkup = self.config_entry.data.get(
+            CONF_KEY_MODE
+        ) == MODE_FULL_CONTROL and supports_scheduled_checkup(interface_type, is_dryer)
         if not user_input[CONF_KEY_MAINTENANCE_ENABLED]:
-            if self.config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL:
+            if can_checkup:
+                return await self.async_step_checkup()
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=self._pending_data
+            )
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            )
+            return self.async_create_entry(data={})
+        if is_dualtech(self._pending_data.get(CONF_KEY_INTERFACE_TYPE, "")):
+            if can_checkup:
                 return await self.async_step_checkup()
             self.hass.config_entries.async_update_entry(
                 self.config_entry, data=self._pending_data
@@ -475,7 +507,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     MAINTENANCE_FILTER_THRESHOLD,
                 )
             )
-        if self.config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL:
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        is_dryer = self.config_entry.data.get(CONF_KEY_IS_TUMBLE_DRYER, False)
+        if self.config_entry.data.get(
+            CONF_KEY_MODE
+        ) == MODE_FULL_CONTROL and supports_scheduled_checkup(interface_type, is_dryer):
             return await self.async_step_checkup()
         self.hass.config_entries.async_update_entry(
             self.config_entry, data=self._pending_data
@@ -605,6 +641,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         new_data[CONF_KEY_DOWNLOADABLE_PROGRAMS] = appliance.downloadable_programs
         if appliance.interface_type:
             new_data[CONF_KEY_INTERFACE_TYPE] = appliance.interface_type
+        if appliance.brand:
+            new_data[CONF_KEY_BRAND] = appliance.brand
+        if appliance.appliance_type:
+            new_data[CONF_KEY_APPLIANCE_TYPE] = appliance.appliance_type
+            if appliance.appliance_type == "washer_dryer":
+                new_data[CONF_KEY_IS_WASHER_DRYER] = True
+        elif appliance.programs:
+            try:
+                parsed = parse_wash_programs(appliance.programs)
+                if any(
+                    p.program_type in ("D", "WD") or p.selector_position_dry is not None
+                    for p in parsed
+                ):
+                    new_data[CONF_KEY_IS_WASHER_DRYER] = True
+            except (KeyError, TypeError, ValueError):
+                pass
 
         self._pending_data = new_data
         return await self.async_step_language()
@@ -645,6 +697,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         new_data = dict(self.config_entry.data)
         new_data[CONF_KEY_MODE] = MODE_READ_ONLY
+        if is_washer_dryer(self.config_entry, None):
+            new_data[CONF_KEY_IS_WASHER_DRYER] = True
         new_data.pop(CONF_KEY_PROGRAMS, None)
         new_data.pop(CONF_KEY_DOWNLOADABLE_PROGRAMS, None)
 
@@ -674,6 +728,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._ip_address: str = ""
         self._config_data: dict[str, Any] = {}  # accumulated config entry data
         self._is_washing_machine: bool = False
+        self._is_tumble_dryer: bool = False
         self._total_cycles: int = (
             0  # fetched once after device probe; used for baselines
         )
@@ -775,6 +830,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             async with async_timeout.timeout(10):
                 status = await client.status()
             self._is_washing_machine = isinstance(status, WashingMachineStatus)
+            self._is_tumble_dryer = isinstance(status, TumbleDryerStatus)
             if self._is_washing_machine:
                 try:
                     async with async_timeout.timeout(20):
@@ -786,11 +842,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     )
                     self._total_cycles = 0
         except Exception:  # pylint: disable=broad-except
-            _LOGGER.debug("Device type probe failed, assuming non-washing-machine")
+            _LOGGER.debug("Device type probe failed, assuming non-controllable machine")
             self._is_washing_machine = False
+            self._is_tumble_dryer = False
 
         if self._is_washing_machine:
             self._config_data[CONF_KEY_IS_WASHING_MACHINE] = True
+        if self._is_tumble_dryer:
+            self._config_data[CONF_KEY_IS_TUMBLE_DRYER] = True
 
         return await self.async_step_mode()
 
@@ -798,7 +857,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Ask the user whether they want Read-Only or Full Control mode."""
-        if not self._is_washing_machine:
+        if not (self._is_washing_machine or self._is_tumble_dryer):
             self._config_data[CONF_KEY_MODE] = MODE_READ_ONLY
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
@@ -813,7 +872,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         if mode == MODE_FULL_CONTROL:
             return await self.async_step_cloud()
 
-        # Read-only washing machine: ask about maintenance counters
+        # Read-only washing machine: ask whether appliance is a washer-dryer
+        if self._is_washing_machine:
+            return await self.async_step_washer_dryer()
+
+        return self.async_create_entry(
+            title=CONF_INTEGRATION_TITLE, data=self._config_data
+        )
+
+    async def async_step_washer_dryer(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask whether the appliance is a washer-dryer in Read-Only mode."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="washer_dryer",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(
+                            CONF_KEY_IS_WASHER_DRYER,
+                            default=False,
+                        ): bool,
+                    }
+                ),
+            )
+        is_wd = bool(user_input[CONF_KEY_IS_WASHER_DRYER])
+        self._config_data[CONF_KEY_IS_WASHER_DRYER] = is_wd
+        self._config_data[CONF_KEY_APPLIANCE_TYPE] = (
+            "washer_dryer" if is_wd else "washer"
+        )
         return await self.async_step_maintenance()
 
     async def async_step_cloud(
@@ -863,6 +950,29 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         )
         if appliance.interface_type:
             self._config_data[CONF_KEY_INTERFACE_TYPE] = appliance.interface_type
+        if appliance.brand:
+            self._config_data[CONF_KEY_BRAND] = appliance.brand
+        if appliance.appliance_type:
+            self._config_data[CONF_KEY_APPLIANCE_TYPE] = appliance.appliance_type
+            if appliance.appliance_type == "washer_dryer":
+                self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
+        elif not self._is_tumble_dryer and appliance.programs:
+            try:
+                parsed = parse_wash_programs(appliance.programs)
+                if any(
+                    p.program_type in ("D", "WD") or p.selector_position_dry is not None
+                    for p in parsed
+                ):
+                    self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
+            except (KeyError, TypeError, ValueError):
+                pass
+        if self._is_tumble_dryer:
+            if not is_dualtech_dryer(appliance.interface_type):
+                _LOGGER.warning(
+                    "Tumble dryer interface '%s' is not supported in Full Control mode; setting mode to Read-Only",
+                    appliance.interface_type,
+                )
+                self._config_data[CONF_KEY_MODE] = MODE_READ_ONLY
 
         return await self.async_step_language()
 
@@ -885,6 +995,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._config_data[CONF_KEY_PROGRAM_LANGUAGE] = user_input[
             CONF_KEY_PROGRAM_LANGUAGE
         ]
+        if self._is_tumble_dryer:
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if self._config_data.get(
+                CONF_KEY_MODE
+            ) == MODE_FULL_CONTROL and supports_scheduled_checkup(interface_type, True):
+                return await self.async_step_checkup()
+            return self.async_create_entry(
+                title=CONF_INTEGRATION_TITLE, data=self._config_data
+            )
         return await self.async_step_maintenance()
 
     async def async_step_maintenance(
@@ -898,8 +1017,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._config_data[CONF_KEY_MAINTENANCE_ENABLED] = user_input[
             CONF_KEY_MAINTENANCE_ENABLED
         ]
+        interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+        can_checkup = self._config_data.get(
+            CONF_KEY_MODE
+        ) == MODE_FULL_CONTROL and supports_scheduled_checkup(
+            interface_type, self._is_tumble_dryer
+        )
         if not user_input[CONF_KEY_MAINTENANCE_ENABLED]:
-            if self._config_data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL:
+            if can_checkup:
+                return await self.async_step_checkup()
+            return self.async_create_entry(
+                title=CONF_INTEGRATION_TITLE, data=self._config_data
+            )
+        if is_dualtech(interface_type):
+            if can_checkup:
                 return await self.async_step_checkup()
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
@@ -990,7 +1121,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     MAINTENANCE_FILTER_THRESHOLD,
                 )
             )
-        if self._config_data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL:
+        if self._config_data.get(
+            CONF_KEY_MODE
+        ) == MODE_FULL_CONTROL and supports_scheduled_checkup(
+            self._config_data.get(CONF_KEY_INTERFACE_TYPE, ""),
+            self._is_tumble_dryer,
+        ):
             return await self.async_step_checkup()
         return self.async_create_entry(
             title=CONF_INTEGRATION_TITLE, data=self._config_data

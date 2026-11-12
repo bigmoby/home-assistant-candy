@@ -54,3 +54,10 @@ def disable_api_rate_limiter() -> Generator[AsyncLimiter]:
     """Disable API rate limiter for tests."""
     with patch("custom_components.candy.client._LIMITER"):
         yield AsyncLimiter(max_rate=1000, time_period=1)
+
+
+@pytest.fixture(name="fast_button_sleep", autouse=True)
+def fast_button_sleep() -> Generator[None]:
+    """Mock button settling delay so tests run quickly."""
+    with patch("custom_components.candy.button.asyncio.sleep"):
+        yield

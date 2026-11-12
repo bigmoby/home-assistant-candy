@@ -1,0 +1,1384 @@
+{
+  "serial": 35,
+  "model": "GVSF H10A2TCE-19",
+  "type": "tumble_dryer",
+  "interface_type": "TD_DIGIT_HP_DOOR",
+  "programs": [
+    {
+      "serial": 355,
+      "position": 0,
+      "icon": "",
+      "description": "",
+      "name": "OFF",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145038",
+      "updated_at": "20171012145038",
+      "program_id": "8a8e04ba-fd7c-49a2-8aed-d4ce7d5ee728",
+      "parameters": [
+        {
+          "serial": 6275,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6276,
+          "validation": "0",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6277,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6278,
+          "validation": "0",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6279,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6280,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6281,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6282,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6283,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6284,
+          "validation": "0",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6285,
+          "validation": "0",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6286,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 356,
+      "position": 1,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_WHITES_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_WHITES",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145038",
+      "updated_at": "20171012145038",
+      "program_id": "494bebc4-14c0-44f4-8078-75af810ae0e1",
+      "parameters": [
+        {
+          "serial": 6287,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6288,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6289,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6290,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6291,
+          "validation": "1",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6292,
+          "validation": "1",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6293,
+          "validation": "1",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6294,
+          "validation": "20",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6295,
+          "validation": "5",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6296,
+          "validation": "2",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6297,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6298,
+          "validation": "150",
+          "name": "duration",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 357,
+      "position": 2,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_ECO_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_ECO",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145038",
+      "updated_at": "20171012145038",
+      "program_id": "8cdfad40-3727-45d3-bd81-e9ad7bcbf525",
+      "parameters": [
+        {
+          "serial": 6299,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6300,
+          "validation": "160",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6301,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6302,
+          "validation": "1",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6303,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6304,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6305,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6306,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6307,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6308,
+          "validation": "2",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6309,
+          "validation": "2",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6310,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 358,
+      "position": 3,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_MIX_AND_DRY_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_MIX_AND_DRY",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145038",
+      "updated_at": "20171012145038",
+      "program_id": "ee6967b0-1132-4aba-96fa-f68089fbf2c9",
+      "parameters": [
+        {
+          "serial": 6311,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6312,
+          "validation": "3",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6313,
+          "validation": "3",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6314,
+          "validation": "3",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6315,
+          "validation": "5",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6316,
+          "validation": "13",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6317,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6318,
+          "validation": "1",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6319,
+          "validation": "1",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6320,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6321,
+          "validation": "125",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6322,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 359,
+      "position": 4,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_COLOURED_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_COLOURED",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145038",
+      "updated_at": "20171012145038",
+      "program_id": "172ebc36-1591-4044-9dd9-e20fe5941f46",
+      "parameters": [
+        {
+          "serial": 6323,
+          "validation": "3",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6324,
+          "validation": "4",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6325,
+          "validation": "2",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6326,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6327,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6328,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6329,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6330,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6331,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6332,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6333,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6334,
+          "validation": "120",
+          "name": "duration",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 360,
+      "position": 5,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_SYNTHETICS_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_SYNTHETICS",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "377a0b89-525f-4647-b2c6-bf2ec7210c89",
+      "parameters": [
+        {
+          "serial": 6335,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6336,
+          "validation": "5",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6337,
+          "validation": "2",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6338,
+          "validation": "5",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6339,
+          "validation": "13",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6340,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6341,
+          "validation": "1",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6342,
+          "validation": "1",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6343,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6344,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6345,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6346,
+          "validation": "100",
+          "name": "duration",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 361,
+      "position": 6,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_SHIRTS_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_SHIRTS",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "bc31eb5c-ca6b-4af1-a2b7-6ab4c74863a6",
+      "parameters": [
+        {
+          "serial": 6347,
+          "validation": "3",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6348,
+          "validation": "6",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6349,
+          "validation": "2",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6350,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6351,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6352,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6353,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6354,
+          "validation": "1",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6355,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6356,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6357,
+          "validation": "70",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6358,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 362,
+      "position": 7,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_XXL_LOAD_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_XXL_LOAD",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "b8bd8953-1873-4816-a955-0fe01bb74eb5",
+      "parameters": [
+        {
+          "serial": 6359,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6360,
+          "validation": "7",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6361,
+          "validation": "5",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6362,
+          "validation": "20",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6363,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6364,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6365,
+          "validation": "220",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6366,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6367,
+          "validation": "3",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6368,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6369,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6370,
+          "validation": "1",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 363,
+      "position": 8,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_JEANS_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_JEANS",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "91ee8f28-11d7-4775-9e49-232b792ffc79",
+      "parameters": [
+        {
+          "serial": 6371,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6372,
+          "validation": "130",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6373,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6374,
+          "validation": "8",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6375,
+          "validation": "3",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6376,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6377,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6378,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6379,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6380,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6381,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6382,
+          "validation": "4",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 364,
+      "position": 9,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_DUVET_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_DUVET",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "c2c2c1b0-c837-4f23-9589-dddc05e72d58",
+      "parameters": [
+        {
+          "serial": 6383,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6384,
+          "validation": "130",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6385,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6386,
+          "validation": "16",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6387,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6388,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6389,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6390,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6391,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6392,
+          "validation": "4",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6393,
+          "validation": "9",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6394,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 365,
+      "position": 10,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_OUTDOOR_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_OUTDOOR",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "3bc41368-fef6-4c2d-ac2b-aa9b69da4418",
+      "parameters": [
+        {
+          "serial": 6395,
+          "validation": "3",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6396,
+          "validation": "10",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6397,
+          "validation": "3",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6398,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6399,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6400,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6401,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6402,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6403,
+          "validation": "16",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6404,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6405,
+          "validation": "95",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6406,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 366,
+      "position": 11,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_WOOL_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_WOOL",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "e7cd02e2-80b0-482a-9c3b-43beb766fe89",
+      "parameters": [
+        {
+          "serial": 6407,
+          "validation": "2",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6408,
+          "validation": "11",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6409,
+          "validation": "0",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6410,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6411,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6412,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6413,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6414,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6415,
+          "validation": "1",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6416,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6417,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6418,
+          "validation": "70",
+          "name": "duration",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 367,
+      "position": 12,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_ANTIALLERGY_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_ANTIALLERGY",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "a444fea3-d308-45a6-aa61-51f4b08b6293",
+      "parameters": [
+        {
+          "serial": 6419,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6420,
+          "validation": "180",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6421,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6422,
+          "validation": "16",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6423,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6424,
+          "validation": "1",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6425,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6426,
+          "validation": "20",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6427,
+          "validation": "10",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6428,
+          "validation": "4",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6429,
+          "validation": "12",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6430,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 368,
+      "position": 13,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_FRESH_12_MIN_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_FRESH_12_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "5e88ff2d-4ec6-4d7c-be2a-03570e6a89d3",
+      "parameters": [
+        {
+          "serial": 6431,
+          "validation": "12",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6432,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6433,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6434,
+          "validation": "16",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6435,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6436,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6437,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6438,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6439,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6440,
+          "validation": "0",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6441,
+          "validation": "13",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6442,
+          "validation": "2",
+          "name": "program_type",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 369,
+      "position": 14,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_ANTI_ODOURS_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_ANTI_ODOURS",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "ac1f134b-e9a8-4cc4-9716-fa0cb19d8f7b",
+      "parameters": [
+        {
+          "serial": 6443,
+          "validation": "2",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6444,
+          "validation": "14",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6445,
+          "validation": "0",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6446,
+          "validation": "0",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6447,
+          "validation": "0",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6448,
+          "validation": "0",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6449,
+          "validation": "0",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6450,
+          "validation": "0",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6451,
+          "validation": "16",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6452,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6453,
+          "validation": "20",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6454,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 370,
+      "position": 15,
+      "icon": "",
+      "description": "NFC_TD_PROGRAM_NAME_WHITES_DESCRIPTION",
+      "name": "NFC_TD_PROGRAM_NAME_WHITES",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20171012145039",
+      "updated_at": "20171012145039",
+      "program_id": "45c51d0f-6229-4a0a-97e8-79f62e7aad44",
+      "parameters": [
+        {
+          "serial": 6455,
+          "validation": "0",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6456,
+          "validation": "15",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6457,
+          "validation": "2",
+          "name": "default_drying_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6458,
+          "validation": "5",
+          "name": "default_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6459,
+          "validation": "20",
+          "name": "max_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6460,
+          "validation": "1",
+          "name": "set_dry_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6461,
+          "validation": "1",
+          "name": "set_time_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6462,
+          "validation": "1",
+          "name": "set_rapido",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6463,
+          "validation": "20",
+          "name": "mask1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6464,
+          "validation": "0",
+          "name": "mask2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6465,
+          "validation": "150",
+          "name": "duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6466,
+          "validation": "",
+          "name": "temperature",
+          "datatype": "mixed"
+        }
+      ]
+    }
+  ]
+}

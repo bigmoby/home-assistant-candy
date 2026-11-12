@@ -41,6 +41,8 @@ class CloudApplianceData:
     programs: list[dict]
     interface_type: str
     downloadable_programs: list[dict]
+    brand: str
+    appliance_type: str
 
 
 class SimplyFiCloudError(Exception):
@@ -233,4 +235,6 @@ def _match_appliance(
         programs=programs,
         interface_type=matched.get("interface_type", ""),
         downloadable_programs=downloadable_programs,
+        brand=matched.get("brand", ""),
+        appliance_type=matched.get("appliance_type", ""),
     )

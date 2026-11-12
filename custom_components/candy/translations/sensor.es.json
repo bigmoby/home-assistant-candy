@@ -23,7 +23,9 @@
       "Iron Dry": "Secado para planchan",
       "Hang Dry": "Secado para colgar",
       "Store Dry": "Secado para almacenar",
-      "Bone Dry": "Secado extra"
+      "Bone Dry": "Secado extra",
+      "Pre-heating": "Precalentamiento",
+      "Completed": "Completado"
     }
   }
 }

@@ -1,0 +1,534 @@
+# --------------------------------------------------------------------------------------------------
+# Home Assistant Dashboard Card: Candy / Hoover Tumble Dryer (Full Control)
+# --------------------------------------------------------------------------------------------------
+# Requirements:
+#   - piitaya/lovelace-mushroom (custom:mushroom-template-card, custom:mushroom-chips-card)
+#
+# Instructions:
+#   Copy the contents of this file into a Manual Card on your dashboard.
+#   Replace every occurrence of `<machine_name>` with your dryer's entity ID prefix
+#   (e.g. `tumble_dryer` or `my_tumble_dryer`).
+#
+# Note:
+#   - This card is a complete all-in-one panel for standalone Tumble Dryers. It includes cycle
+#     controls, live telemetry, hardware alerts (lint filter & condensate tank), self check-up,
+#     and warning resets. A separate maintenance card is NOT needed for dryers.
+#   - For standard Washing Machines, use `washing-machine.yaml` + `maintenance.yaml`.
+#   - For Washer-Dryer combos, use `washer-dryer.yaml` + `maintenance.yaml`.
+# --------------------------------------------------------------------------------------------------
+type: vertical-stack
+cards:
+  # ------------------------------------------------------------------------------------------------
+  # 1. Main Appliance Status Banner
+  # ------------------------------------------------------------------------------------------------
+  - type: custom:mushroom-template-card
+    primary: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} Running
+      {% elif state == 'paused' %} Paused
+      {% elif state == 'finished' %} Cycle finished
+      {% elif 'delayed' in state %} Delayed start
+      {% elif 'checkup' in state or 'diagnostic' in state %} Check-up running
+      {% elif 'sending' in state %} Sending command...
+      {% elif state in ['idle', 'stopped'] %} Ready
+      {% elif state == 'error' %} Error
+      {% else %} Off {% endif %}
+    secondary: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% set raw_phase = states('sensor.<machine_name>_dryer_cycle_status') %}
+      {% set phase = raw_phase | lower %}
+      {% set prog = states('sensor.<machine_name>_dryer_program') %}
+      {% set del = states('number.<machine_name>_delay') | int(0) %}
+      {% if state == 'running' %}
+        {% if phase in ['stopped', 'idle', 'unknown', 'unavailable', 'running', ''] %}
+          Drying...
+        {% elif 'pre' in phase %}
+          Pre-heating
+        {% elif 'cool' in phase %}
+          Cooling down
+        {% else %}
+          {{ raw_phase }}
+        {% endif %}
+      {% elif 'delayed' in state %}
+        {% if del > 0 %}
+          Starts in {{ del // 60 }}h {{ del % 60 }}min ({{ (as_timestamp(now()) + (del * 60)) | timestamp_custom('%H:%M', default='--:--') }})
+        {% else %}
+          Delayed start active
+        {% endif %}
+      {% elif state == 'finished' %}
+        Cycle complete · Empty drum
+      {% elif state in ['idle', 'stopped'] and prog not in ['unknown', 'unavailable', ''] %}
+        {{ state_attr('sensor.<machine_name>_dryer_program', 'program_name') or ('Program ' ~ prog) }}
+      {% elif state == 'error' %}
+        {% set err = states('sensor.<machine_name>_dryer_error') %}
+        {% set desc = state_attr('sensor.<machine_name>_dryer_error', 'description') %}
+        {% if err not in ['0', 'unknown', 'unavailable', ''] and desc %}
+          Fault: {{ desc }}
+        {% elif err not in ['0', 'unknown', 'unavailable', ''] %}
+          Fault code: {{ err }}
+        {% else %}
+          Appliance error detected
+        {% endif %}
+      {% else %}
+        —
+      {% endif %}
+    icon: mdi:tumble-dryer
+    badge_icon: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% set phase = states('sensor.<machine_name>_dryer_cycle_status') | lower %}
+      {% if state == 'running' %}
+        {% if 'cool' in phase %} mdi:snowflake {% else %} mdi:play-circle {% endif %}
+      {% elif state == 'paused' %} mdi:pause-circle
+      {% elif state == 'finished' %} mdi:check-circle
+      {% elif state == 'error' %} mdi:alert-circle
+      {% elif 'delayed' in state %} mdi:timer-outline
+      {% elif 'sending' in state %} mdi:loading
+      {% else %} '' {% endif %}
+    badge_color: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% set phase = states('sensor.<machine_name>_dryer_cycle_status') | lower %}
+      {% if state == 'running' %}
+        {% if 'cool' in phase %} cyan {% else %} blue {% endif %}
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
+    entity: sensor.<machine_name>
+    tap_action:
+      action: more-info
+    color: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
+    features_position: bottom
+
+  # ------------------------------------------------------------------------------------------------
+  # 2. Critical Appliance Warnings (Condensate Water Tank & Lint Filter)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: or
+        conditions:
+          - condition: state
+            entity: binary_sensor.<machine_name>_water_tank_full
+            state: "on"
+          - condition: state
+            entity: binary_sensor.<machine_name>_clean_filter
+            state: "on"
+    card:
+      type: custom:mushroom-chips-card
+      chips:
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: binary_sensor.<machine_name>_water_tank_full
+              state: "on"
+          chip:
+            type: template
+            icon: mdi:cup-water
+            content: Water tank full — Empty tank
+            icon_color: red
+            tap_action:
+              action: more-info
+              entity: binary_sensor.<machine_name>_water_tank_full
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: binary_sensor.<machine_name>_clean_filter
+              state: "on"
+          chip:
+            type: template
+            icon: mdi:air-filter
+            content: Clean lint filter
+            icon_color: amber
+            tap_action:
+              action: more-info
+              entity: binary_sensor.<machine_name>_clean_filter
+
+  # ------------------------------------------------------------------------------------------------
+  # 3. Live Telemetry Chips (Program, Dryness, Remaining Time, Remote & Door Status)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - Idle
+          - idle
+    card:
+      type: custom:mushroom-chips-card
+      chips:
+        - type: template
+          icon: mdi:tumble-dryer
+          content: Prog. {{ states('sensor.<machine_name>_dryer_program') }}
+          icon_color: blue
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_dryer_program
+        - type: template
+          icon: mdi:weather-sunny
+          content: >-
+            {% set lvl = states('sensor.<machine_name>_dry_level') %}
+            {% if lvl == 'iron_dry' %} Iron dry
+            {% elif lvl == 'hang_dry' %} Hang dry
+            {% elif lvl == 'store_dry' %} Store dry
+            {% elif lvl == 'bone_dry' %} Bone dry
+            {% elif lvl not in ['unknown', 'unavailable', ''] %}{{ lvl | title }}
+            {% else %}—{% endif %}
+          icon_color: orange
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_dry_level
+        - type: template
+          icon: mdi:progress-clock
+          content: >-
+            {% set m = states('sensor.<machine_name>_dryer_cycle_remaining_time') | int(0) %}
+            {% if m > 0 %}{{ m }} min{% else %}—{% endif %}
+          icon_color: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% if state == 'paused' %} orange {% else %} blue {% endif %}
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_dryer_cycle_remaining_time
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: binary_sensor.<machine_name>_door
+              state: "on"
+          chip:
+            type: template
+            icon: mdi:door-open
+            content: Door open
+            icon_color: red
+            tap_action:
+              action: more-info
+              entity: binary_sensor.<machine_name>_door
+        - type: template
+          icon: >-
+            {% if is_state('binary_sensor.<machine_name>_remote_control', 'on') %}
+              mdi:remote
+            {% else %}
+              mdi:remote-off
+            {% endif %}
+          content: >-
+            {% if is_state('binary_sensor.<machine_name>_remote_control', 'on') %}
+              Remote enabled
+            {% else %}
+              Dial control
+            {% endif %}
+          icon_color: >-
+            {% if is_state('binary_sensor.<machine_name>_remote_control', 'on') %}
+              green
+            {% else %}
+              grey
+            {% endif %}
+          tap_action:
+            action: more-info
+            entity: binary_sensor.<machine_name>_remote_control
+
+  # ------------------------------------------------------------------------------------------------
+  # 4. Program Selection & Configuration Controls (When Remote Control is Active)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: select.<machine_name>_dryer_program
+        state_not: unavailable
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+    card:
+      type: vertical-stack
+      cards:
+        - type: tile
+          entity: select.<machine_name>_dryer_program
+          name: Dryer program
+          icon: mdi:tumble-dryer
+          vertical: false
+          features:
+            - type: select-options
+        - type: horizontal-stack
+          cards:
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: select.<machine_name>_dry_level
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: select.<machine_name>_dry_level
+                name: Dry level
+                icon: mdi:weather-sunny
+                features:
+                  - type: select-options
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: select.<machine_name>_timed_drying
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: select.<machine_name>_timed_drying
+                name: Timed drying
+                icon: mdi:timer-sand
+                features:
+                  - type: select-options
+        - type: tile
+          entity: number.<machine_name>_delay
+          name: Start delay
+          icon: mdi:timer-outline
+          hide_state: false
+          vertical: false
+          features:
+            - style: buttons
+              type: numeric-input
+          features_position: bottom
+
+  # ------------------------------------------------------------------------------------------------
+  # 5. Timing Estimates (Starts / Finishes)
+  # ------------------------------------------------------------------------------------------------
+  - type: horizontal-stack
+    cards:
+      - type: conditional
+        conditions:
+          - condition: numeric_state
+            entity: number.<machine_name>_delay
+            above: 0
+        card:
+          type: custom:mushroom-template-card
+          entity: number.<machine_name>_delay
+          primary: Starts
+          secondary: >-
+            {% set del = states('number.<machine_name>_delay') | int(0) %}
+            {{ (as_timestamp(now()) + (del * 60)) | timestamp_custom('%H:%M', default='--:--') }}
+          icon: mdi:clock-start
+          icon_color: purple
+          tap_action:
+            action: more-info
+      - type: conditional
+        conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: sensor.<machine_name>
+                state: running
+              - condition: state
+                entity: sensor.<machine_name>
+                state: Running
+              - condition: state
+                entity: sensor.<machine_name>
+                state: paused
+              - condition: state
+                entity: sensor.<machine_name>
+                state: Paused
+        card:
+          type: custom:mushroom-template-card
+          entity: sensor.<machine_name>
+          primary: Finishes
+          secondary: >-
+            {% set rem = states('sensor.<machine_name>_dryer_cycle_remaining_time') | int(0) %}
+            {% if rem > 0 %}
+              {{ (as_timestamp(now()) + (rem * 60)) | timestamp_custom('%H:%M', default='--:--') }}
+            {% else %}
+              Finishing...
+            {% endif %}
+          icon: mdi:clock-end
+          icon_color: green
+          tap_action:
+            action: more-info
+
+  # ------------------------------------------------------------------------------------------------
+  # 6. Cycle Controls (Start, Pause, Resume, Stop, Cancel Anti-Crease)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: binary_sensor.<machine_name>_remote_control
+        state: "on"
+    card:
+      type: horizontal-stack
+      cards:
+        # Start button (shown when idle / stopped / delay programming)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - Running
+                - running
+                - Paused
+                - paused
+                - Finished
+                - finished
+                - "Off"
+                - "off"
+                - Sending command
+                - sending command
+                - sending_command
+          card:
+            type: custom:mushroom-template-card
+            primary: Start
+            icon: mdi:play-circle-outline
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_start_drying
+            layout: vertical
+            color: green
+        # Pause button (shown while actively running)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Running
+                - running
+            - condition: state
+              entity: button.<machine_name>_pause_drying
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Pause
+            icon: mdi:pause-circle-outline
+            icon_color: orange
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_pause_drying
+        # Resume button (shown when cycle is paused)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Paused
+                - paused
+            - condition: state
+              entity: button.<machine_name>_resume_drying
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Resume
+            icon: mdi:play-circle-outline
+            icon_color: green
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_resume_drying
+        # Stop button (shown when active, running, paused, or delayed)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - Idle
+                - idle
+                - Finished
+                - finished
+                - "Off"
+                - "off"
+                - Sending command
+                - sending command
+                - sending_command
+          card:
+            type: custom:mushroom-template-card
+            primary: Stop
+            icon: mdi:stop-circle-outline
+            icon_color: red
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_stop_drying
+        # Cancel Anti-Crease tumbling (shown when available post-cycle)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: button.<machine_name>_cancel_anti_crease
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Stop Tumbling
+            icon: mdi:cancel
+            icon_color: purple
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_cancel_anti_crease
+
+  # ------------------------------------------------------------------------------------------------
+  # 7. Diagnostics & Maintenance Actions
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: binary_sensor.<machine_name>_remote_control
+        state: "on"
+      - condition: or
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_check_up
+            state_not: unavailable
+          - condition: state
+            entity: button.<machine_name>_reset_warnings
+            state_not: unavailable
+    card:
+      type: horizontal-stack
+      cards:
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: button.<machine_name>_check_up
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Self Check-up
+            secondary: >-
+              {% set st = states('sensor.<machine_name>_check_up_state') %}
+              {% if st in ['1', 'running'] %} Running...
+              {% elif st in ['2', 'complete'] %} Passed
+              {% else %} Ready {% endif %}
+            icon: mdi:stethoscope
+            icon_color: teal
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_check_up
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: button.<machine_name>_reset_warnings
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Reset Warnings
+            secondary: Clear alerts
+            icon: mdi:alert-remove-outline
+            icon_color: blue
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_reset_warnings
+

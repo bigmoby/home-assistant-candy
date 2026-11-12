@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
@@ -11,6 +11,8 @@ from custom_components.candy import CONF_KEY_USE_ENCRYPTION, DOMAIN
 from custom_components.candy.client import Encryption
 from custom_components.candy.client.cloud import CloudApplianceData, SimplyFiCloudError
 from custom_components.candy.client.model import (
+    DishwasherState,
+    DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
     MachineState,
@@ -19,7 +21,11 @@ from custom_components.candy.client.model import (
     WashingMachineStatus,
     WashProgramState,
 )
-from custom_components.candy.config_flow import MANUAL_IP_OPTION
+from custom_components.candy.config_flow import (
+    MANUAL_IP_OPTION,
+    _current_remaining_cycles,
+    _remaining_to_last_reset,
+)
 from custom_components.candy.const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_WEEKLY,
@@ -27,6 +33,9 @@ from custom_components.candy.const import (
     CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
+    CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_TUMBLE_DRYER,
+    CONF_KEY_IS_WASHER_DRYER,
     CONF_KEY_IS_WASHING_MACHINE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
@@ -39,6 +48,7 @@ from custom_components.candy.const import (
     CONF_KEY_PROGRAMS,
     CONF_KEY_SERIAL_NUMBER,
     CONF_KEY_WATER_HARDNESS,
+    DATA_KEY_STATS_COORDINATOR,
     MODE_FULL_CONTROL,
     MODE_READ_ONLY,
     UNIQUE_ID_WASH_MAINT_FULL_CHECKUP,
@@ -67,6 +77,17 @@ _IDLE_WASHING_MACHINE = WashingMachineStatus(
     checkup_state=None,
     soil_level=None,
     recipe_id=None,
+    dry_target=None,
+    detergent_on=None,
+    softener_on=None,
+    detergent_empty=None,
+    softener_empty=None,
+    detergent_reserve=None,
+    softener_reserve=None,
+    detergent_cycles_remaining=None,
+    softener_cycles_remaining=None,
+    water_hardness=None,
+    extra_dose_active=None,
 )
 
 # ---------------------------------------------------------------------------
@@ -185,6 +206,13 @@ async def test_no_encryption_detected(hass, no_discovery, detect_no_encryption):
     )
 
     assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "maintenance"
 
     result = await hass.config_entries.flow.async_configure(
@@ -219,6 +247,13 @@ async def test_detected_encryption_and_key_found(
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
     )
 
     assert result["type"] == data_entry_flow.FlowResultType.FORM
@@ -276,6 +311,13 @@ async def test_detected_encryption_without_key(
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
     )
 
     assert result["type"] == data_entry_flow.FlowResultType.FORM
@@ -350,6 +392,13 @@ async def test_discovery_select_device(hass, detect_no_encryption):  # pylint: d
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
     )
 
     assert result["type"] == data_entry_flow.FlowResultType.FORM
@@ -468,6 +517,8 @@ _MOCK_APPLIANCE = CloudApplianceData(
         }
     ],
     downloadable_programs=[],
+    brand="candy",
+    appliance_type="washer",
 )
 
 
@@ -587,6 +638,25 @@ _IDLE_TUMBLE_DRYER = TumbleDryerStatus(
     need_clean_filter=False,
     water_tank_full=False,
     door_closed=True,
+    error=None,
+    delay_value=None,
+    checkup_state=None,
+    recipe_id=None,
+    time=None,
+    rapido=None,
+)
+
+_IDLE_DISHWASHER = DishwasherStatus(
+    machine_state=DishwasherState.IDLE,
+    program="",
+    remaining_minutes=0,
+    delayed_start_hours=None,
+    door_open=False,
+    door_open_allowed=None,
+    eco_mode=False,
+    remote_control=False,
+    salt_empty=False,
+    rinse_aid_empty=False,
 )
 
 
@@ -597,7 +667,7 @@ async def test_maintenance_step_skipped_for_non_washing_machine(
     with patch(
         "custom_components.candy.config_flow.CandyClient.status",
         new_callable=AsyncMock,
-        return_value=_IDLE_TUMBLE_DRYER,
+        return_value=_IDLE_DISHWASHER,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -609,6 +679,148 @@ async def test_maintenance_step_skipped_for_non_washing_machine(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert CONF_KEY_IS_WASHING_MACHINE not in result["data"]
     assert CONF_KEY_MAINTENANCE_ENABLED not in result["data"]
+
+
+async def test_tumble_dryer_read_only_skips_maintenance(
+    hass, no_discovery, detect_no_encryption
+):
+    """Tumble dryer in Read-Only mode skips maintenance step and creates entry."""
+    with patch(
+        "custom_components.candy.config_flow.CandyClient.status",
+        new_callable=AsyncMock,
+        return_value=_IDLE_TUMBLE_DRYER,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "mode"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert CONF_KEY_IS_WASHING_MACHINE not in result["data"]
+    assert CONF_KEY_MAINTENANCE_ENABLED not in result["data"]
+
+
+async def test_tumble_dryer_full_control_skips_checkup_schedule(
+    hass, no_discovery, detect_no_encryption
+):
+    """Tumble dryer in Full Control mode skips checkup scheduling and creates entry directly after language."""
+    dryer_appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="GVSH9A2DCE-80",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="TD_DIGIT_HP_DOOR",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="dryer",
+    )
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient.status",
+            new_callable=AsyncMock,
+            return_value=_IDLE_TUMBLE_DRYER,
+        ),
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=dryer_appliance,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "mode"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        assert result["step_id"] == "cloud"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["step_id"] == "language"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert CONF_KEY_CHECKUP_ENABLED not in result["data"]
+    assert CONF_KEY_CHECKUP_SCHEDULE not in result["data"]
+    assert result["data"].get(CONF_KEY_IS_TUMBLE_DRYER) is True
+
+
+async def test_tumble_dryer_unsupported_interface_reverts_to_read_only(
+    hass, no_discovery, detect_no_encryption
+):
+    """Tumble dryer with unsupported (non-DualTech) interface reverts Full Control to Read-Only mode."""
+    dryer_appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="GVSH9A2DCE-80",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="TD_SMARTPRO_WIFIBLE",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="dryer",
+    )
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient.status",
+            new_callable=AsyncMock,
+            return_value=_IDLE_TUMBLE_DRYER,
+        ),
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=dryer_appliance,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "mode"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        assert result["step_id"] == "cloud"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["step_id"] == "language"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"].get(CONF_KEY_MODE) == MODE_READ_ONLY
+    assert result["data"].get(CONF_KEY_IS_TUMBLE_DRYER) is True
 
 
 async def test_read_only_with_maintenance_disabled(
@@ -623,6 +835,12 @@ async def test_read_only_with_maintenance_disabled(
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
     )
 
     assert result["step_id"] == "maintenance"
@@ -649,6 +867,13 @@ async def test_read_only_with_maintenance_enabled(
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
     )
+
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
     )
@@ -806,6 +1031,13 @@ async def test_maintenance_only_full_checkup(hass, no_discovery, detect_no_encry
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
     )
+
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
     )
@@ -851,6 +1083,13 @@ async def test_maintenance_limescale_only(hass, no_discovery, detect_no_encrypti
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
     )
+
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
     )
@@ -942,6 +1181,225 @@ async def test_options_flow_full_control_switch_to_read_only(hass):
     assert updated.data[CONF_KEY_MODE] == MODE_READ_ONLY
     assert CONF_KEY_PROGRAMS not in updated.data
     assert CONF_KEY_DOWNLOADABLE_PROGRAMS not in updated.data
+
+
+async def test_options_flow_switch_to_read_only_preserves_washer_dryer(hass):
+    """switch_to_read_only preserves is_washer_dryer flag even after programs are popped."""
+    dry_prog = {
+        "program": {
+            "position": 16,
+            "name": "HIGH_DRY",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+                {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                {"command_parameter": {"name": "program_type", "validation": "D"}},
+            ],
+        }
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="fc-switch-ro-wd",
+        data={
+            **_FC_BASE_DATA,
+            CONF_KEY_PROGRAMS: [dry_prog],
+            CONF_KEY_DOWNLOADABLE_PROGRAMS: [],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "switch_to_read_only"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_READ_ONLY
+    assert updated.data.get(CONF_KEY_IS_WASHER_DRYER) is True
+    assert CONF_KEY_PROGRAMS not in updated.data
+
+
+async def test_full_control_cloud_detects_washer_dryer_from_appliance_type(
+    hass, no_discovery, detect_no_encryption
+):
+    """Cloud setup sets CONF_KEY_IS_WASHER_DRYER when appliance_type is washer_dryer."""
+    appliance_wd = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="washer_dryer",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=appliance_wd,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_CHECKUP_ENABLED: False}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"].get(CONF_KEY_IS_WASHER_DRYER) is True
+
+
+async def test_full_control_cloud_does_not_set_washer_dryer_when_appliance_type_washer(
+    hass, no_discovery, detect_no_encryption
+):
+    """Cloud setup keeps CONF_KEY_IS_WASHER_DRYER False when appliance_type is washer even if catalog has dry program."""
+    dry_prog = {
+        "program": {
+            "position": 16,
+            "name": "HIGH_DRY",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+                {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                {"command_parameter": {"name": "program_type", "validation": "D"}},
+            ],
+        }
+    }
+    appliance_washer = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WASHER_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[dry_prog],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="washer",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=appliance_washer,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_CHECKUP_ENABLED: False}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"].get(CONF_KEY_IS_WASHER_DRYER) is not True
+
+
+async def test_full_control_cloud_detects_washer_dryer_from_hardware_parameters_fallback(
+    hass, no_discovery, detect_no_encryption
+):
+    """Cloud setup falls back to structured hardware parameters when appliance_type is blank."""
+    dry_prog = {
+        "program": {
+            "position": 16,
+            "name": "HIGH_DRY",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+                {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                {"command_parameter": {"name": "program_type", "validation": "D"}},
+            ],
+        }
+    }
+    appliance_untyped = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[dry_prog],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=appliance_untyped,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_CHECKUP_ENABLED: False}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"].get(CONF_KEY_IS_WASHER_DRYER) is True
 
 
 async def test_options_flow_full_control_checkup_disabled(hass):
@@ -1058,6 +1516,29 @@ async def test_options_flow_non_washing_machine(hass):
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_options_flow_tumble_dryer_omits_checkup_settings(hass):
+    """Options flow for full-control tumble dryer omits checkup_settings option."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="fc-dryer-options",
+        data={
+            **_FC_BASE_DATA,
+            CONF_KEY_IS_WASHING_MACHINE: False,
+            CONF_KEY_IS_TUMBLE_DRYER: True,
+            CONF_KEY_INTERFACE_TYPE: "TD_DIGIT_HP_DOOR",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "init"
+    schema = result["data_schema"].schema
+    next_step_field = schema["next_step"]
+    assert "checkup_settings" not in next_step_field.config["options"]
+    assert "maintenance_settings" not in next_step_field.config["options"]
 
 
 async def test_options_flow_maintenance_limescale_disabled(hass):
@@ -1290,3 +1771,646 @@ async def test_full_control_flow_with_checkup_schedule(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_KEY_CHECKUP_ENABLED] is True
     assert result["data"][CONF_KEY_CHECKUP_SCHEDULE] == CHECKUP_SCHEDULE_EVERY_CYCLE
+
+
+async def test_read_only_flow_with_washer_dryer_selection(
+    hass, no_discovery, detect_no_encryption
+):
+    """Test Read-Only flow when user indicates the appliance is a washer-dryer."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: True}
+    )
+    assert result["step_id"] == "maintenance"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_KEY_IS_WASHER_DRYER] is True
+    assert result["data"][CONF_KEY_MODE] == MODE_READ_ONLY
+
+
+async def test_read_only_flow_with_washer_dryer_unselected(
+    hass, no_discovery, detect_no_encryption
+):
+    """Test Read-Only flow when user indicates appliance is standard washing machine."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+    assert result["step_id"] == "washer_dryer"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_IS_WASHER_DRYER: False}
+    )
+    assert result["step_id"] == "maintenance"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_KEY_IS_WASHER_DRYER] is False
+    assert result["data"][CONF_KEY_MODE] == MODE_READ_ONLY
+
+
+async def test_full_control_dualtech_skips_counter_types_when_maintenance_enabled(
+    hass, no_discovery, detect_no_encryption
+):
+    """DualTech appliances skip maintenance_types and water_hardness when maintenance is enabled."""
+    dualtech_appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="HBDOS695",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-13",
+        interface_type="3D_DUAL",
+        programs=_MOCK_APPLIANCE.programs,
+        downloadable_programs=[],
+        brand="hoover",
+        appliance_type="washer",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=dualtech_appliance,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "maintenance"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
+        )
+
+        # Directly skips maintenance_types and water_hardness to checkup
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "checkup"
+
+
+def test_remaining_to_last_reset_and_current_remaining_cycles(hass):
+    """Test helper functions in config_flow."""
+    # 1. total == 0 returns 0 (line 164)
+    assert _remaining_to_last_reset(50, 0, 100) == 0
+
+    # 2. total > 0 calculates properly, including negative values
+    assert _remaining_to_last_reset(80, 10, 100) == -10
+    assert _remaining_to_last_reset(50, 100, 100) == 50
+
+    # 3. _current_remaining_cycles:
+    # Entity not in registry -> None
+    assert (
+        _current_remaining_cycles(hass, "test_id", UNIQUE_ID_WASH_MAINT_FULL_CHECKUP)
+        is None
+    )
+
+    # Entity in registry, but hass.states.get is None (line 184)
+    registry = er.async_get(hass)
+    unique_id = UNIQUE_ID_WASH_MAINT_FULL_CHECKUP.format("test_id")
+    registry.async_get_or_create("sensor", DOMAIN, unique_id)
+    assert (
+        _current_remaining_cycles(hass, "test_id", UNIQUE_ID_WASH_MAINT_FULL_CHECKUP)
+        is None
+    )
+
+    # Entity state is non-numeric (line 184)
+    entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
+    hass.states.async_set(entity_id, "unavailable")
+    assert (
+        _current_remaining_cycles(hass, "test_id", UNIQUE_ID_WASH_MAINT_FULL_CHECKUP)
+        is None
+    )
+
+    # Entity state is valid numeric
+    hass.states.async_set(entity_id, "42")
+    assert (
+        _current_remaining_cycles(hass, "test_id", UNIQUE_ID_WASH_MAINT_FULL_CHECKUP)
+        == 42
+    )
+
+
+async def test_options_flow_maintenance_settings_branch(hass):
+    """Test user selecting maintenance_settings in options flow init (line 265)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="fc-opts-maint",
+        data=_FC_BASE_DATA,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "maintenance_settings"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "maintenance"
+
+
+async def test_options_flow_maintenance_disabled_with_checkup(hass):
+    """Test options flow maintenance disabled advancing to checkup (line 319)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="fc-opts-maint-dis-checkup",
+        data={
+            **_FC_BASE_DATA,
+            CONF_KEY_INTERFACE_TYPE: "RAPIDO",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "maintenance_settings"}
+    )
+    assert result["step_id"] == "maintenance"
+
+    # Maintenance disabled with can_checkup=True advances to checkup (line 319)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "checkup"
+
+
+async def test_options_flow_dualtech_maintenance_paths(hass):
+    """Test options flow maintenance for DualTech appliances (lines 328-336)."""
+    # 1. Dualtech with can_checkup=True advances to checkup (line 329)
+    entry_can_checkup = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="fc-opts-dualtech-checkup",
+        data={
+            **_FC_BASE_DATA,
+            CONF_KEY_INTERFACE_TYPE: "3D_DUAL",
+        },
+    )
+    entry_can_checkup.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry_can_checkup.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "maintenance_settings"}
+    )
+    assert result["step_id"] == "maintenance"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "checkup"
+
+    # 2. Dualtech with can_checkup=False (read-only mode) saves entry directly (lines 330-336)
+    entry_no_checkup = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="ro-opts-dualtech-maint",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_WASHING_MACHINE: True,
+            CONF_KEY_INTERFACE_TYPE: "3D_DUAL",
+        },
+    )
+    entry_no_checkup.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry_no_checkup.entry_id)
+    assert result["step_id"] == "maintenance"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_options_flow_maintenance_baselines_with_stats_data_and_checkup(hass):
+    """Test options flow maintenance baselines with stats data and advance to checkup (lines 426, 436-444, 515)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="fc-opts-stats-baselines",
+        data={
+            **_FC_BASE_DATA,
+            CONF_KEY_INTERFACE_TYPE: "RAPIDO",
+            CONF_KEY_WATER_HARDNESS: 2,
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 0,
+            CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 0,
+            CONF_KEY_MAINTENANCE_LAST_FILTER: 0,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    # Provide stats coordinator data with total_cycles > 0 (line 426)
+    mock_stats_coord = MagicMock()
+    mock_stats_coord.data = WashingMachineStatistics(total_cycles=150)
+    hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})[
+        DATA_KEY_STATS_COORDINATOR
+    ] = mock_stats_coord
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "maintenance_settings"}
+    )
+    assert result["step_id"] == "maintenance"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
+    )
+    assert result["step_id"] == "maintenance_types"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED: True,
+            CONF_KEY_MAINTENANCE_FILTER_ENABLED: True,
+        },
+    )
+    assert result["step_id"] == "hardness"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={CONF_KEY_WATER_HARDNESS: "2"},
+    )
+    assert result["step_id"] == "maintenance_baselines"
+
+    # Verify defaults were calculated using cycles_remaining from total_cycles (lines 436-444)
+    schema_keys = list(result["data_schema"].schema)
+    sc_default = next(
+        k for k in schema_keys if k == CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP
+    ).default()
+    # 100 - (150 - 0) = -50 -> overdue -> 0
+    assert sc_default == 0
+
+    # Submitting baselines advances to checkup (line 515)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 100,
+            CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 100,
+            CONF_KEY_MAINTENANCE_LAST_FILTER: 100,
+        },
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "checkup"
+
+
+async def test_options_flow_update_cloud_data_exceptions_and_washer_dryer(hass):
+    """Test options flow cloud update exception handling and washer-dryer detection (lines 620-623, 649, 652-654)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id="fc-cloud-opts-err", data=_FC_BASE_DATA
+    )
+    entry.add_to_hass(hass)
+
+    # 1. Unexpected Exception in fetch_appliance_data (lines 620-623)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "update_cloud_data"}
+    )
+    assert result["step_id"] == "update_cloud_data"
+
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Unexpected connection crash"),
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "update_cloud_data"
+    assert result["errors"] == {"base": "cloud_auth"}
+
+    # 2. appliance_type == 'washer_dryer' and malformed programs (lines 649, 652-654)
+    wd_appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[{"invalid": "data"}],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="washer_dryer",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=wd_appliance,
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "language"
+
+    # 3. Programs contain dry program -> sets is_washer_dryer when appliance_type is blank
+    dry_prog = {
+        "program": {
+            "position": 16,
+            "name": "HIGH_DRY",
+            "command_parameters": [
+                {
+                    "command_parameter": {
+                        "name": "selector_position",
+                        "validation": "16",
+                    }
+                },
+                {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                {"command_parameter": {"name": "program_type", "validation": "D"}},
+            ],
+        }
+    }
+    wd_appliance_dry = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="WD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[dry_prog],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "update_cloud_data"}
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=wd_appliance_dry,
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "language"
+
+
+async def test_config_flow_configure_local_exception(hass, no_discovery):
+    """Test async_step_user when _configure_local raises unexpected exception (lines 780-781, 785)."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(
+        "custom_components.candy.config_flow.ConfigFlow._configure_local",
+        side_effect=RuntimeError("Local socket failure"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["errors"] == {"base": "detect_encryption"}
+
+
+async def test_config_flow_cloud_washer_dryer_and_malformed_programs(
+    hass, no_discovery, detect_no_encryption
+):
+    """Test cloud step with appliance_type washer_dryer and malformed programs (lines 951, 963-964)."""
+    appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="HBDOS695",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-13",
+        interface_type="3D_DUAL",
+        programs=[{"invalid": "data"}],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="washer_dryer",
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=appliance,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "language"
+
+
+async def test_config_flow_dryer_advances_to_checkup_when_supported(
+    hass, no_discovery, detect_no_encryption
+):
+    """Test dryer advancing to checkup step when scheduled checkup is supported (line 992)."""
+    dryer_appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="CSOE",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-13",
+        interface_type="TD_DIGIT_6D",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="dryer",
+    )
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient.status",
+            new_callable=AsyncMock,
+            return_value=TumbleDryerStatus(
+                machine_state=MachineState.IDLE,
+                program=0,
+                program_state=DryerProgramState.STOPPED,
+                cycle_state=DryerCycleState.LEVEL_NONE,
+                remaining_minutes=0,
+                remote_control=False,
+                dry_level=0,
+                dry_level_selected=0,
+                refresh=False,
+                need_clean_filter=False,
+                water_tank_full=False,
+                door_closed=True,
+                error=None,
+                delay_value=0,
+                checkup_state=None,
+                recipe_id=None,
+                time=None,
+                rapido=None,
+            ),
+        ),
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=dryer_appliance,
+        ),
+        patch(
+            "custom_components.candy.config_flow.supports_scheduled_checkup",
+            return_value=True,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "checkup"
+
+
+async def test_config_flow_dualtech_maintenance_without_checkup(
+    hass, no_discovery, detect_no_encryption
+):
+    """Test DualTech appliance creates entry when maintenance enabled and can_checkup is False (line 1024)."""
+    dualtech_appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testenckey",
+        appliance_model="HBDOS695",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-13",
+        interface_type="3D_DUAL",
+        programs=_MOCK_APPLIANCE.programs,
+        downloadable_programs=[],
+        brand="hoover",
+        appliance_type="washer",
+    )
+    with (
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=dualtech_appliance,
+        ),
+        patch(
+            "custom_components.candy.config_flow.supports_scheduled_checkup",
+            return_value=False,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        assert result["step_id"] == "maintenance"
+
+        # Maintenance enabled with can_checkup=False creates entry directly (line 1024)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_config_flow_maintenance_baselines_advance_to_checkup(
+    hass, no_discovery, detect_no_encryption
+):
+    """Test ConfigFlow maintenance baselines submission advancing to checkup (line 1119)."""
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=_MOCK_APPLIANCE,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        assert result["step_id"] == "maintenance"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: True}
+        )
+        assert result["step_id"] == "maintenance_types"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED: True,
+                CONF_KEY_MAINTENANCE_FILTER_ENABLED: True,
+            },
+        )
+        assert result["step_id"] == "hardness"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={CONF_KEY_WATER_HARDNESS: "2"},
+        )
+        assert result["step_id"] == "maintenance_baselines"
+
+        # Submitting baselines advances to checkup (line 1119)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 100,
+                CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 100,
+                CONF_KEY_MAINTENANCE_LAST_FILTER: 100,
+            },
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "checkup"

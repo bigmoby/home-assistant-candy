@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import (
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
@@ -399,6 +400,37 @@ async def test_full_checkup_unloads_cleanly(
     assert DOMAIN not in hass.data
 
 
+async def test_full_checkup_reset_uses_background_task(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Check-up completion schedules baseline and reset via entry.async_create_background_task."""
+    entry = await _setup(hass, aioclient_mock, _RUNNING_CHECKUP_JSON)
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch.object(
+            entry,
+            "async_create_background_task",
+            wraps=entry.async_create_background_task,
+        ) as mock_bg_task,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_51_CYCLES)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+        task_names = [call.kwargs.get("name") for call in mock_bg_task.call_args_list]
+        assert f"{DOMAIN}_{entry.entry_id}_send_full_checkup_reset" in task_names
+        assert f"{DOMAIN}_{entry.entry_id}_update_full_checkup_baseline" in task_names
+
+
 def test_full_checkup_coordinator_data_none(
     hass: HomeAssistant,
 ):
@@ -561,3 +593,220 @@ async def test_full_checkup_completion_restores_from_storage_when_stats_none(
         await hass.async_block_till_done()
 
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 388
+
+
+async def test_full_checkup_completion_dualtech(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """DualTech appliances send PrNm=2 for reset and update stats baseline."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _RUNNING_CHECKUP_JSON,
+        **{
+            CONF_KEY_INTERFACE_TYPE: "3D_DUAL",
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 0,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    assert DATA_KEY_STATS_COORDINATOR in hass.data[DOMAIN][entry.entry_id]
+
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_notify,
+        patch("custom_components.candy.pn_async_dismiss") as mock_dismiss,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+        patch("custom_components.candy.asyncio.sleep") as mock_sleep,
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_51_CYCLES)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # 1. Notification posted and old notification dismissed
+    mock_notify.assert_called_once()
+    mock_dismiss.assert_called_once_with(
+        hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry.entry_id)
+    )
+
+    # 2. Stats baseline updated from stats coordinator
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 51
+
+    # 3. DualTech appliance reset sent with PrNm=2 (not 11)
+    mock_send.assert_called_once()
+    qs = mock_send.call_args[0][0]
+    assert "Write=1" in qs
+    assert "StSt=0" in qs
+    assert "PrNm=2" in qs
+    assert any(c.args == (5,) for c in mock_sleep.call_args_list)
+
+
+_TD_RUNNING_CHECKUP_JSON = """{
+  "statusTD": {
+    "StatoTD": "6", "PrPh": "1", "Pr": "1", "RemTime": "3", "StatoWiFi": "1",
+    "DryLev": "1", "DryingManagerLevel": "1", "CleanFilter": "0", "WaterTankFull": "0",
+    "DoorState": "1", "Refresh": "0", "CheckUpState": "1", "CodiceErrore": "0"
+  }
+}"""
+
+_TD_COMPLETED_CHECKUP_JSON = """{
+  "statusTD": {
+    "StatoTD": "1", "PrPh": "0", "Pr": "1", "RemTime": "0", "StatoWiFi": "1",
+    "DryLev": "1", "DryingManagerLevel": "1", "CleanFilter": "0", "WaterTankFull": "0",
+    "DoorState": "1", "Refresh": "0", "CheckUpState": "2", "CodiceErrore": "0"
+  }
+}"""
+
+_TD_COMPLETED_CHECKUP_LOCAL_JSON = """{
+  "statusTD": {
+    "StatoTD": "1", "PrPh": "0", "Pr": "1", "RemTime": "0", "StatoWiFi": "0",
+    "DryLev": "1", "DryingManagerLevel": "1", "CleanFilter": "0", "WaterTankFull": "0",
+    "DoorState": "1", "Refresh": "0", "CheckUpState": "2", "CodiceErrore": "0"
+  }
+}"""
+
+_TD_COMPLETED_CHECKUP_ERROR_JSON = """{
+  "statusTD": {
+    "StatoTD": "7", "PrPh": "0", "Pr": "1", "RemTime": "0", "StatoWiFi": "1",
+    "DryLev": "1", "DryingManagerLevel": "1", "CleanFilter": "0", "WaterTankFull": "0",
+    "DoorState": "1", "Refresh": "0", "CheckUpState": "2", "CodiceErrore": "E03"
+  }
+}"""
+
+
+async def test_dryer_checkup_completion_resets_hardware(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Dryer checkup completion posts notification and sends Write=1&CheckUpState=0."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _TD_RUNNING_CHECKUP_JSON,
+        **{CONF_KEY_INTERFACE_TYPE: "TD_DIGIT_HP_DOOR"},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_notify,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+        patch("custom_components.candy.asyncio.sleep") as mock_sleep,
+    ):
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{TEST_IP}/http-read.json?encrypted=0",
+            text=_TD_COMPLETED_CHECKUP_JSON,
+        )
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # 1. Notification posted
+    mock_notify.assert_called_once()
+    _, kwargs = mock_notify.call_args
+    assert kwargs["notification_id"] == NOTIF_ID_FULL_CHECKUP.format(entry.entry_id)
+
+    # 2. Reset command sent
+    mock_send.assert_called_once()
+    qs = mock_send.call_args[0][0]
+    assert "Write=1" in qs
+    assert "CheckUpState=0" in qs
+    assert any(c.args == (5,) for c in mock_sleep.call_args_list)
+
+
+async def test_dryer_checkup_completion_local_mode_skips_write(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """When remote control is False on dryer, reset write command is skipped."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _TD_RUNNING_CHECKUP_JSON,
+        **{CONF_KEY_INTERFACE_TYPE: "TD_DIGIT_HP_DOOR"},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_notify,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+    ):
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{TEST_IP}/http-read.json?encrypted=0",
+            text=_TD_COMPLETED_CHECKUP_LOCAL_JSON,
+        )
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    mock_notify.assert_called_once()
+    mock_send.assert_not_called()
+
+
+async def test_dryer_checkup_no_duplicate_on_startup(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Starting HA with CheckUpState=2 on dryer does not fire duplicate notification or write."""
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_notify,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+    ):
+        entry = await _setup(
+            hass,
+            aioclient_mock,
+            _TD_COMPLETED_CHECKUP_JSON,
+            **{CONF_KEY_INTERFACE_TYPE: "TD_DIGIT_HP_DOOR"},
+        )
+        coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    mock_notify.assert_not_called()
+    mock_send.assert_not_called()
+
+
+async def test_dryer_checkup_with_error_does_not_reset(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Dryer checkup finishing with error does not post result notification or reset."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _TD_RUNNING_CHECKUP_JSON,
+        **{CONF_KEY_INTERFACE_TYPE: "TD_DIGIT_HP_DOOR"},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_notify,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+    ):
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{TEST_IP}/http-read.json?encrypted=0",
+            text=_TD_COMPLETED_CHECKUP_ERROR_JSON,
+        )
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert not any(
+        call.kwargs.get("notification_id")
+        == NOTIF_ID_FULL_CHECKUP.format(entry.entry_id)
+        for call in mock_notify.call_args_list
+    )
+    mock_send.assert_not_called()

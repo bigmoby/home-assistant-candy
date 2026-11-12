@@ -386,3 +386,196 @@ async def test_special_program_recipe_id(hass, aioclient_mock):
     status = await client.status()
     assert isinstance(status, WashingMachineStatus)
     assert status.recipe_id == "D_33"
+
+
+async def test_fetch_raw_status(hass, aioclient_mock):
+    """Test fetch_raw_status returns raw unparsed telemetry dictionary."""
+    raw_payload = {"statusLavatrice": {"MachMd": "1", "PrPh": "0"}}
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json",
+        json=raw_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    data = await client.fetch_raw_status()
+    assert data == raw_payload
+
+
+async def test_fetch_raw_statistics(hass, aioclient_mock):
+    """Test fetch_raw_statistics returns raw statusCounters dictionary."""
+    stats_payload = {"statusCounters": {"Program1": "10", "Temp40": "20"}}
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json=stats_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    data = await client.fetch_raw_statistics()
+    assert data == stats_payload
+
+
+async def test_fetch_all_endpoints_success(hass, aioclient_mock):
+    """Test fetch_all_endpoints aggregates telemetry and statistics."""
+    telemetry = {"statusLavatrice": {"MachMd": "2"}}
+    stats = {"statusCounters": {"Program1": "5"}}
+
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(f"http://{TEST_IP}/http-getStatistics.json", json=stats)
+
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    endpoints = await client.fetch_all_endpoints()
+    assert endpoints["http-read.json"] == telemetry
+    assert "http-config.json" not in endpoints
+    assert endpoints["http-getStatistics.json"] == stats
+
+
+async def test_fetch_all_endpoints_read_error(hass, aioclient_mock):
+    """Test fetch_all_endpoints handles unreachable device on initial read."""
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", status=500)
+
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    endpoints = await client.fetch_all_endpoints()
+    assert "error" in endpoints["http-read.json"]
+    assert "http-config.json" not in endpoints
+    assert endpoints["http-getStatistics.json"] == {
+        "status": "Skipped: device is unreachable"
+    }
+
+
+async def test_client_plaintext_json_fallback_when_encrypted(hass, aioclient_mock):
+    """Test that when encryption is enabled, unencrypted JSON payload is handled cleanly."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json",
+        text='{"statusLavatrice": {"WiFiStatus": "1", "MachMd": "1"}}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY,
+        use_encryption=True,
+    )
+    data = await client.fetch_raw_status()
+    assert "statusLavatrice" in data
+
+
+async def test_fetch_all_endpoints_stats_error(hass, aioclient_mock):
+    """Test fetch_all_endpoints records errors when statistics fetch fails."""
+    telemetry = {"statusLavatrice": {"MachMd": "2"}}
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+    aioclient_mock.get(f"http://{TEST_IP}/http-prepareStatistics.json", status=500)
+
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    endpoints = await client.fetch_all_endpoints()
+    assert endpoints["http-read.json"] == telemetry
+    assert "http-config.json" not in endpoints
+    assert "error" in endpoints["http-getStatistics.json"]
+
+
+async def test_fetch_all_endpoints_non_stats_appliance(hass, aioclient_mock):
+    """Test fetch_all_endpoints handles appliances that do not support statistics."""
+    telemetry = {"statusForno": {"StatoWiFi": "1"}}
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    endpoints = await client.fetch_all_endpoints()
+    assert endpoints["http-read.json"] == telemetry
+    assert "http-config.json" not in endpoints
+    assert "not supported" in endpoints["http-getStatistics.json"]["status"]
+
+
+async def test_set_water_hardness_invalid(hass):
+    """Test set_water_hardness raises ValueError for invalid hardness levels."""
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    with pytest.raises(ValueError, match="Invalid water hardness level: 0"):
+        await client.set_water_hardness(0)
+    with pytest.raises(ValueError, match="Invalid water hardness level: 4"):
+        await client.set_water_hardness(4)
+
+
+async def test_resume_good_night(hass, aioclient_mock):
+    """Test resume_good_night sends RestartGN command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&Write=1&RestartGN=1",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    await client.resume_good_night()
+    assert aioclient_mock.call_count == 1
+
+
+async def test_set_wine_cooler_light_dual_zone(hass, aioclient_mock):
+    """Test sending light command for dual zone wine cooler."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&Write=1&w1=1&w2=16&w4=2&w5=12&w7=1",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key="",
+        use_encryption=False,
+    )
+    status = WineCoolerStatus(
+        machine_state=WineCoolerState.ON,
+        program=WineCoolerProgram.RED_WINE,
+        temp=16,
+        light=False,
+        error=None,
+        remote_control=True,
+        program_down=WineCoolerProgram.WHITE_WINE,
+        temp_down=12,
+    )
+    await client.set_wine_cooler_light(True, status)
+    assert aioclient_mock.call_count == 1
+
+
+@pytest.mark.parametrize("expected_lingering_tasks", [True])
+async def test_discover_devices_non_200_probe(hass, aioclient_mock):
+    """Test discover_devices ignores non-200 probe responses."""
+    aioclient_mock.get("http://192.168.0.1/http-read.json?encrypted=0", status=404)
+    result = await discover_devices(async_get_clientsession(hass), "192.168.0.0")
+    assert "192.168.0.1" not in result

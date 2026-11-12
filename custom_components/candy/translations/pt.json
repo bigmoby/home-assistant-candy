@@ -28,6 +28,13 @@
           "mode": "Modo"
         }
       },
+      "washer_dryer": {
+        "title": "Máquina de lavar e secar",
+        "description": "No modo Somente leitura, os aparelhos Candy não podem ser distinguidos automaticamente entre uma máquina de lavar roupa padrão e uma máquina de lavar e secar. Marque esta caixa se o seu aparelho tiver funções de secagem.",
+        "data": {
+          "is_washer_dryer": "O aparelho é uma máquina de lavar e secar"
+        }
+      },
       "cloud": {
         "title": "Conta Simply-Fi",
         "data": {

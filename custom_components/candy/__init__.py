@@ -25,7 +25,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .client import CandyClient, parse_wash_programs
+from .client import CandyClient, get_dryer_command_builder, parse_wash_programs
 from .client.model import (
     CheckUpState,
     DishwasherState,
@@ -50,6 +50,7 @@ from .const import (
     CONF_KEY_CHECKUP_LAST_RESULT,
     CONF_KEY_CHECKUP_PENDING,
     CONF_KEY_CHECKUP_SCHEDULE,
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FILTER,
@@ -64,6 +65,9 @@ from .const import (
     DATA_KEY_CHECKUP_UNSUB,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DATA_KEY_DRYER_CHECKUP_UNSUB,
+    DATA_KEY_DRYER_ERROR_UNSUB,
+    DATA_KEY_DRYER_WARNING_UNSUB,
     DATA_KEY_FULL_CHECKUP_UNSUB,
     DATA_KEY_LIMESCALE_UNSUB,
     DATA_KEY_MAINT_UNSUB,
@@ -75,6 +79,9 @@ from .const import (
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MAINTENANCE_HARDNESS_THRESHOLDS,
     MODE_FULL_CONTROL,
+    NOTIF_ID_DRYER_ERROR,
+    NOTIF_ID_DRYER_FILTER,
+    NOTIF_ID_DRYER_WATER_TANK,
     NOTIF_ID_FULL_CHECKUP,
     NOTIF_ID_LIMESCALE,
     NOTIF_ID_MAINT_FILTER,
@@ -89,9 +96,11 @@ from .const import (
     UNIQUE_ID_WASHING_MACHINE,
     UNIQUE_ID_WINE_COOLER,
 )
+from .coordinator import CandyDataUpdateCoordinator
 from .helpers import (
     cycles_remaining,
-    get_wash_error_notification_strings,
+    get_appliance_error_notification_strings,
+    is_dualtech,
     localized_notification_text,
 )
 
@@ -103,6 +112,8 @@ _OFF_INFERRED_STATES = {
     MachineState.FINISHED1,
     MachineState.FINISHED2,
     MachineState.IDLE,
+    DishwasherState.IDLE,
+    OvenState.IDLE,
     WineCoolerState.OFF,
 }
 
@@ -110,6 +121,7 @@ _OFF_INFERRED_STATES = {
 # 60 s while the machine is reachable and running any cycle.
 SCAN_INTERVAL_ACTIVE = timedelta(seconds=60)
 SCAN_INTERVAL_RESTING = timedelta(seconds=20)
+MAX_CONSECUTIVE_TIMEOUTS = 3
 
 
 def _make_off_status(
@@ -257,6 +269,17 @@ def _offline_washing_machine() -> WashingMachineStatus:
         checkup_state=None,
         soil_level=None,
         recipe_id=None,
+        dry_target=None,
+        detergent_on=None,
+        softener_on=None,
+        detergent_empty=None,
+        softener_empty=None,
+        detergent_reserve=None,
+        softener_reserve=None,
+        detergent_cycles_remaining=None,
+        softener_cycles_remaining=None,
+        water_hardness=None,
+        extra_dose_active=None,
     )
 
 
@@ -275,6 +298,12 @@ def _offline_tumble_dryer() -> TumbleDryerStatus:
         need_clean_filter=False,
         water_tank_full=False,
         door_closed=True,
+        error=None,
+        delay_value=None,
+        checkup_state=None,
+        recipe_id=None,
+        time=None,
+        rapido=None,
     )
 
 
@@ -351,8 +380,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             type(last_known_status).__name__,
         )
 
+    consecutive_timeouts = 0
+
     async def update_status():
-        nonlocal last_known_status
+        nonlocal last_known_status, consecutive_timeouts
         prev_state = getattr(last_known_status, "machine_state", None)
         can_infer_off = (
             prev_state in _OFF_INFERRED_STATES or prev_state == MachineState.OFF
@@ -370,31 +401,59 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 status = await fetch
                 _LOGGER.debug("Fetched status: %s", status)
                 last_known_status = status
+                consecutive_timeouts = 0
                 coordinator.update_interval = SCAN_INTERVAL_ACTIVE
+                coordinator.sync_autodose_state(status)
                 return status
         except (TimeoutError, aiohttp.ClientError) as err:
+            consecutive_timeouts += 1
+            if prev_state == MachineState.OFF:
+                coordinator.update_interval = SCAN_INTERVAL_RESTING
+                last_known_status = _make_off_status(last_known_status)
+                return last_known_status
+
             if can_infer_off:
+                if (
+                    consecutive_timeouts < MAX_CONSECUTIVE_TIMEOUTS
+                    and last_known_status is not None
+                ):
+                    _LOGGER.debug(
+                        "Device at %s is unreachable (attempt %d/%d, last state: %s). "
+                        "Retrying in %s.",
+                        ip_address,
+                        consecutive_timeouts,
+                        MAX_CONSECUTIVE_TIMEOUTS,
+                        prev_state,
+                        SCAN_INTERVAL_RESTING,
+                    )
+                    coordinator.update_interval = SCAN_INTERVAL_RESTING
+                    return last_known_status
+
                 _LOGGER.debug(
-                    "Device at %s is unreachable (last state: %s). "
+                    "Device at %s is unreachable after %d attempts (last state: %s). "
                     "Assuming it was powered off.",
                     ip_address,
+                    consecutive_timeouts,
                     prev_state,
                 )
                 coordinator.update_interval = SCAN_INTERVAL_RESTING
-                return _make_off_status(last_known_status)
+                last_known_status = _make_off_status(last_known_status)
+                return last_known_status
             raise UpdateFailed(f"Error communicating with API: {err!r}") from err
         except Exception as err:
             raise UpdateFailed(f"Error communicating with API: {err!r}") from err
 
-    coordinator = DataUpdateCoordinator(
+    coordinator = CandyDataUpdateCoordinator(
         hass,
         _LOGGER,
         name=DOMAIN,
         update_interval=SCAN_INTERVAL_ACTIVE,
         update_method=update_status,
+        client=client,
     )
 
     await coordinator.async_config_entry_first_refresh()
+    coordinator.sync_autodose_state(coordinator.data)
 
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = {
         DATA_KEY_COORDINATOR: coordinator,
@@ -447,14 +506,19 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         else:
             await stats_coordinator.async_refresh()
         stats_entity_id = er.async_get(hass).async_get_entity_id(
-            "sensor", DOMAIN, UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry.entry_id)
+            "sensor",
+            DOMAIN,
+            UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry.entry_id),
         )
         if stats_coordinator.last_update_success or stats_entity_id is not None:
             hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_COORDINATOR] = (
                 stats_coordinator
             )
 
-        if config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED):
+        if (
+            config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED)
+            and stats_coordinator is not None
+        ):
             unsub = _register_maintenance_notifications(
                 hass, config_entry, stats_coordinator
             )
@@ -466,12 +530,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 unsub_checkup
             )
 
-        unsub_stats_refresh = _register_stats_refresh_listener(
-            hass, coordinator, stats_coordinator
-        )
-        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
-            unsub_stats_refresh
-        )
+        if stats_coordinator is not None:
+            unsub_stats_refresh = _register_stats_refresh_listener(
+                hass, config_entry, coordinator, stats_coordinator
+            )
+            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
+                unsub_stats_refresh
+            )
 
         unsub_full_checkup = _register_full_checkup_listener(
             hass, config_entry, coordinator, stats_coordinator, client
@@ -492,6 +557,25 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         )
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_LIMESCALE_UNSUB] = (
             unsub_limescale
+        )
+    elif isinstance(coordinator.data, TumbleDryerStatus):
+        unsub_dryer_error = _register_dryer_error_listener(
+            hass, config_entry, coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DRYER_ERROR_UNSUB] = (
+            unsub_dryer_error
+        )
+        unsub_dryer_warning = _register_dryer_warning_listener(
+            hass, config_entry, coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DRYER_WARNING_UNSUB] = (
+            unsub_dryer_warning
+        )
+        unsub_dryer_checkup = _register_dryer_checkup_listener(
+            hass, config_entry, coordinator, client
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DRYER_CHECKUP_UNSUB] = (
+            unsub_dryer_checkup
         )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
@@ -637,7 +721,7 @@ def _register_full_checkup_listener(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
-    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
+    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics] | None,
     client: CandyClient,
 ) -> Callable[[], None]:
     """Register a coordinator listener that handles Full Check-up completion."""
@@ -677,34 +761,45 @@ def _register_full_checkup_listener(
             )
             pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
 
-            async def _update_baseline() -> None:
-                await stats_coordinator.async_request_refresh()
-                total: int | None = None
-                if stats_coordinator.data is not None:
-                    total = stats_coordinator.data.total_cycles
-                else:
-                    restored = _restore_last_known_statistics(hass, entry_id)
-                    if restored is not None:
-                        total = restored.total_cycles
+            if stats_coordinator is not None:
 
-                if total is not None:
-                    new_data = dict(config_entry.data)
-                    new_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = total
-                    hass.config_entries.async_update_entry(config_entry, data=new_data)
-                    stats_coordinator.async_update_listeners()
+                async def _update_baseline() -> None:
+                    await stats_coordinator.async_request_refresh()
+                    total: int | None = None
+                    if stats_coordinator.data is not None:
+                        total = stats_coordinator.data.total_cycles
+                    else:
+                        restored = _restore_last_known_statistics(hass, entry_id)
+                        if restored is not None:
+                            total = restored.total_cycles
 
-            hass.async_create_task(_update_baseline())
+                    if total is not None:
+                        new_data = dict(config_entry.data)
+                        new_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = total
+                        hass.config_entries.async_update_entry(
+                            config_entry, data=new_data
+                        )
+                        stats_coordinator.async_update_listeners()
+
+                config_entry.async_create_background_task(
+                    hass,
+                    _update_baseline(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_update_full_checkup_baseline",
+                )
 
             if (
                 config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
                 and status.remote_control
             ):
+                interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+                reset_prnm = 2 if is_dualtech(interface_type) else 11
 
                 async def _send_reset() -> None:
                     try:
                         await client.send_command(
                             urlencode(
-                                {"Write": 1, "StSt": 0, "PrNm": 11}, quote_via=quote
+                                {"Write": 1, "StSt": 0, "PrNm": reset_prnm},
+                                quote_via=quote,
                             )
                         )
                         await asyncio.sleep(5)
@@ -714,7 +809,11 @@ def _register_full_checkup_listener(
                             "Failed to reset appliance check-up state: %s", err
                         )
 
-                hass.async_create_task(_send_reset())
+                config_entry.async_create_background_task(
+                    hass,
+                    _send_reset(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_send_full_checkup_reset",
+                )
 
     return coordinator.async_add_listener(_on_status_update)
 
@@ -723,7 +822,7 @@ def _register_limescale_listener(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
-    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
+    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics] | None,
 ) -> Callable[[], None]:
     """Register a coordinator listener that handles Limescale Cleaning completion."""
     if not config_entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
@@ -781,25 +880,31 @@ def _register_limescale_listener(
                 )
                 pn_async_dismiss(hass, NOTIF_ID_MAINT_LIMESCALE.format(entry_id))
 
-                async def _update_baseline() -> None:
-                    await stats_coordinator.async_request_refresh()
-                    total: int | None = None
-                    if stats_coordinator.data is not None:
-                        total = stats_coordinator.data.total_cycles
-                    else:
-                        restored = _restore_last_known_statistics(hass, entry_id)
-                        if restored is not None:
-                            total = restored.total_cycles
+                if stats_coordinator is not None:
 
-                    if total is not None:
-                        new_data = dict(config_entry.data)
-                        new_data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] = total
-                        hass.config_entries.async_update_entry(
-                            config_entry, data=new_data
-                        )
-                        stats_coordinator.async_update_listeners()
+                    async def _update_baseline() -> None:
+                        await stats_coordinator.async_request_refresh()
+                        total: int | None = None
+                        if stats_coordinator.data is not None:
+                            total = stats_coordinator.data.total_cycles
+                        else:
+                            restored = _restore_last_known_statistics(hass, entry_id)
+                            if restored is not None:
+                                total = restored.total_cycles
 
-                hass.async_create_task(_update_baseline())
+                        if total is not None:
+                            new_data = dict(config_entry.data)
+                            new_data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] = total
+                            hass.config_entries.async_update_entry(
+                                config_entry, data=new_data
+                            )
+                            stats_coordinator.async_update_listeners()
+
+                    config_entry.async_create_background_task(
+                        hass,
+                        _update_baseline(),
+                        name=f"{DOMAIN}_{config_entry.entry_id}_update_limescale_baseline",
+                    )
         elif curr_state in (MachineState.IDLE, MachineState.OFF):
             was_running_autoclean[0] = False
 
@@ -808,6 +913,7 @@ def _register_limescale_listener(
 
 def _register_stats_refresh_listener(
     hass: HomeAssistant,
+    config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
     stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
 ) -> Callable[[], None]:
@@ -825,7 +931,78 @@ def _register_stats_refresh_listener(
         prev = prev_state[0]
         prev_state[0] = curr
         if curr in _FINISHED_STATES and prev not in _FINISHED_STATES:
-            hass.async_create_task(stats_coordinator.async_request_refresh())
+            config_entry.async_create_background_task(
+                hass,
+                stats_coordinator.async_request_refresh(),
+                name=f"{DOMAIN}_{config_entry.entry_id}_stats_refresh",
+            )
+
+    return coordinator.async_add_listener(_on_status_update)
+
+
+def _extract_error_code(status: Any) -> int | None:
+    if isinstance(status, WashingMachineStatus):
+        return status.error
+    if isinstance(status, TumbleDryerStatus):
+        return status.error_code
+    return None
+
+
+def _register_appliance_error_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+    appliance_type: str,
+) -> Callable[[], None]:
+    """Register a coordinator listener that posts appliance error notifications and dismisses them when cleared."""
+    entry_id = config_entry.entry_id
+    notif_id = (
+        NOTIF_ID_DRYER_ERROR.format(entry_id)
+        if appliance_type == "dryer"
+        else NOTIF_ID_WASH_ERROR.format(entry_id)
+    )
+    lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
+    unknown_err_msg = (
+        "Unknown tumble dryer error code: %s"
+        if appliance_type == "dryer"
+        else "Unknown washing machine error code: %s"
+    )
+
+    initial_error = _extract_error_code(coordinator.data)
+    prev_error: list[int | None] = [initial_error]
+
+    if initial_error is not None and initial_error > 0:
+        notif_strings = get_appliance_error_notification_strings(
+            appliance_type, initial_error, lang
+        )
+        if notif_strings is not None:
+            title, message = notif_strings
+            pn_async_create(hass, message, title=title, notification_id=notif_id)
+        else:
+            _LOGGER.warning(unknown_err_msg, initial_error)
+
+    def _on_status_update() -> None:
+        status = coordinator.data
+        if status is None:
+            return
+        curr_error = _extract_error_code(status)
+        prior_error = prev_error[0]
+        prev_error[0] = curr_error
+
+        if curr_error == prior_error:
+            return
+
+        if curr_error is not None and curr_error > 0:
+            notif_strings = get_appliance_error_notification_strings(
+                appliance_type, curr_error, lang
+            )
+            if notif_strings is not None:
+                title, message = notif_strings
+                pn_async_create(hass, message, title=title, notification_id=notif_id)
+            else:
+                _LOGGER.warning(unknown_err_msg, curr_error)
+        elif prior_error is not None and prior_error > 0:
+            pn_async_dismiss(hass, notif_id)
 
     return coordinator.async_add_listener(_on_status_update)
 
@@ -835,43 +1012,164 @@ def _register_wash_error_listener(
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
 ) -> Callable[[], None]:
-    """Register a coordinator listener that posts error notifications and dismisses them when cleared."""
+    return _register_appliance_error_listener(hass, config_entry, coordinator, "washer")
+
+
+def _register_dryer_error_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+) -> Callable[[], None]:
+    return _register_appliance_error_listener(hass, config_entry, coordinator, "dryer")
+
+
+def _register_dryer_warning_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+) -> Callable[[], None]:
+    """Register a coordinator listener that manages persistent notifications for dryer hardware warnings."""
     entry_id = config_entry.entry_id
-    notif_id = NOTIF_ID_WASH_ERROR.format(entry_id)
+    filter_notif_id = NOTIF_ID_DRYER_FILTER.format(entry_id)
+    water_tank_notif_id = NOTIF_ID_DRYER_WATER_TANK.format(entry_id)
     lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
 
-    initial = cast(WashingMachineStatus | None, coordinator.data)
-    initial_error = initial.error if initial is not None else None
-    prev_error: list[int | None] = [initial_error]
+    initial_status = cast(TumbleDryerStatus | None, coordinator.data)
+    initial_filter = (
+        initial_status.need_clean_filter if initial_status is not None else False
+    )
+    initial_tank = (
+        initial_status.water_tank_full if initial_status is not None else False
+    )
 
-    if initial_error is not None and initial_error > 0:
-        notif_strings = get_wash_error_notification_strings(initial_error, lang)
-        if notif_strings is not None:
-            title, message = notif_strings
-            pn_async_create(hass, message, title=title, notification_id=notif_id)
-        else:
-            _LOGGER.warning("Unknown washing machine error code: %s", initial_error)
+    prev_filter: list[bool] = [initial_filter]
+    prev_tank: list[bool] = [initial_tank]
+
+    if initial_filter:
+        title = localized_notification_text("dryer_clean_filter_title", lang)
+        message = localized_notification_text("dryer_clean_filter_message", lang)
+        pn_async_create(
+            hass,
+            message,
+            title=title,
+            notification_id=filter_notif_id,
+        )
+
+    if initial_tank:
+        title = localized_notification_text("dryer_water_tank_full_title", lang)
+        message = localized_notification_text("dryer_water_tank_full_message", lang)
+        pn_async_create(
+            hass,
+            message,
+            title=title,
+            notification_id=water_tank_notif_id,
+        )
 
     def _on_status_update() -> None:
-        status = cast(WashingMachineStatus | None, coordinator.data)
+        status = cast(TumbleDryerStatus | None, coordinator.data)
         if status is None:
             return
-        curr_error = status.error
-        prior_error = prev_error[0]
-        prev_error[0] = curr_error
 
-        if curr_error == prior_error:
+        curr_filter = status.need_clean_filter
+        prior_filter = prev_filter[0]
+        prev_filter[0] = curr_filter
+
+        if curr_filter and not prior_filter:
+            title = localized_notification_text("dryer_clean_filter_title", lang)
+            message = localized_notification_text("dryer_clean_filter_message", lang)
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=filter_notif_id,
+            )
+        elif not curr_filter and prior_filter:
+            pn_async_dismiss(hass, filter_notif_id)
+
+        curr_tank = status.water_tank_full
+        prior_tank = prev_tank[0]
+        prev_tank[0] = curr_tank
+
+        if curr_tank and not prior_tank:
+            title = localized_notification_text("dryer_water_tank_full_title", lang)
+            message = localized_notification_text("dryer_water_tank_full_message", lang)
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=water_tank_notif_id,
+            )
+        elif not curr_tank and prior_tank:
+            pn_async_dismiss(hass, water_tank_notif_id)
+
+    return coordinator.async_add_listener(_on_status_update)
+
+
+def _register_dryer_checkup_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+    client: CandyClient,
+) -> Callable[[], None]:
+    """Register a coordinator listener that handles tumble dryer Check-up completion."""
+    initial = cast(TumbleDryerStatus | None, coordinator.data)
+    prev_state: list[CheckUpState | None] = [
+        initial.checkup_state if initial is not None else None
+    ]
+
+    def _on_status_update() -> None:
+        status = cast(TumbleDryerStatus | None, coordinator.data)
+        if status is None:
             return
+        curr_state = status.checkup_state
+        prior_state = prev_state[0]
+        prev_state[0] = curr_state
 
-        if curr_error is not None and curr_error > 0:
-            notif_strings = get_wash_error_notification_strings(curr_error, lang)
-            if notif_strings is not None:
-                title, message = notif_strings
-                pn_async_create(hass, message, title=title, notification_id=notif_id)
-            else:
-                _LOGGER.warning("Unknown washing machine error code: %s", curr_error)
-        elif prior_error is not None and prior_error > 0:
-            pn_async_dismiss(hass, notif_id)
+        has_no_error = (status.error_code in (None, 0)) and (
+            status.machine_state != MachineState.ERROR
+        )
+
+        if (
+            curr_state == CheckUpState.COMPLETED
+            and prior_state == CheckUpState.RUNNING
+            and has_no_error
+        ):
+            entry_id = config_entry.entry_id
+            lang = config_entry.data.get(
+                CONF_KEY_PROGRAM_LANGUAGE, hass.config.language
+            )
+            title = localized_notification_text("full_checkup_result_title", lang)
+            message = localized_notification_text("full_checkup_result_message", lang)
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=NOTIF_ID_FULL_CHECKUP.format(entry_id),
+            )
+
+            if (
+                config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
+                and status.remote_control
+            ):
+                interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+                builder = get_dryer_command_builder(interface_type)
+                reset_cmd = builder.build_checkup_reset()
+
+                async def _send_reset() -> None:
+                    try:
+                        await client.send_command(urlencode(reset_cmd, quote_via=quote))
+                        await asyncio.sleep(5)
+                        await coordinator.async_request_refresh()
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to reset tumble dryer check-up state: %s", err
+                        )
+
+                config_entry.async_create_background_task(
+                    hass,
+                    _send_reset(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_send_dryer_checkup_reset",
+                )
 
     return coordinator.async_add_listener(_on_status_update)
 
@@ -887,6 +1185,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DATA_KEY_FULL_CHECKUP_UNSUB,
             DATA_KEY_STATS_REFRESH_UNSUB,
             DATA_KEY_WASH_ERROR_UNSUB,
+            DATA_KEY_DRYER_ERROR_UNSUB,
+            DATA_KEY_DRYER_WARNING_UNSUB,
+            DATA_KEY_DRYER_CHECKUP_UNSUB,
             DATA_KEY_LIMESCALE_UNSUB,
         ):
             unsub = entry_data.get(key)

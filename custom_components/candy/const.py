@@ -13,6 +13,9 @@ DATA_KEY_FULL_CHECKUP_UNSUB = "full_checkup_unsub"
 DATA_KEY_STATS_REFRESH_UNSUB = "stats_refresh_unsub"
 DATA_KEY_LIMESCALE_UNSUB = "limescale_unsub"
 DATA_KEY_WASH_ERROR_UNSUB = "wash_error_unsub"
+DATA_KEY_DRYER_ERROR_UNSUB = "dryer_error_unsub"
+DATA_KEY_DRYER_WARNING_UNSUB = "dryer_warning_unsub"
+DATA_KEY_DRYER_CHECKUP_UNSUB = "dryer_checkup_unsub"
 
 CONF_INTEGRATION_TITLE = "Candy"
 CONF_KEY_USE_ENCRYPTION = "use_encryption"
@@ -30,6 +33,8 @@ CONF_KEY_DEVICE_MODEL = "device_model"
 CONF_KEY_SERIAL_NUMBER = "serial_number"
 CONF_KEY_PURCHASE_DATE = "purchase_date"
 CONF_KEY_PROGRAM_LANGUAGE = "program_language"
+CONF_KEY_BRAND = "brand"
+CONF_KEY_APPLIANCE_TYPE = "appliance_type"
 
 PROGRAM_LANGUAGES: dict[str, str] = {
     "bg": "Български",
@@ -53,6 +58,7 @@ PROGRAM_LANGUAGES: dict[str, str] = {
 }
 
 UNIQUE_ID_WASHING_MACHINE = "{0}-washing_machine"
+UNIQUE_ID_WASHER_DRYER = "{0}-washer_dryer"
 UNIQUE_ID_WASH_PROGRAM = "{0}-wash_program"
 UNIQUE_ID_WASH_CYCLE_STATUS = "{0}-wash_cycle_status"
 UNIQUE_ID_WASH_REMAINING_TIME = "{0}-wash_remaining_time"
@@ -76,6 +82,25 @@ SOIL_LABELS_REVERSE: dict[str, int] = {v: k for k, v in SOIL_LABELS.items()}
 # Additive minutes when steam (steam=5) is enabled, keyed by program steam_type.
 # Source: APK assets/assisted/full_remaining_time_value_v11.json, programType "Wash + Steam".
 STEAM_DURATION_OFFSETS: dict[str, int] = {"C": 37, "S": 29, "R": 35}
+
+# Additive minutes for extra wash options keyed by option uid_suffix.
+# Source: APK assets/assisted/full_remaining_time_value_v11.json.
+# Standard: Cottons / default (prewash +20, extra dose +20, rinse 1/2/3 +10/+20/+30).
+WASH_OPTION_DURATION_DELTAS_STANDARD: dict[str, int] = {
+    "wash_option_prewash": 20,
+    "wash_option_extra_dose": 20,
+    "wash_option_rinse_1": 10,
+    "wash_option_rinse_2": 20,
+    "wash_option_rinse_3": 30,
+}
+# Reduced: Synthetics / Delicates / Wool (steam_type in {"S", "R"}, dry_type in {"S", "W"}, pr_code == 4).
+WASH_OPTION_DURATION_DELTAS_REDUCED: dict[str, int] = {
+    "wash_option_prewash": 15,
+    "wash_option_extra_dose": 15,
+    "wash_option_rinse_1": 6,
+    "wash_option_rinse_2": 12,
+    "wash_option_rinse_3": 18,
+}
 UNIQUE_ID_WASH_ESTIMATED_DURATION = "{0}-wash_estimated_duration"
 UNIQUE_ID_WASH_SCHEDULED_START = "{0}-wash_scheduled_start"
 UNIQUE_ID_WASH_SCHEDULED_FINISH = "{0}-wash_scheduled_finish"
@@ -83,8 +108,82 @@ UNIQUE_ID_WASH_LIQUID_DETERGENT = "{0}-wash_liquid_detergent"
 UNIQUE_ID_WASH_POWDER_DETERGENT = "{0}-wash_powder_detergent"
 UNIQUE_ID_WASH_CYCLE_CAPACITY = "{0}-wash_cycle_capacity"
 UNIQUE_ID_WASH_PURCHASE_DATE = "{0}-wash_purchase_date"
+UNIQUE_ID_WASH_DRY_TARGET = "{0}-wash_dry_target"
+
+PROGRAM_TYPE_WASHING = "washing"
+PROGRAM_TYPE_DRYING = "drying"
+PROGRAM_TYPE_WASH_AND_DRY = "wash_and_dry"
+PROGRAM_TYPES: list[str] = [
+    PROGRAM_TYPE_WASHING,
+    PROGRAM_TYPE_DRYING,
+    PROGRAM_TYPE_WASH_AND_DRY,
+]
+
+DRY_TARGET_NO_DRY = "no_dry"
+DRY_TARGET_EXTRA_DRY = "extra_dry"
+DRY_TARGET_IRON_DRY = "iron_dry"
+DRY_TARGET_CUPBOARD_DRY = "cupboard_dry"
+DRY_TARGET_120_MIN = "120_minutes"
+DRY_TARGET_90_MIN = "90_minutes"
+DRY_TARGET_60_MIN = "60_minutes"
+DRY_TARGET_30_MIN = "30_minutes"
+DRY_TARGET_WOOL_DRY = "wool_dry"
+
+DRY_TARGET_OPTIONS_FULL: list[str] = [
+    DRY_TARGET_NO_DRY,
+    DRY_TARGET_EXTRA_DRY,
+    DRY_TARGET_CUPBOARD_DRY,
+    DRY_TARGET_IRON_DRY,
+    DRY_TARGET_120_MIN,
+    DRY_TARGET_90_MIN,
+    DRY_TARGET_60_MIN,
+    DRY_TARGET_30_MIN,
+]
+
+DRY_TARGET_OPTIONS_ONLY_DRY: list[str] = [
+    DRY_TARGET_EXTRA_DRY,
+    DRY_TARGET_CUPBOARD_DRY,
+    DRY_TARGET_IRON_DRY,
+    DRY_TARGET_120_MIN,
+    DRY_TARGET_90_MIN,
+    DRY_TARGET_60_MIN,
+    DRY_TARGET_30_MIN,
+]
+
+# Confirmed via Simply-Fi APK CandyWasherDryerDualTech.dryWithValue (classes4.dex):
+# 0 = none, 1 = extra, 2 = pronto armadio (cupboard), 3 = pronto stiro (iron), 4 = cooldown, 9 = wool dry
+DRY_TARGET_TO_VALUE: dict[str, int] = {
+    DRY_TARGET_NO_DRY: 0,
+    DRY_TARGET_EXTRA_DRY: 1,
+    DRY_TARGET_CUPBOARD_DRY: 2,
+    DRY_TARGET_IRON_DRY: 3,
+    DRY_TARGET_120_MIN: 5,
+    DRY_TARGET_90_MIN: 6,
+    DRY_TARGET_60_MIN: 7,
+    DRY_TARGET_30_MIN: 8,
+    DRY_TARGET_WOOL_DRY: 9,
+}
+
+# Programs on DualTech dial bezel representing maintenance/parking slots, hidden from UI selection
+# Confirmed via Simply-Fi APK CandyWasherDualTech.FLANGIA_PROGRAMS_TO_HIDE (classes4.dex)
+FLANGIA_PROGRAMS_TO_HIDE: frozenset[str] = frozenset(
+    {"MAINTENANCE", "SMART_FI_PLUS", "ONE_FI_EXTRA", "TUMBLING"}
+)
+
+DRY_TARGET_DURATIONS: dict[str, int] = {
+    DRY_TARGET_NO_DRY: 0,
+    DRY_TARGET_IRON_DRY: 90,
+    DRY_TARGET_CUPBOARD_DRY: 120,
+    DRY_TARGET_EXTRA_DRY: 150,
+    DRY_TARGET_120_MIN: 120,
+    DRY_TARGET_90_MIN: 90,
+    DRY_TARGET_60_MIN: 60,
+    DRY_TARGET_30_MIN: 30,
+}
 
 CONF_KEY_IS_WASHING_MACHINE = "is_washing_machine"
+CONF_KEY_IS_WASHER_DRYER = "is_washer_dryer"
+CONF_KEY_IS_TUMBLE_DRYER = "is_tumble_dryer"
 CONF_KEY_INTERFACE_TYPE = "interface_type"
 
 CONF_KEY_MAINTENANCE_ENABLED = "maintenance_enabled"
@@ -134,15 +233,21 @@ NOTIF_ID_FULL_CHECKUP = "candy_{0}_full_checkup"
 UNIQUE_ID_WASH_LIMESCALE_BUTTON = "{0}-wash_limescale_button"
 NOTIF_ID_LIMESCALE = "candy_{0}_limescale"
 NOTIF_ID_WASH_ERROR = "candy_{0}_wash_error"
+NOTIF_ID_DRYER_ERROR = "candy_{0}_dryer_error"
+NOTIF_ID_DRYER_FILTER = "candy_{0}_dryer_filter"
+NOTIF_ID_DRYER_WATER_TANK = "candy_{0}_dryer_water_tank"
 
+UNIQUE_ID_WASH_PROGRAM_TYPE_SELECT = "{0}-wash_program_type_select"
 UNIQUE_ID_WASH_PROGRAM_SELECT = "{0}-wash_program_select"
 UNIQUE_ID_WASH_PROGRAM_DESCRIPTION = "{0}-wash_program_description"
 UNIQUE_ID_WASH_TEMP_SELECT = "{0}-wash_temp_select"
 UNIQUE_ID_WASH_SPIN_SELECT = "{0}-wash_spin_select"
 UNIQUE_ID_WASH_SOIL_SELECT = "{0}-wash_soil_select"
+UNIQUE_ID_WASH_DRY_SELECT = "{0}-wash_dry_select"
 UNIQUE_ID_WASH_DELAY_NUMBER = "{0}-wash_delay_number"
 UNIQUE_ID_WASH_START_BUTTON = "{0}-wash_start_button"
 UNIQUE_ID_WASH_PAUSE_BUTTON = "{0}-wash_pause_button"
+UNIQUE_ID_WASH_RESUME_BUTTON = "{0}-wash_resume_button"
 UNIQUE_ID_WASH_STOP_BUTTON = "{0}-wash_stop_button"
 UNIQUE_ID_WASH_STEAM_SWITCH = "{0}-wash_steam_switch"
 UNIQUE_ID_WASH_NFC_SWITCH = "{0}-wash_nfc_switch"
@@ -154,6 +259,36 @@ UNIQUE_ID_WASH_OPTION_RINSE_1 = "{0}-wash_option_rinse_1"
 UNIQUE_ID_WASH_OPTION_RINSE_2 = "{0}-wash_option_rinse_2"
 UNIQUE_ID_WASH_OPTION_RINSE_3 = "{0}-wash_option_rinse_3"
 UNIQUE_ID_WASH_OPTION_ACQUAPLUS = "{0}-wash_option_acquaplus"
+UNIQUE_ID_WASH_RESUME_GOOD_NIGHT = "{0}-wash_resume_good_night"
+UNIQUE_ID_WASH_DETERGENT_EMPTY = "{0}-wash_detergent_empty"
+UNIQUE_ID_WASH_SOFTENER_EMPTY = "{0}-wash_softener_empty"
+UNIQUE_ID_WASH_DETERGENT_RESERVE = "{0}-wash_detergent_reserve"
+UNIQUE_ID_WASH_SOFTENER_RESERVE = "{0}-wash_softener_reserve"
+UNIQUE_ID_WASH_DETERGENT_CYCLES = "{0}-wash_detergent_cycles"
+UNIQUE_ID_WASH_SOFTENER_CYCLES = "{0}-wash_softener_cycles"
+UNIQUE_ID_WASH_DETERGENT_AUTODOSE = "{0}-wash_detergent_autodose"
+UNIQUE_ID_WASH_SOFTENER_AUTODOSE = "{0}-wash_softener_autodose"
+UNIQUE_ID_WASH_WATER_HARDNESS = "{0}-wash_water_hardness"
+UNIQUE_ID_WASH_EXTRA_DOSE_SWITCH = "{0}-wash_extra_dose_switch"
+
+WATER_HARDNESS_SOFT = "soft"
+WATER_HARDNESS_MEDIUM = "medium"
+WATER_HARDNESS_HARD = "hard"
+WATER_HARDNESS_OPTIONS = [
+    WATER_HARDNESS_SOFT,
+    WATER_HARDNESS_MEDIUM,
+    WATER_HARDNESS_HARD,
+]
+WATER_HARDNESS_FROM_VALUE: dict[int, str] = {
+    1: WATER_HARDNESS_SOFT,
+    2: WATER_HARDNESS_MEDIUM,
+    3: WATER_HARDNESS_HARD,
+}
+WATER_HARDNESS_TO_VALUE: dict[str, int] = {
+    WATER_HARDNESS_SOFT: 1,
+    WATER_HARDNESS_MEDIUM: 2,
+    WATER_HARDNESS_HARD: 3,
+}
 
 # (bitmask, translation_key, unique_id_suffix, english_name)
 WASH_OPTIONS: list[tuple[int, str, str, str]] = [
@@ -171,6 +306,63 @@ UNIQUE_ID_TUMBLE_DRYER = "{0}-tumble_dryer"
 UNIQUE_ID_TUMBLE_PROGRAM = "{0}-tumble_program"
 UNIQUE_ID_TUMBLE_CYCLE_STATUS = "{0}-tumble_cycle_status"
 UNIQUE_ID_TUMBLE_REMAINING_TIME = "{0}-tumble_remaining_time"
+UNIQUE_ID_TUMBLE_DRY_LEVEL = "{0}-tumble_dry_level"
+UNIQUE_ID_TUMBLE_ERROR = "{0}-tumble_error"
+UNIQUE_ID_TUMBLE_CHECKUP_STATE = "{0}-tumble_checkup_state"
+UNIQUE_ID_TUMBLE_DELAY = "{0}-tumble_delay"
+
+UNIQUE_ID_TUMBLE_REMOTE_CONTROL = "{0}-tumble_remote_control"
+UNIQUE_ID_TUMBLE_DOOR = "{0}-tumble_door"
+UNIQUE_ID_TUMBLE_CLEAN_FILTER = "{0}-tumble_clean_filter"
+UNIQUE_ID_TUMBLE_WATER_TANK = "{0}-tumble_water_tank"
+
+UNIQUE_ID_TUMBLE_PROGRAM_SELECT = "{0}-tumble_program_select"
+UNIQUE_ID_TUMBLE_DRY_LEVEL_SELECT = "{0}-tumble_dry_level_select"
+UNIQUE_ID_TUMBLE_TIME_SELECT = "{0}-tumble_time_select"
+UNIQUE_ID_TUMBLE_RAPID_SELECT = "{0}-tumble_rapid_select"
+UNIQUE_ID_TUMBLE_DELAY_NUMBER = "{0}-tumble_delay_number"
+UNIQUE_ID_TUMBLE_START_BUTTON = "{0}-tumble_start_button"
+UNIQUE_ID_TUMBLE_STOP_BUTTON = "{0}-tumble_stop_button"
+UNIQUE_ID_TUMBLE_PAUSE_BUTTON = "{0}-tumble_pause_button"
+UNIQUE_ID_TUMBLE_RESUME_BUTTON = "{0}-tumble_resume_button"
+UNIQUE_ID_TUMBLE_ANTI_CREASE_BUTTON = "{0}-tumble_anti_crease_button"
+UNIQUE_ID_TUMBLE_CHECKUP_BUTTON = "{0}-tumble_checkup_button"
+UNIQUE_ID_TUMBLE_RESET_WARNINGS_BUTTON = "{0}-tumble_reset_warnings_button"
+
+DRY_LEVEL_IRON = "iron_dry"
+DRY_LEVEL_HANG = "hang_dry"
+DRY_LEVEL_STORE = "store_dry"
+DRY_LEVEL_BONE = "bone_dry"
+
+DRY_LEVEL_OPTIONS: list[str] = [
+    DRY_LEVEL_IRON,
+    DRY_LEVEL_HANG,
+    DRY_LEVEL_STORE,
+    DRY_LEVEL_BONE,
+]
+
+# Rapid dry levels confirmed via CandyTumbleDryerCommand.java (classes4.dex): 1=30m, 2=45m, 3=59m
+RAPID_LEVEL_TO_VALUE: dict[str, int] = {
+    "off": 0,
+    "30": 1,
+    "45": 2,
+    "59": 3,
+}
+RAPID_LEVEL_FROM_VALUE: dict[int, str] = {v: k for k, v in RAPID_LEVEL_TO_VALUE.items()}
+
+DRY_LEVEL_TO_VALUE: dict[str, int] = {
+    DRY_LEVEL_IRON: 1,
+    DRY_LEVEL_HANG: 2,
+    DRY_LEVEL_STORE: 3,
+    DRY_LEVEL_BONE: 4,
+}
+
+DRY_LEVEL_FROM_VALUE: dict[int, str] = {
+    1: DRY_LEVEL_IRON,
+    2: DRY_LEVEL_HANG,
+    3: DRY_LEVEL_STORE,
+    4: DRY_LEVEL_BONE,
+}
 
 UNIQUE_ID_OVEN = "{0}-oven"
 UNIQUE_ID_OVEN_PROGRAM = "{0}-oven_program"
@@ -189,6 +381,7 @@ UNIQUE_ID_WINE_COOLER_TEMP_DOWN = "{0}-wine_cooler_temp_down"
 UNIQUE_ID_WINE_COOLER_PROGRAM_DOWN = "{0}-wine_cooler_program_down"
 
 DEVICE_NAME_WASHING_MACHINE = "Washing machine"
+DEVICE_NAME_WASHER_DRYER = "Washer dryer"
 DEVICE_NAME_TUMBLE_DRYER = "Tumble dryer"
 DEVICE_NAME_OVEN = "Oven"
 DEVICE_NAME_DISHWASHER = "Dishwasher"

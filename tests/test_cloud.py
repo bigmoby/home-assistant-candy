@@ -56,6 +56,8 @@ def _appliance_entry(ip=None, key="secret-key", programs=None):
         "sixteen_digits_code": "SN12345678901234",
         "purchase_date": "2024-01-01",
         "interface_type": "RAPIDO_4DIG_STM_NEL",
+        "brand": "candy",
+        "appliance_type": "washer",
         "programs": (
             programs
             if programs is not None
@@ -80,6 +82,8 @@ def test_match_appliance_by_ip():
     assert result.mac_address == "AA:BB:CC:DD:EE:FF"
     assert result.encryption_key == "secret-key"
     assert result.downloadable_programs == []
+    assert result.brand == "candy"
+    assert result.appliance_type == "washer"
 
 
 def test_match_appliance_single_fallback():
@@ -87,6 +91,15 @@ def test_match_appliance_single_fallback():
     result = _match_appliance(appliances, "192.168.1.100", [{"id": 99}])
     assert isinstance(result, CloudApplianceData)
     assert result.downloadable_programs == [{"id": 99}]
+
+
+def test_match_appliance_washer_dryer_hoover():
+    entry = _appliance_entry(ip="10.0.0.1")
+    entry["appliance"]["brand"] = "hoover"
+    entry["appliance"]["appliance_type"] = "washer_dryer"
+    result = _match_appliance([entry], "10.0.0.1", [])
+    assert result.brand == "hoover"
+    assert result.appliance_type == "washer_dryer"
 
 
 def test_match_appliance_no_match_multiple():

@@ -1,13 +1,29 @@
+# --------------------------------------------------------------------------------------------------
+# Home Assistant Dashboard Card: Candy / Hoover Washing Machine (Full Control)
+# --------------------------------------------------------------------------------------------------
+# Requirements:
+#   - piitaya/lovelace-mushroom (custom:mushroom-template-card, custom:mushroom-chips-card)
+#
+# Instructions:
+#   Copy the contents of this file into a Manual Card on your dashboard.
+#   Replace every occurrence of `<machine_name>` with your device's entity ID prefix
+#   (e.g. `washing_machine` or `my_washing_machine`).
+#
+# Note:
+#   For Washer-Dryer combo appliances, use `washer-dryer.yaml` instead.
+# --------------------------------------------------------------------------------------------------
 type: vertical-stack
 cards:
   - type: custom:mushroom-template-card
     primary: >-
-      {% set state = states('sensor.<machine_name>') | lower %} {% if
-      state == 'running' %} Running {% elif state == 'paused' %}
-      Paused {% elif state == 'finished' %} Cycle finished {% elif 'delayed'
-      in state %} Delayed start {% elif 'sending' in state %} Sending
-      command... {% elif state in ['idle', 'stopped'] %} Ready {% else %}
-      Off {% endif %}
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} Running
+      {% elif state == 'paused' %} Paused
+      {% elif state == 'finished' %} Cycle finished
+      {% elif 'delayed' in state %} Delayed start
+      {% elif 'sending' in state %} Sending command...
+      {% elif state in ['idle', 'stopped'] %} Ready
+      {% else %} Off {% endif %}
     secondary: >-
       {% set state = states('sensor.<machine_name>') | lower %}
       {% set raw_phase = states('sensor.<machine_name>_wash_cycle_status') %}
@@ -30,25 +46,33 @@ cards:
       {% endif %}
     icon: mdi:washing-machine
     badge_icon: >-
-      {% set state = states('sensor.<machine_name>') | lower %} {% if
-      state == 'running' %} mdi:play-circle {% elif state == 'paused' %}
-      mdi:pause-circle {% elif state == 'finished' %} mdi:check-circle {% elif
-      state == 'error' %} mdi:alert-circle {% elif 'delayed' in state %}
-      mdi:timer-outline {% elif 'sending' in state %} mdi:loading {% else %} ''
-      {% endif %}
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} mdi:play-circle
+      {% elif state == 'paused' %} mdi:pause-circle
+      {% elif state == 'finished' %} mdi:check-circle
+      {% elif state == 'error' %} mdi:alert-circle
+      {% elif 'delayed' in state %} mdi:timer-outline
+      {% elif 'sending' in state %} mdi:loading
+      {% else %} '' {% endif %}
     badge_color: >-
-      {% set state = states('sensor.<machine_name>') | lower %} {% if
-      state == 'running' %} blue {% elif state == 'paused' %} orange {% elif
-      state == 'finished' %} green {% elif state == 'error' %} red {% elif
-      'delayed' in state %} purple {% else %} grey {% endif %}
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
     entity: sensor.<machine_name>
     tap_action:
       action: more-info
     color: >-
-      {% set state = states('sensor.<machine_name>') | lower %} {% if
-      state == 'running' %} blue {% elif state == 'paused' %} orange {% elif
-      state == 'finished' %} green {% elif state == 'error' %} red {% elif
-      'delayed' in state %} purple {% else %} grey {% endif %}
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
     features_position: bottom
   - type: conditional
     conditions:
@@ -89,9 +113,8 @@ cards:
         - type: template
           icon: mdi:progress-clock
           content: >-
-            {% set m =
-            states('sensor.<machine_name>_wash_cycle_remaining_time') |
-            int(0) %} {% if m > 0 %}{{ m }} min{% else %}—{% endif %}
+            {% set m = states('sensor.<machine_name>_wash_cycle_remaining_time') | int(0) %}
+            {% if m > 0 %}{{ m }} min{% else %}—{% endif %}
           icon_color: >-
             {% set state = states('sensor.<machine_name>') | lower %}
             {% if state == 'paused' %} orange {% else %} blue {% endif %}
@@ -107,10 +130,6 @@ cards:
           tap_action:
             action: more-info
             entity: sensor.<machine_name>_wash_fill_level
-          conditions:
-            - condition: state
-              entity: sensor.<machine_name>
-              state: running
         - type: template
           icon: mdi:tune-variant
           content: >-
@@ -140,10 +159,6 @@ cards:
           icon_color: indigo
           tap_action:
             action: none
-          conditions:
-            - condition: state
-              entity: sensor.<machine_name>
-              state: running
   - type: conditional
     conditions:
       - condition: state
@@ -320,10 +335,9 @@ cards:
           type: custom:mushroom-template-card
           entity: sensor.<machine_name>_wash_scheduled_start
           primary: Starts
-          secondary: >
+          secondary: >-
             {{ states('sensor.<machine_name>_wash_scheduled_start') |
-            as_timestamp(default=none) | timestamp_custom('%H:%M',
-            default='--:--') }}
+            as_timestamp(default=none) | timestamp_custom('%H:%M', default='--:--') }}
           icon: mdi:clock-start
           icon_color: purple
           tap_action:
@@ -345,14 +359,10 @@ cards:
           type: custom:mushroom-template-card
           entity: sensor.<machine_name>
           primary: Finishes
-          secondary: >
-            {% set state = states('sensor.<machine_name>') | lower %} {%
-            set sched =
-            states('sensor.<machine_name>_wash_scheduled_finish') %} {%
-            set rem =
-            states('sensor.<machine_name>_wash_cycle_remaining_time') |
-            int(-1) %}
-
+          secondary: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% set sched = states('sensor.<machine_name>_wash_scheduled_finish') %}
+            {% set rem = states('sensor.<machine_name>_wash_cycle_remaining_time') | int(-1) %}
             {% if rem > 0 and state == 'running' %}
               {{ (as_timestamp(now()) + (rem * 60)) | timestamp_custom('%H:%M', default='--:--') }}
             {% elif sched not in ['unavailable', 'unknown', ''] %}
@@ -379,10 +389,14 @@ cards:
               state_not:
                 - Running
                 - running
+                - Paused
+                - paused
                 - Delayed start programmed
                 - delayed_start_programmed
                 - delayed
                 - Delayed
+                - Finished
+                - finished
                 - "Off"
                 - "off"
                 - Sending command
@@ -412,6 +426,9 @@ cards:
               state_not:
                 - "Off"
                 - "off"
+            - condition: state
+              entity: button.<machine_name>_pause_wash
+              state_not: unavailable
           card:
             type: custom:mushroom-template-card
             primary: Pause
@@ -423,6 +440,32 @@ cards:
               perform_action: button.press
               target:
                 entity_id: button.<machine_name>_pause_wash
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Paused
+                - paused
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - "Off"
+                - "off"
+            - condition: state
+              entity: button.<machine_name>_resume_wash
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Resume
+            icon: mdi:play-circle-outline
+            icon_color: green
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_resume_wash
         - type: conditional
           conditions:
             - condition: state
@@ -448,3 +491,4 @@ cards:
               perform_action: button.press
               target:
                 entity_id: button.<machine_name>_stop_wash
+

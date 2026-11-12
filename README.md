@@ -15,10 +15,12 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
 
 - **Supported appliances**:
   - 🧺 Washing Machine — with optional **Full Remote Control** (see below)
-  - 🌫️ Tumble Dryer
+  - 🔄 Washer Dryer combo — with optional **Full Remote Control** (see below)
+  - 🌫️ Tumble Dryer - with optional **Full Remote Control** (see below)
   - 🔪 Dishwasher
   - 🍳 Oven
   - 🍷 Wine Cooler / Cellar
+- **Full Remote Control:** Complete interactive control panel for **washing machines**, **washer-dryer combos** and **tumble dryers** (see the [compatibility matrix](#compatibility-note) for supported and tested models). Select localized programs, adjust wash & dry parameters (temp, spin speed, soil level, drying mode), start/pause/stop cycles, and track remote status.
 - **Zero-Config Decryption:** Say goodbye to manually extracting encryption keys. This integration boasts a natively built-in *sliding-window/known-plaintext* algorithm that unlocks your device seamlessly in fractions of a second during setup.
 - **Strict HA Compatibility:** Follows the rigorous MyPy styling standards enforced by Home Assistant 2025.
 - Uses the local device API for real-time responsiveness. 
@@ -28,66 +30,49 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
 
 ---
 
-## 🧺 Washing Machine — Full Control
+## 🎛️ Full Control Features
 
-Full Control mode turns the integration into a complete remote panel, going beyond status monitoring to let you program, start, and track your washing machine from Home Assistant. The protocol was reverse-engineered from the official Candy/Simply-Fi app, and the feature set matches everything the mobile app offers.
+Full Control mode turns the integration into an interactive remote panel for **washing machines**, **washer-dryer combos** and **tumble dryers**, matching and enhancing the official Simply-Fi mobile app experience directly within Home Assistant.
 
+*Washing Machine Example*
 <p float="left">
-  <img src="docs//images/dashboard_washing_machine.png" width="300" />
-  <img src="docs//images/dashboard_maintenance.png" width="300" /> 
+  <img src="docs/images/dashboard_washing_machine.png" width="300" />
+  <img src="docs/images/dashboard_maintenance.png" width="300" /> 
 </p>
 
-### How it works
+### What it provides
 
-At setup, you choose between **Read-Only** (sensors only) and **Full Control**. Full Control prompts for your Simply-Fi cloud credentials once — they are used to download the program catalog, encryption key, and device metadata, then immediately discarded and never stored. Program names, descriptions, and option labels come directly from the official app, available in 17 languages, and default to your Home Assistant language.
+- **Complete Cycle Control:** Select official localized programs, adjust temperature, spin speed, soil level, or drying targets (dryness level, timed drying), and trigger Start, Pause, Resume, Stop, or Cancel Anti-Crease.
+- **Proactive Maintenance & Diagnostics:** Cycle-based reminders for washing machines (Full Check-up, Limescale cleaning, Filter care), live hardware alerts for tumble dryers (lint filter and water tank full), and electronic self check-up.
+- **Vendor Troubleshooting:** Automatic Home Assistant notifications with authentic step-by-step guidance when the appliance encounters a fault.
+- **Ready-to-Use Dashboards:** Pre-built Lovelace cards using [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom) ready to control your appliance (see [`dashboard/`](dashboard/README.md)).
+- **Smart Safety Gating:** Automatically disables controls when manual or local operation takes precedence.
 
-### Setup flow
+📖 **For detailed instructions, appliance workflows, and safety rules, see the [Remote Control Guide](docs/remote-control.md).**
 
-1. Device is discovered automatically on the local network (or enter the IP manually).
-2. Choose mode: **Read-Only** or **Full Control**.
-3. *(Full Control)* Enter your Simply-Fi email and password — programs and device info are downloaded, credentials are discarded.
-4. Select the display language for program names and description, pick your favourite language indipendently the Home Assistant language.
-5. Optionally enable maintenance cycle counters (check-up, limescale, filter) and set water hardness.
-6. Optionally enable automatic self-diagnostic scheduling (every cycle / weekly / monthly).
 
-### What you get
+### Key Improvements Over the Official App
 
-**Control entities:** program selector (with localized program names and descriptions), temperature, spin speed, soil level, delay start, extra switches (Prewash, Hygiene, Steam and so on), and Start / Pause / Stop buttons.
-
-**Maintenance & diagnostics:** mirrors the Candy app's built-in reminders. 
-Check-up, limescale, and filter counters with configurable water hardness thresholds; self-diagnostic result sensor and last check-up timestamp. When counters reach their thresholds, persistent notifications prompt you to perform maintenance. Starting a diagnostic or limescale routine posts preparation instructions, and completing the cycle automatically resets its counter baseline and dismisses the reminder (manual reset buttons are also available as fallback; the filter counter is cleaned manually and reset via button).
-
-**Proactive error handling:** monitors washing machine fault codes in real time and posts persistent Home Assistant notifications with localized vendor troubleshooting instructions (such as checking water taps, unblocking the pump filter, or adjusting laundry load balance). Notifications update dynamically if codes change and dismiss automatically when the appliance clears the error.
-
-**Remote Control status:** a dedicated sensor tracks whether the machine currently accepts remote commands, and disables every control entity while it doesn't. See [`docs/remote-control.md`](docs/remote-control.md) for details.
-
-### Improvements over the official app
-
-- **Proactive troubleshooting & reminders:** Home Assistant immediately presents vendor troubleshooting guidance on errors and clears alerts when resolved, plus manages the full maintenance notification lifecycle without opening the Simply-Fi app.
-
-- **Faster feedback:** every write command locks the controls, waits for the machine to process it, then forces an immediate refresh — so the dashboard reflects the new state in a few seconds instead of waiting for the next 60-second poll.
-- **Faster wake-up:** while the machine is off, Home Assistant polls every 20 seconds instead of 60, so it notices when the machine turns back on much sooner.
-- **Accurate end-time calculation:** The integration computes an accurate scheduled finish timestamp, accounting for all variables.
-- **Always-on visibility:** Machine state and controls are available on your dashboard without opening the app.
-- **Correct lifetime cycle count:** the official app derives total wash cycles from per-program
-  counters that are 8-bit and silently wrap at 256 — after enough washes on one program its
-  total jumps *backwards* by 256. This integration reads the wide temperature counters instead,
-  so the total keeps climbing correctly.
-
-### Dashboard cards
-
-Ready-made Lovelace cards are included in the [`dashboard/`](dashboard/) folder. 
-
-[Mushroom](https://github.com/piitaya/lovelace-mushroom) custom card is required.
-
-- [`washing-machine.yaml`](dashboard/washing-machine.yaml) — main control card: status, running info, program selector, options, start/pause/stop buttons, and scheduled start/finish times.
-- [`maintenance.yaml`](dashboard/maintenance.yaml) — maintenance card: check-up, limescale, and filter counters with reset buttons and check-up result.
-
-To use them, copy the card YAML into a new manual card in your Lovelace dashboard and replace every occurrence of `<machine_name>` with your own machine's entity ID prefix (e.g. `my_washing_machine`).
+- **Direct Dashboard Control:** Monitor and run cycles directly from Home Assistant without opening the mobile app.
+- **Faster Responsiveness:** Fast 20-second wake-up detection when the machine turns on, plus immediate state refresh (~5s) after sending commands.
+- **Persistent Error Guidance:** Troubleshooting instructions appear right in Home Assistant and clear automatically once the machine fault is resolved.
+- **Accurate Cycle Tracking:** Fixes the vendor app's 8-bit counter overflow bug (which resets total wash counts after 256 cycles) and provides precise finish time estimates.
 
 ### Compatibility Note
 
-Full functionality has been tested on the **RAPIDO** series. Other washing machine series may behave differently. If you encounter issues or unexpected behaviour, please share your findings in the [Discussions](https://github.com/bigmoby/home-assistant-candy/discussions/categories/device-support-improvements) section or open an Issue — feedback is very welcome.
+The remote control functionality has been implemented for several physical appliances. See the table below.
+
+| Appliance | Interface / Family | Tested | Notes |
+|---|---|---|---|
+| Washing Machine | Candy RapidÓ (`RAPIDO`, `RAPIDO_4DIG_STM_NEL`) | Yes | Reference hardware (`RO41274DWMSE/1-S`).|
+| Washing Machine / Washer Dryer | Hoover AXI (`red_devil_axi*`, `hwash700`) | Yes | Reference hardware (`AWMPD 410LH8/1-S` and `AWDPD4138LHR/1`). |
+| Tumble Dryer | DualTech (`TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL`) | Yes | Reference hardware (`GVS H9A2TCE-80`). |
+| Washing Machine / Washer Dryer | DualTech (`3D_DUAL`, `4D_DUAL`, `DUALTECH`) | Yes | Tested on `3D_DUAL` hardware. Remote pause and stats counters are unsupported by hardware. |
+| Washer Dryer | Candy RapidÓ (`ROW` series) | No | Shares RapidÓ protocol with generic washer-dryer engine. |
+| Washing Machine / Washer Dryer | Candy Bianca (`BIANCA`, `BWD` series) | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by Bianca hardware. |
+| Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. |
+
+Other appliance series may not behave correctly. If you encounter issues or unexpected behaviour, please open an [Issue](https://github.com/bigmoby/home-assistant-candy/issues) and attach the output of the `simplyfi.py`  tool. Feedback is very welcome.
 
 ---
 
@@ -99,6 +84,9 @@ Full functionality has been tested on the **RAPIDO** series. Other washing machi
 3. Restart Home Assistant.
 4. Go to **Settings > Devices & Services**, click **Add integration** and search for `Candy`.
 5. Enter the **IP Address** of your appliance.
+6. If available, you can choose to enable Full Control of your appliance.
+    - **One-Time Cloud Sign-In:** Enter your Simply-Fi credentials once to download your device's program catalog and encryption key. Credentials are discarded immediately and never stored.
+    - **Customize:** Choose your preferred display language for program names and descriptions (10 languages available), and optionally configure maintenance thresholds.
 6. The integration will automatically authenticate, decrypt if necessary, and assign the appliance to your dashboard!
 
 ### Method 2: Manual
@@ -107,17 +95,30 @@ Full functionality has been tested on the **RAPIDO** series. Other washing machi
 
 ---
 
-## 🚀 Built-in Debugging Tool
+## 🚀 Built-in Debugging Tool (`simplyfi.py` v2.0.0)
 
-Are you a developer, or do you want to inspect what raw JSON your specific appliance is throwing over your network? We've got you covered:
+Want to troubleshoot network reachability, verify your 16-character encryption key, test remote control readiness, or inspect raw and decoded telemetry from your appliance? We've got you covered:
 
-Inside the `tools/` folder of this repository, you'll find the standalone `simplyfi.py` script. You can run it effortlessly from any terminal independent from Home Assistant!
+Inside the `tools/` folder, you'll find the standalone `simplyfi.py` diagnostic suite. It runs from any terminal independently from Home Assistant:
 
 ```bash
-python3 tools/simplyfi.py <YOUR_APPLIANCE_IP_ADDRESS>
+# 1. Recover your 16-character XOR key automatically
+python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> getkey
+
+# 2. Inspect real-time decoded telemetry in a human-readable table
+python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> inspect
+
+# 3. Audit remote control prerequisites and physical dial knob position
+python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> remote
+
+# 4. Fetch cycle statistics via the 2-step handshake (prepare + fetch)
+python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> stats
+
+# 5. Generate a complete, sanitized diagnostic report for GitHub issues
+python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
 ```
 
-This is incredibly useful for validating your appliance network reachability or diagnosing new payloads.
+Supports all 10 appliance families: Washing Machines, Washer-Dryers, Tumble Dryers, Dishwashers, Ovens, Wine Coolers, Refrigerators/Freezers, Kitchen Hoods, Induction/Gas Cooktops, and Robot Vacuums. For full details and command grammar, see [`tools/agents.md`](tools/agents.md).
 
 ---
 
@@ -147,10 +148,13 @@ Use that IP when configuring the integration in Home Assistant.
 
 ## 🙋 My device isn't supported. Can you help?
 
-Absolutely! If you have an appliance that is not supported yet (or you notice odd readings), head over to the [Discussions section](https://github.com/bigmoby/home-assistant-candy/discussions/categories/device-support-improvements). Open a new thread or comment to an existing one with the following information:
+Absolutely! If you have an appliance that is not supported yet (e.g. Refrigerator, Hood, Cooktop, or a new Dishwasher/Oven variant), or you notice odd readings, please open a new [Issue](https://github.com/bigmoby/home-assistant-candy/issues) with the following information:
 
-1. The raw status API response of your device (Please use the provided `tools/simplyfi.py` inside this repo to query your IP and get the full JSON).
-2. A brief, intuitive explanation of what you think each field correlates to based on the machine's state (e.g., _The `SpinSp` field reads "8", meaning Spin speed 800 RPM in my model_).
+1. Run the diagnostic tool (sanitized by default; use `--raw` if unredacted output is needed):
+   ```bash
+   python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
+   ```
+2. Paste the generated Markdown output directly into your issue. It automatically includes sanitized device configuration, decoded telemetry registers, raw JSON payloads, and cycle counters while redacting sensitive Wi-Fi credentials, MAC addresses, and encryption keys.
 
 ---
 

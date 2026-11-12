@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 import json
 from pathlib import Path
+from typing import Any
 
 _PROGRAM_NAMES: dict[str, dict[str, str]] = json.loads(
     (Path(__file__).parent / "program_names.json").read_text(encoding="utf-8")
@@ -76,8 +79,45 @@ class WashProgramState(StatusCode):
     DRYING = (6, "Drying")
     ERROR = (7, "Error")
     STEAM = (8, "Steam")
-    GOOD_NIGHT = (9, "Spin - Good Night")  # TODO: GN pause?
+    GOOD_NIGHT = (
+        9,
+        "Good Night rinse hold",
+    )  # Rinse hold with water in drum; resume with Write=1&RestartGN=1
     SPIN = (10, "Spin")
+
+
+# Confirmed via Simply-Fi APK CandyWasherDryerDualTech.dryWithValue (classes4.dex):
+# 0 = none, 1 = extra, 2 = pronto armadio (cupboard), 3 = pronto stiro (iron), 4 = cool-down, 9 = wool dry
+class WasherDryerDryTarget(StatusCode):
+    NO_DRY = (0, "no_dry")
+    EXTRA_DRY = (1, "extra_dry")
+    CUPBOARD_DRY = (2, "cupboard_dry")
+    IRON_DRY = (3, "iron_dry")
+    COOLDOWN = (4, "cooldown")
+    TIME_120 = (5, "120_minutes")
+    TIME_90 = (6, "90_minutes")
+    TIME_60 = (7, "60_minutes")
+    TIME_30 = (8, "30_minutes")
+    WOOL_DRY = (9, "wool_dry")
+
+    @classmethod
+    def from_raw(cls, raw: Any) -> WasherDryerDryTarget | None:
+        """Parse a wire DryT register value safely.
+
+        Returns the matching WasherDryerDryTarget if raw is a valid digit
+        string or integer in 0..9; returns None for empty, non-digit, or
+        unrecognized codes (e.g. unequipped standalone washer sentinels).
+        """
+        if raw is None:
+            return None
+        val_str = str(raw).strip()
+        if not val_str.isdigit():
+            return None
+        code = int(val_str)
+        for target in cls:
+            if target.code == code:
+                return target
+        return None
 
 
 @dataclass
@@ -105,6 +145,18 @@ class WashingMachineStatus:
     checkup_state: CheckUpState | None  # CheckUpState — diagnostic lifecycle
     soil_level: int | None  # SLevel — 0–4 soil level setting
     recipe_id: str | None  # RecipeId — downloadable program (e.g. "D_33")
+    dry_target: WasherDryerDryTarget | None
+    # Auto-dose fields (_ad models)
+    detergent_on: bool | None
+    softener_on: bool | None
+    detergent_empty: bool | None
+    softener_empty: bool | None
+    detergent_reserve: bool | None
+    softener_reserve: bool | None
+    detergent_cycles_remaining: int | None
+    softener_cycles_remaining: int | None
+    water_hardness: int | None
+    extra_dose_active: bool | None
 
     @classmethod
     def from_json(cls, json):
@@ -137,6 +189,37 @@ class WashingMachineStatus:
             recipe_id=str(json["RecipeId"]).strip()
             if json.get("RecipeId") is not None
             else None,
+            dry_target=WasherDryerDryTarget.from_raw(json.get("DryT")),
+            detergent_on=json["Det"] == "1"
+            if "Det" in json and json["Det"] != ""
+            else None,
+            softener_on=json["Soft"] == "1"
+            if "Soft" in json and json["Soft"] != ""
+            else None,
+            detergent_empty=json["DetWarn"] == "1"
+            if "DetWarn" in json and json["DetWarn"] != ""
+            else None,
+            softener_empty=json["SoftWarn"] == "1"
+            if "SoftWarn" in json and json["SoftWarn"] != ""
+            else None,
+            detergent_reserve=json["DetPreW"] == "1"
+            if "DetPreW" in json and json["DetPreW"] != ""
+            else None,
+            softener_reserve=json["SoftPreW"] == "1"
+            if "SoftPreW" in json and json["SoftPreW"] != ""
+            else None,
+            detergent_cycles_remaining=int(json["DPrgCnt"])
+            if "DPrgCnt" in json and str(json["DPrgCnt"]).isdigit()
+            else None,
+            softener_cycles_remaining=int(json["SPrgCnt"])
+            if "SPrgCnt" in json and str(json["SPrgCnt"]).isdigit()
+            else None,
+            water_hardness=int(json["WaterHard"])
+            if "WaterHard" in json and str(json["WaterHard"]).isdigit()
+            else None,
+            extra_dose_active=json["rED"] == "1"
+            if "rED" in json and json["rED"] != ""
+            else None,
         )
 
 
@@ -155,6 +238,19 @@ class DryerCycleState(StatusCode):
     LEVEL_BONE = (4, "Bone Dry")
 
 
+_STATO_TD_MAP: dict[int, MachineState] = {
+    0: MachineState.IDLE,
+    1: MachineState.IDLE,
+    2: MachineState.RUNNING,
+    3: MachineState.PAUSED,
+    4: MachineState.DELAYED_START_SELECTION,
+    5: MachineState.DELAYED_START_PROGRAMMED,
+    6: MachineState.RUNNING,
+    7: MachineState.ERROR,
+    8: MachineState.FINISHED1,
+}
+
+
 @dataclass
 class TumbleDryerStatus:
     machine_state: MachineState
@@ -169,11 +265,27 @@ class TumbleDryerStatus:
     need_clean_filter: bool
     water_tank_full: bool
     door_closed: bool
+    error: str | None
+    delay_value: int | None
+    checkup_state: CheckUpState | None
+    recipe_id: str | None
+    time: int | None
+    rapido: int | None
 
     @classmethod
     def from_json(cls, json):
+        err = json.get("CodiceErrore")
+        error_val = (
+            str(err).strip()
+            if err is not None and str(err).strip() not in ("0", "E0", "")
+            else None
+        )
+        raw_stato = int(json["StatoTD"])
+        machine_state = _STATO_TD_MAP.get(raw_stato)
+        if machine_state is None:
+            raise ValueError(f"Unrecognized StatoTD code: {raw_stato}")
         return cls(
-            machine_state=MachineState.from_code(int(json["StatoTD"])),
+            machine_state=machine_state,
             program_state=DryerProgramState.from_code(int(json["PrPh"])),
             cycle_state=DryerCycleState.from_code(int(json["DryLev"])),
             program=int(json["Pr"]),
@@ -185,7 +297,31 @@ class TumbleDryerStatus:
             need_clean_filter=json["CleanFilter"] == "1",
             water_tank_full=json["WaterTankFull"] == "1",
             door_closed=json["DoorState"] == "1",
+            error=error_val,
+            delay_value=int(json["DelVal"])
+            if "DelVal" in json and str(json["DelVal"]).isdigit()
+            else None,
+            checkup_state=CheckUpState.from_code(int(json["CheckUpState"]))
+            if "CheckUpState" in json and str(json["CheckUpState"]).isdigit()
+            else None,
+            recipe_id=str(json["RecipeId"]).strip()
+            if json.get("RecipeId") not in (None, "NULL", "")
+            else None,
+            time=int(json["Time"])
+            if "Time" in json and str(json["Time"]).isdigit()
+            else None,
+            rapido=int(json["Rapido"])
+            if "Rapido" in json and str(json["Rapido"]).isdigit()
+            else None,
         )
+
+    @property
+    def error_code(self) -> int | None:
+        """Integer error code (0 if clear, e.g. 3 for E03)."""
+        if self.error is None or self.error in ("0", "E0", ""):
+            return 0
+        raw = self.error.upper().lstrip("E")
+        return int(raw) if raw.isdigit() else None
 
 
 class DishwasherState(StatusCode):
@@ -298,17 +434,29 @@ class WashingMachineWashProgram:
     powder_detergent_dose: int | None  # 1–4 dose level, or None if not applicable
     max_cycle_capacity: int | None  # kg
     available_options: int  # OptMsk1 bitmask of valid options for this program
+    program_type: str
+    selector_position_dry: int | None
+    dry_supported: bool
+    dry: int
 
     @classmethod
-    def from_dict(cls, program_dict: dict) -> "WashingMachineWashProgram":
+    def from_dict(cls, program_dict: dict) -> WashingMachineWashProgram:
         """Parse a program entry from the Simply-Fi appliances JSON."""
-        p = program_dict["program"]
-        params = {
-            cp["command_parameter"]["name"]: cp["command_parameter"]["validation"]
-            for cp in p["command_parameters"]
-        }
+        p = program_dict.get("program", program_dict)
+        raw_params = p.get("command_parameters") or p.get("parameters") or []
+        params: dict[str, str] = {}
+        if isinstance(raw_params, dict):
+            params = {k: str(v) for k, v in raw_params.items()}
+        elif isinstance(raw_params, list):
+            for cp in raw_params:
+                if "command_parameter" in cp:
+                    params[cp["command_parameter"]["name"]] = str(
+                        cp["command_parameter"]["validation"]
+                    )
+                elif "name" in cp:
+                    params[cp["name"]] = str(cp["validation"])
 
-        def _int(key: str, fallback: int = 0) -> int:
+        def _int(key: str, fallback: int) -> int:
             val = params.get(key, "")
             try:
                 return int(val)
@@ -325,33 +473,93 @@ class WashingMachineWashProgram:
                 return result if result > 0 else None
 
         raw_name: str = p.get("name", "")
-        for prefix in ("DUAL_WM_WD_PROGRAM_NAME_", "DUAL_WM_WD_"):
+        for prefix in (
+            "DUAL_WM_WD_PROGRAM_NAME_",
+            "DUAL_WM_WD_",
+            "NFC_PROGRAM_NAME_1D_",
+            "NFC_PROGRAM_NAME_2D_",
+            "NFC_PROGRAM_NAME_",
+            "WA_PROG_",
+            "NFC_CARE_",
+        ):
             if raw_name.startswith(prefix):
                 raw_name = raw_name[len(prefix) :]
                 break
+        if raw_name == "AUTO_CLEAN":
+            raw_name = "AUTOCLEAN"
+
+        raw_program_type: str = params.get("program_type", "").upper()
+        if "WASH_AND_DRY" in raw_name.upper() or "WASH_DRY" in raw_name.upper():
+            raw_program_type = "WD"
+        elif not raw_program_type:
+            if "_DRY" in raw_name.upper() or "DRY_" in raw_name.upper():
+                raw_program_type = "D"
+            else:
+                raw_program_type = "W"
+
+        selector_position_dry = _int_or_none("selector_position_dry")
+        dry_val = _int("dry", 0)
+        dry_supported = (selector_position_dry is not None) or (dry_val > 0)
 
         return cls(
             position=int(p["position"]),
-            selector_position=_int("selector_position"),
+            selector_position=_int("selector_position", 0),
             name=raw_name,
-            pr_code=_int("pr_code"),
-            max_temperature=_int("maximum_temperature"),
-            default_temperature=_int("default_temperature"),
-            max_spin_speed=_int("maximum_spin_speed"),
-            default_spin_speed=_int("default_spin_speed"),
-            min_soil_level=_int("minimum_soil_level"),
-            max_soil_level=_int("maximum_soil_level"),
-            default_soil_level=_int("default_soil_level"),
-            steam=_int("steam") != 0,
+            pr_code=_int("pr_code", 0),
+            max_temperature=_int("maximum_temperature", 0),
+            default_temperature=_int("default_temperature", 0),
+            max_spin_speed=_int("maximum_spin_speed", 0),
+            default_spin_speed=_int("default_spin_speed", 0),
+            min_soil_level=_int("minimum_soil_level", 0),
+            max_soil_level=_int("maximum_soil_level", 0),
+            default_soil_level=_int("default_soil_level", 0),
+            steam=_int("steam", 0) != 0,
             steam_type=params.get("steam_type", ""),
-            default_duration=_int("default_duration"),
-            duration_soil_max=_int("remaining_time_soil_max"),
-            duration_soil_medium=_int("remaining_time_soil_medium"),
-            duration_soil_min=_int("remaining_time_soil_min"),
+            default_duration=_int("default_duration", 0),
+            duration_soil_max=_int("remaining_time_soil_max", 0),
+            duration_soil_medium=_int("remaining_time_soil_medium", 0),
+            duration_soil_min=_int("remaining_time_soil_min", 0),
             liquid_detergent_dose=_int_or_none("liquid_detergent_dose"),
             powder_detergent_dose=_int_or_none("powder_detergent_dose"),
             max_cycle_capacity=_int_or_none("max_cycle_capacity"),
-            available_options=_int("available_options"),
+            available_options=_int("available_options", 0),
+            program_type=raw_program_type,
+            selector_position_dry=selector_position_dry,
+            dry_supported=dry_supported,
+            dry=dry_val,
+        )
+
+    @property
+    def is_dry(self) -> bool:
+        """Return True if this program is a standalone drying cycle.
+
+        Note: Describes individual cycle type for program selectors and options,
+        not physical appliance hardware identity.
+        """
+        if self.program_type:
+            return self.program_type == "D"
+        name_upper = self.name.upper()
+        return (
+            name_upper.endswith("_DRY")
+            or "_DRY_" in name_upper
+            or name_upper.startswith("DRY_")
+        )
+
+    @property
+    def is_wash(self) -> bool:
+        """Return True if this program includes a wash phase."""
+        if self.program_type:
+            return self.program_type in ("W", "WD")
+        return not self.is_dry
+
+    @property
+    def is_wash_and_dry(self) -> bool:
+        """Return True if this program supports combined wash and dry."""
+        return (
+            (self.program_type == "WD")
+            or (self.is_wash and self.dry_supported)
+            or ("WASH_AND_DRY" in self.name.upper())
+            or ("WASH_DRY" in self.name.upper())
         )
 
     @property
@@ -384,6 +592,93 @@ class WashingMachineWashProgram:
                 return self.duration_soil_medium or self.default_duration
             return self.duration_soil_max or self.default_duration
         return self.default_duration
+
+
+@dataclass
+class TumbleDryerProgram:
+    position: int
+    selector_position: int
+    name: str
+    default_drying_level: int
+    max_time_level: int
+    default_time_level: int
+    set_dry_level: bool
+    set_time_level: bool
+    set_rapido: bool
+    duration: int
+    mask1: int
+    mask2: int
+
+    @classmethod
+    def from_dict(cls, program_dict: dict) -> TumbleDryerProgram:
+        """Parse a program entry from the Simply-Fi tumble dryer appliance JSON."""
+        p = program_dict.get("program", program_dict)
+        raw_params = p.get("command_parameters") or p.get("parameters") or []
+        params: dict[str, str] = {}
+        if isinstance(raw_params, dict):
+            params = {k: str(v) for k, v in raw_params.items()}
+        elif isinstance(raw_params, list):
+            for cp in raw_params:
+                if "command_parameter" in cp:
+                    params[cp["command_parameter"]["name"]] = str(
+                        cp["command_parameter"]["validation"]
+                    )
+                elif "name" in cp:
+                    params[cp["name"]] = str(cp["validation"])
+
+        def _int(key: str, fallback: int) -> int:
+            val = params[key] if key in params else p.get(key, "")
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return fallback
+
+        raw_name: str = p.get("name", "")
+        for prefix in (
+            "__HOOVER__NFC_TD_PROGRAM_NAME_",
+            "__HOOVER__DUAL_TD_PROGRAM_DOWNLOAD_",
+            "NFC_TD_PROGRAM_NAME_",
+            "TD_PROGRAM_NAME_",
+            "NFC_TD_",
+            "DUAL_TD_PROGRAM_DOWNLOAD_",
+            "DUAL_WM_PROGRAM_DOWNLOAD_",
+        ):
+            if raw_name.startswith(prefix):
+                raw_name = raw_name[len(prefix) :]
+                break
+
+        return cls(
+            position=int(p.get("position", 0)),
+            selector_position=_int("selector_position", 0),
+            name=raw_name,
+            default_drying_level=_int("default_drying_level", 0),
+            max_time_level=_int("max_time_level", 0),
+            default_time_level=_int("default_time_level", 0),
+            set_dry_level=_int("set_dry_level", 0) != 0,
+            set_time_level=_int("set_time_level", 0) != 0,
+            set_rapido=_int("set_rapido", 0) != 0,
+            duration=_int("duration", 0),
+            mask1=_int("mask1", 0),
+            mask2=_int("mask2", 0),
+        )
+
+    @property
+    def display_name(self) -> str:
+        return self.localized_name("en")
+
+    def localized_name(self, language: str) -> str:
+        """Return the program name in the given BCP-47 language code."""
+        translations = _PROGRAM_NAMES.get(self.name, {})
+        return (
+            translations.get(language)
+            or translations.get("en")
+            or self.name.replace("_", " ").title()
+        )
+
+    def localized_description(self, language: str) -> str | None:
+        """Return the program description in the given BCP-47 language code, or None."""
+        translations = _PROGRAM_NAMES.get(self.name + "_DESCRIPTION", {})
+        return translations.get(language) or translations.get("en") or None
 
 
 @dataclass
@@ -446,7 +741,7 @@ def _safe_int(val: object, fallback: int) -> int:
     return fallback
 
 
-def load_downloadable_programs(cloud_raw: list[dict]) -> list["DownloadableProgram"]:
+def load_downloadable_programs(cloud_raw: list[dict]) -> list[DownloadableProgram]:
     """Build DownloadableProgram list from cloud wm_wd_programs response.
 
     Only programs present in nfc_programs.json (APK allowlist) are included,

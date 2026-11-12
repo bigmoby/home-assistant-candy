@@ -28,6 +28,13 @@
           "mode": "Mode"
         }
       },
+      "washer_dryer": {
+        "title": "Lave-linge séchant",
+        "description": "En mode Lecture seule, les appareils Candy ne peuvent pas être distingués automatiquement entre un lave-linge standard et un lave-linge séchant. Cochez cette case si votre appareil dispose de fonctions de séchage.",
+        "data": {
+          "is_washer_dryer": "L'appareil est un lave-linge séchant"
+        }
+      },
       "cloud": {
         "title": "Compte Simply-Fi",
         "data": {
