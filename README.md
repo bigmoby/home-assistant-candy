@@ -68,7 +68,7 @@ The remote control functionality has been implemented for several physical appli
 | Washing Machine / Washer Dryer | Hoover AXI (`red_devil_axi*`, `hwash700`) | Yes | Reference hardware (`AWMPD 410LH8/1-S` and `AWDPD4138LHR/1`). |
 | Tumble Dryer | DualTech (`TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL`) | Yes | Reference hardware (`GVS H9A2TCE-80`). |
 | Washing Machine / Washer Dryer | DualTech (`3D_DUAL`, `4D_DUAL`, `DUALTECH`) | Yes | Tested on `3D_DUAL` hardware. Remote pause and stats counters are unsupported by hardware. |
-| Washer Dryer | Candy RapidÓ (`ROW` series) | No | Shares RapidÓ protocol with generic washer-dryer engine. |
+| Washer Dryer | Candy RapidÓ (`ROW` series) | Yes | Reference Hardware ( `CSOW 4963TWCE-80`). |
 | Washing Machine / Washer Dryer | Candy Bianca (`BIANCA`, `BWD` series) | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by Bianca hardware. |
 | Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. |
 
