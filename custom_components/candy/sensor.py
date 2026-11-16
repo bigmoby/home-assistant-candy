@@ -154,6 +154,7 @@ from .const import (
 )
 from .helpers import (
     cycles_remaining,
+    dry_target_label_for_interface,
     get_dryer_error_notification_strings,
     is_washer_dryer,
     supports_autodose,
@@ -451,7 +452,8 @@ class CandyWashDryTargetSensor(CandyBaseSensor):
         status = cast(WashingMachineStatus, self.coordinator.data)
         if status.dry_target is None:
             return None
-        return status.dry_target.label
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        return dry_target_label_for_interface(status.dry_target.code, interface_type)
 
     @property
     def icon(self) -> str:
@@ -1385,11 +1387,13 @@ class CandyWashEstimatedDurationSensor(CandyBaseSensor):
         )
         if dry_target is None:
             device_status = cast(WashingMachineStatus, self.coordinator.data)
-            if (
-                device_status.dry_target is not None
-                and device_status.dry_target.label in DRY_TARGET_DURATIONS
-            ):
-                dry_target = device_status.dry_target.label
+            if device_status.dry_target is not None:
+                interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+                target_label = dry_target_label_for_interface(
+                    device_status.dry_target.code, interface_type
+                )
+                if target_label in DRY_TARGET_DURATIONS:
+                    dry_target = target_label
 
         if program.is_dry:
             dry_duration = DRY_TARGET_DURATIONS.get(dry_target, 0) if dry_target else 0

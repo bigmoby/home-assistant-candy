@@ -102,6 +102,7 @@ from .const import (
 )
 from .helpers import (
     command_settling_delay,
+    dry_target_value_for_interface,
     dryer_device_info,
     is_dualtech,
     is_washer_dryer,
@@ -471,7 +472,8 @@ class WashStartButton(CandyWashButtonBase):
         if state is None or state.state in ("unavailable", "unknown"):
             return 0
         if state.state in DRY_TARGET_TO_VALUE:
-            return DRY_TARGET_TO_VALUE[state.state]
+            interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+            return dry_target_value_for_interface(state.state, interface_type)
         raise ValueError(f"Unknown dry target: {state.state}")
 
     async def async_press(self) -> None:

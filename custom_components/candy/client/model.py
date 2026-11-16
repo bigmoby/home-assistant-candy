@@ -86,13 +86,13 @@ class WashProgramState(StatusCode):
     SPIN = (10, "Spin")
 
 
-# Confirmed via Simply-Fi APK CandyWasherDryerDualTech.dryWithValue (classes4.dex):
-# 0 = none, 1 = extra, 2 = pronto armadio (cupboard), 3 = pronto stiro (iron), 4 = cool-down, 9 = wool dry
+# Confirmed via Simply-Fi APK CNYWasherDryerType (classes4.dex), AIDryerType.java, and live wire DryT:
+# 0 = none, 1 = extra, 2 = pronto stiro (iron), 3 = pronto armadio (cupboard), 4 = cool-down, 9 = wool dry
 class WasherDryerDryTarget(StatusCode):
     NO_DRY = (0, "no_dry")
     EXTRA_DRY = (1, "extra_dry")
-    CUPBOARD_DRY = (2, "cupboard_dry")
-    IRON_DRY = (3, "iron_dry")
+    IRON_DRY = (2, "iron_dry")
+    CUPBOARD_DRY = (3, "cupboard_dry")
     COOLDOWN = (4, "cooldown")
     TIME_120 = (5, "120_minutes")
     TIME_90 = (6, "90_minutes")

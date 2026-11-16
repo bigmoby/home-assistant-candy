@@ -70,6 +70,7 @@ from .const import (
     WATER_HARDNESS_TO_VALUE,
 )
 from .helpers import (
+    dry_target_label_for_interface,
     dryer_device_info,
     is_dualtech,
     is_washer_dryer,
@@ -388,14 +389,18 @@ class CandyWashDrySelect(CandyWashSelectBase):
     @property
     def current_option(self) -> str | None:
         opts = self.options
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
         if not self._machine_is_idle():
             status = cast(WashingMachineStatus, self.coordinator.data)
             if (
                 status.dry_target is not None
                 and status.dry_target != WasherDryerDryTarget.COOLDOWN
             ):
-                if status.dry_target.label in opts:
-                    return status.dry_target.label
+                target_label = dry_target_label_for_interface(
+                    status.dry_target.code, interface_type
+                )
+                if target_label in opts:
+                    return target_label
             return (
                 DRY_TARGET_NO_DRY
                 if DRY_TARGET_NO_DRY in opts
@@ -410,8 +415,11 @@ class CandyWashDrySelect(CandyWashSelectBase):
             WasherDryerDryTarget.COOLDOWN,
             WasherDryerDryTarget.NO_DRY,
         ):
-            if status.dry_target.label in opts:
-                return status.dry_target.label
+            target_label = dry_target_label_for_interface(
+                status.dry_target.code, interface_type
+            )
+            if target_label in opts:
+                return target_label
 
         current_type = self._active_program_type()
         if current_type == PROGRAM_TYPE_WASHING:

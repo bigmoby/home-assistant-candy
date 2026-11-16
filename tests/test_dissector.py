@@ -187,8 +187,8 @@ def test_decode_registers_washer_dry_target() -> None:
     dry_map = {
         "0": "None",
         "1": "Extra Dry",
-        "2": "Cupboard Dry",
-        "3": "Iron Dry",
+        "2": "Iron Dry (Standard) / Cupboard Dry (DualTech)",
+        "3": "Cupboard Dry (Standard) / Iron Dry (DualTech)",
         "4": "Cooldown",
         "5": "120 min",
         "6": "90 min",

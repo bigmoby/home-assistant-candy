@@ -22,6 +22,8 @@ from custom_components.candy.const import (
 from custom_components.candy.helpers import (
     command_settling_delay,
     cycles_remaining,
+    dry_target_label_for_interface,
+    dry_target_value_for_interface,
     dryer_device_info,
     get_appliance_error_notification_strings,
     get_dryer_error_notification_strings,
@@ -382,3 +384,53 @@ def test_is_washer_dryer_corrupt_programs():
         data={CONF_KEY_PROGRAMS: [{"invalid": "format"}]},
     )
     assert is_washer_dryer(entry, None) is False
+
+
+@pytest.mark.parametrize(
+    ("target", "interface_type", "expected"),
+    [
+        # Standard platform (RapidÓ, Bianca, Smart Pro, AXI)
+        ("no_dry", "RAPIDO_4DIG_STM", 0),
+        ("extra_dry", "RAPIDO_4DIG_STM", 1),
+        ("iron_dry", "RAPIDO_4DIG_STM", 2),
+        ("cupboard_dry", "RAPIDO_4DIG_STM", 3),
+        ("120_minutes", "BIANCA_TOUCH", 5),
+        ("unknown_target", "RAPIDO_4DIG_STM", 0),
+        # DualTech platform (3D_DUAL)
+        ("no_dry", "3D_DUAL", 0),
+        ("extra_dry", "3D_DUAL", 1),
+        ("cupboard_dry", "3D_DUAL", 2),
+        ("iron_dry", "3D_DUAL", 3),
+        ("120_minutes", "3D_DUAL_NEL", 5),
+        ("unknown_target", "3D_DUAL", 0),
+    ],
+)
+def test_dry_target_value_for_interface(
+    target: str, interface_type: str | None, expected: int
+) -> None:
+    assert dry_target_value_for_interface(target, interface_type) == expected
+
+
+@pytest.mark.parametrize(
+    ("code", "interface_type", "expected"),
+    [
+        # Standard platform (RapidÓ, Bianca, Smart Pro, AXI)
+        (0, "RAPIDO_4DIG_STM", "no_dry"),
+        (1, "RAPIDO_4DIG_STM", "extra_dry"),
+        (2, "RAPIDO_4DIG_STM", "iron_dry"),
+        (3, "RAPIDO_4DIG_STM", "cupboard_dry"),
+        (5, "BIANCA_TOUCH", "120_minutes"),
+        (99, "RAPIDO_4DIG_STM", "no_dry"),
+        # DualTech platform (3D_DUAL)
+        (0, "3D_DUAL", "no_dry"),
+        (1, "3D_DUAL", "extra_dry"),
+        (2, "3D_DUAL", "cupboard_dry"),
+        (3, "3D_DUAL", "iron_dry"),
+        (5, "3D_DUAL_NEL", "120_minutes"),
+        (99, "3D_DUAL", "no_dry"),
+    ],
+)
+def test_dry_target_label_for_interface(
+    code: int, interface_type: str | None, expected: str
+) -> None:
+    assert dry_target_label_for_interface(code, interface_type) == expected

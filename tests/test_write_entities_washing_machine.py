@@ -4232,7 +4232,25 @@ async def test_start_button_sends_command_wd_wash_and_dry(
     assert "StSt=1" in query_string
     assert "PrNm=1" in query_string
     assert "PrCode=65" in query_string
-    assert "Dry=3" in query_string
+    assert "Dry=2" in query_string
+
+    # Also verify cupboard_dry sends Dry=3
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": dry_id, "option": DRY_TARGET_CUPBOARD_DRY},
+        blocking=True,
+    )
+    with patch(
+        "custom_components.candy.client.CandyClient.send_command",
+        new_callable=AsyncMock,
+    ) as mock_send_cupboard:
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_id}, blocking=True
+        )
+    mock_send_cupboard.assert_called_once()
+    qs_cupboard: str = mock_send_cupboard.call_args[0][0]
+    assert "Dry=3" in qs_cupboard
 
 
 async def test_start_button_sends_command_wd_drying(
@@ -4651,7 +4669,7 @@ async def test_estimated_duration_delayed_start_falls_back_to_telemetry_dry_targ
     delayed_json = (
         _IDLE_JSON.replace('"MachMd": "1"', '"MachMd": "5"')
         .replace('"DelVal": "0"', '"DelVal": "60"')
-        .replace('"statusLavatrice": {', '"statusLavatrice": {"DryT": "2", ')
+        .replace('"statusLavatrice": {', '"statusLavatrice": {"DryT": "3", ')
     )
 
     entry = await _init_full_control_wd(

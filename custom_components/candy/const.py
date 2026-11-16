@@ -150,9 +150,37 @@ DRY_TARGET_OPTIONS_ONLY_DRY: list[str] = [
     DRY_TARGET_30_MIN,
 ]
 
+# Standard washer-dryer register mapping (Bianca, RapidÓ, Smart Pro, AXI, etc.)
+# Confirmed via Simply-Fi APK CNYWasherDryerType (classes4.dex), AIDryerType.java, and live wire DryT:
+# 0 = none, 1 = extra, 2 = pronto stiro (iron), 3 = pronto armadio (cupboard), 4 = cooldown, 9 = wool dry
+DRY_TARGET_TO_VALUE: dict[str, int] = {
+    DRY_TARGET_NO_DRY: 0,
+    DRY_TARGET_EXTRA_DRY: 1,
+    DRY_TARGET_IRON_DRY: 2,
+    DRY_TARGET_CUPBOARD_DRY: 3,
+    DRY_TARGET_120_MIN: 5,
+    DRY_TARGET_90_MIN: 6,
+    DRY_TARGET_60_MIN: 7,
+    DRY_TARGET_30_MIN: 8,
+    DRY_TARGET_WOOL_DRY: 9,
+}
+
+VALUE_TO_DRY_TARGET: dict[int, str] = {
+    0: DRY_TARGET_NO_DRY,
+    1: DRY_TARGET_EXTRA_DRY,
+    2: DRY_TARGET_IRON_DRY,
+    3: DRY_TARGET_CUPBOARD_DRY,
+    5: DRY_TARGET_120_MIN,
+    6: DRY_TARGET_90_MIN,
+    7: DRY_TARGET_60_MIN,
+    8: DRY_TARGET_30_MIN,
+    9: DRY_TARGET_WOOL_DRY,
+}
+
+# DualTech washer-dryer register mapping (3D_DUAL, DUALTECH)
 # Confirmed via Simply-Fi APK CandyWasherDryerDualTech.dryWithValue (classes4.dex):
 # 0 = none, 1 = extra, 2 = pronto armadio (cupboard), 3 = pronto stiro (iron), 4 = cooldown, 9 = wool dry
-DRY_TARGET_TO_VALUE: dict[str, int] = {
+DUALTECH_DRY_TARGET_TO_VALUE: dict[str, int] = {
     DRY_TARGET_NO_DRY: 0,
     DRY_TARGET_EXTRA_DRY: 1,
     DRY_TARGET_CUPBOARD_DRY: 2,
@@ -162,6 +190,18 @@ DRY_TARGET_TO_VALUE: dict[str, int] = {
     DRY_TARGET_60_MIN: 7,
     DRY_TARGET_30_MIN: 8,
     DRY_TARGET_WOOL_DRY: 9,
+}
+
+DUALTECH_VALUE_TO_DRY_TARGET: dict[int, str] = {
+    0: DRY_TARGET_NO_DRY,
+    1: DRY_TARGET_EXTRA_DRY,
+    2: DRY_TARGET_CUPBOARD_DRY,
+    3: DRY_TARGET_IRON_DRY,
+    5: DRY_TARGET_120_MIN,
+    6: DRY_TARGET_90_MIN,
+    7: DRY_TARGET_60_MIN,
+    8: DRY_TARGET_30_MIN,
+    9: DRY_TARGET_WOOL_DRY,
 }
 
 # Programs on DualTech dial bezel representing maintenance/parking slots, hidden from UI selection

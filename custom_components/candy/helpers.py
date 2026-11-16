@@ -27,8 +27,12 @@ from .const import (
     DEVICE_NAME_WASHER_DRYER,
     DEVICE_NAME_WASHING_MACHINE,
     DOMAIN,
+    DRY_TARGET_TO_VALUE,
+    DUALTECH_DRY_TARGET_TO_VALUE,
+    DUALTECH_VALUE_TO_DRY_TARGET,
     MODE_FULL_CONTROL,
     SUGGESTED_AREA_BATHROOM,
+    VALUE_TO_DRY_TARGET,
 )
 
 _NOTIFICATION_STRINGS: dict[str, dict[str, str]] = json.loads(
@@ -62,6 +66,20 @@ def is_dualtech(interface_type: str | None) -> bool:
 def is_dualtech_dryer(interface_type: str | None) -> bool:
     """Return True if the interface_type belongs to a DualTech tumble dryer."""
     return is_dualtech_dryer_interface(interface_type)
+
+
+def dry_target_value_for_interface(target_name: str, interface_type: str | None) -> int:
+    """Return numeric wire parameter value for drying target and interface type."""
+    if is_dualtech(interface_type):
+        return DUALTECH_DRY_TARGET_TO_VALUE.get(target_name, 0)
+    return DRY_TARGET_TO_VALUE.get(target_name, 0)
+
+
+def dry_target_label_for_interface(raw_code: int, interface_type: str | None) -> str:
+    """Return drying target label string for raw telemetry code and interface type."""
+    if is_dualtech(interface_type):
+        return DUALTECH_VALUE_TO_DRY_TARGET.get(raw_code, "no_dry")
+    return VALUE_TO_DRY_TARGET.get(raw_code, "no_dry")
 
 
 def command_settling_delay(interface_type: str | None) -> int:
