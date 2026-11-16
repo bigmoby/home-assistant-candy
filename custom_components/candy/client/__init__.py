@@ -370,7 +370,7 @@ async def detect_encryption(
                     "Brute force decryption key from the encrypted response..."
                 )
                 _LOGGER.debug("Response: %s", resp_hex)
-                key = find_key(bytes.fromhex(resp_hex))
+                key = await asyncio.to_thread(find_key, bytes.fromhex(resp_hex))
                 if key is None:
                     raise ValueError("Couldn't brute force key") from json_err
 

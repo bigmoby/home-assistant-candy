@@ -214,11 +214,7 @@ def _match_appliance(
                 "ensure the device is registered in the Simply-Fi app."
             )
 
-    encryption_key = matched.get("encryption_key", "")
-    if not encryption_key:
-        raise SimplyFiCloudError(
-            "Appliance data missing encryption_key — cannot proceed with Full Control setup"
-        )
+    encryption_key = matched.get("encryption_key") or ""
 
     programs = matched.get("programs", [])
     if not programs:

@@ -587,8 +587,8 @@ async def test_full_control_flow(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     data = result["data"]
     assert data[CONF_KEY_MODE] == MODE_FULL_CONTROL
-    assert data[CONF_KEY_USE_ENCRYPTION] is True
-    assert data[CONF_PASSWORD] == "testenckey"
+    assert data[CONF_KEY_USE_ENCRYPTION] is False
+    assert data.get(CONF_PASSWORD, "") == ""
     assert data[CONF_KEY_DEVICE_MODEL] == "RO41274DWMSE/1-S"
     assert data[CONF_KEY_SERIAL_NUMBER] == "1234567890123456"
     assert len(data[CONF_KEY_PROGRAMS]) == 1
@@ -596,6 +596,51 @@ async def test_full_control_flow(
     # Credentials must NOT be stored
     assert "email" not in data
     assert "password_plain" not in data
+
+
+async def test_full_control_flow_preserves_discovered_local_key(
+    hass, no_discovery, detect_encryption_find_key, mock_cloud_success
+):
+    """Full Control flow preserves locally discovered XOR key instead of cloud key."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+    )
+    assert result["step_id"] == "mode"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+    )
+    assert result["step_id"] == "cloud"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={"email": "user@example.com", "password": "pass"}
+    )
+    assert result["step_id"] == "language"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+    )
+    assert result["step_id"] == "maintenance"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_MAINTENANCE_ENABLED: False}
+    )
+    assert result["step_id"] == "checkup"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={CONF_KEY_CHECKUP_ENABLED: False}
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    data = result["data"]
+    assert data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+    assert data[CONF_KEY_USE_ENCRYPTION] is True
+    # "testkey" is discovered locally by detect_encryption_find_key;
+    # "testenckey" from mock cloud must not overwrite it.
+    assert data[CONF_PASSWORD] == "testkey"
 
 
 async def test_full_control_cloud_error(
@@ -1477,7 +1522,8 @@ async def test_options_flow_full_control_update_cloud_data_success(
     )
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     updated = hass.config_entries.async_get_entry(entry.entry_id)
-    assert updated.data[CONF_PASSWORD] == "testenckey"  # from _MOCK_APPLIANCE
+    assert updated.data[CONF_PASSWORD] == "key"  # Preserved from existing entry
+    assert updated.data[CONF_KEY_USE_ENCRYPTION] is True
     assert updated.data[CONF_KEY_DEVICE_MODEL] == "RO41274DWMSE/1-S"
 
 

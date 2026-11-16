@@ -109,9 +109,14 @@ def test_match_appliance_no_match_multiple():
 
 
 def test_match_appliance_missing_encryption_key():
+    """Missing or empty encryption_key in cloud data is allowed (local transport governs)."""
     appliances = [_appliance_entry(ip="10.0.0.1", key="")]
-    with pytest.raises(SimplyFiCloudError, match="missing encryption_key"):
-        _match_appliance(appliances, "10.0.0.1", [])
+    result = _match_appliance(appliances, "10.0.0.1", [])
+    assert result.encryption_key == ""
+
+    appliances_none = [_appliance_entry(ip="10.0.0.1", key=None)]
+    result_none = _match_appliance(appliances_none, "10.0.0.1", [])
+    assert result_none.encryption_key == ""
 
 
 def test_match_appliance_missing_programs():

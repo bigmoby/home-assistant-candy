@@ -626,7 +626,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         new_data = dict(self.config_entry.data)
         new_data[CONF_KEY_MODE] = MODE_FULL_CONTROL
-        if appliance.encryption_key:
+        if (
+            CONF_KEY_USE_ENCRYPTION not in self.config_entry.data
+            and appliance.encryption_key
+        ):
             new_data[CONF_KEY_USE_ENCRYPTION] = True
             new_data[CONF_PASSWORD] = appliance.encryption_key
         if appliance.mac_address:
@@ -933,7 +936,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             )
 
         # Credentials are NOT stored — only the fetched appliance data
-        if appliance.encryption_key:
+        # Device transport (encryption mode and local key) is detected and verified
+        # during local setup; do not overwrite working local transport with cloud keys.
+        if (
+            CONF_KEY_USE_ENCRYPTION not in self._config_data
+            and appliance.encryption_key
+        ):
             self._config_data[CONF_KEY_USE_ENCRYPTION] = True
             self._config_data[CONF_PASSWORD] = appliance.encryption_key
         if appliance.mac_address:
