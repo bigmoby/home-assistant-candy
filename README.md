@@ -23,7 +23,7 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
 - **Full Remote Control:** Complete interactive control panel for **washing machines**, **washer-dryer combos** and **tumble dryers** (see the [compatibility matrix](#compatibility-note) for supported and tested models). Select localized programs, adjust wash & dry parameters (temp, spin speed, soil level, drying mode), start/pause/stop cycles, and track remote status.
 - **Zero-Config Decryption:** Say goodbye to manually extracting encryption keys. This integration boasts a natively built-in *sliding-window/known-plaintext* algorithm that unlocks your device seamlessly in fractions of a second during setup.
 - **Strict HA Compatibility:** Follows the rigorous MyPy styling standards enforced by Home Assistant 2025.
-- Uses the local device API for real-time responsiveness. 
+- Uses the local device API for real-time responsiveness.
 - Creates dedicated, native semantic sensors (e.g., remaining time, current status, machine cycle) and exposes granular information cleanly as sensor attributes.
 - **Intelligent Fault Notifications & Error Handling:** Intercepts appliance error codes and shows persistent Home Assistant notifications with authentic vendor troubleshooting steps
 - **Automated Maintenance Notifications:** Show reminders when check-up, descaling, or filter cleaning are due, provides preparation advice on cycle start, and automatically resets baselines upon completion.
@@ -37,7 +37,7 @@ Full Control mode turns the integration into an interactive remote panel for **w
 *Washing Machine Example*
 <p float="left">
   <img src="docs/images/dashboard_washing_machine.png" width="300" />
-  <img src="docs/images/dashboard_maintenance.png" width="300" /> 
+  <img src="docs/images/dashboard_maintenance.png" width="300" />
 </p>
 
 ### What it provides
@@ -67,7 +67,7 @@ The remote control functionality has been implemented for several physical appli
 | Washing Machine | Candy RapidÓ (`RAPIDO`, `RAPIDO_4DIG_STM_NEL`) | Yes | Reference hardware (`RO41274DWMSE/1-S`).|
 | Washing Machine / Washer Dryer | Hoover AXI (`red_devil_axi*`, `hwash700`) | Yes | Reference hardware (`AWMPD 410LH8/1-S` and `AWDPD4138LHR/1`). |
 | Tumble Dryer | DualTech (`TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL`) | Yes | Reference hardware (`GVS H9A2TCE-80`). |
-| Washing Machine / Washer Dryer | DualTech (`3D_DUAL`, `4D_DUAL`, `DUALTECH`) | Yes | Tested on `3D_DUAL` hardware. Remote pause and stats counters are unsupported by hardware. |
+| Washing Machine / Washer Dryer | DualTech (`3D_DUAL`, `4D_DUAL`, `DUALTECH`) | Yes | Tested on `3D_DUAL` hardware. Remote pause is unsupported by hardware. |
 | Washer Dryer | Candy RapidÓ (`ROW` series) | Yes | Reference Hardware ( `CSOW 4963TWCE-80`). |
 | Washing Machine / Washer Dryer | Candy Bianca (`BIANCA`, `BWD` series) | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by Bianca hardware. |
 | Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. |
