@@ -359,13 +359,17 @@ class DishwasherStatus:
     @classmethod
     def from_json(cls, json):
         machine_state = DishwasherStatus.parse_machine_state(json)
-        running = (
-            json.get("StartStop") == "1"
-            and machine_state is not DishwasherState.FINISHED
-        )
-        if "r2" in json and machine_state is DishwasherState.IDLE:
-            # StartStop can stay 1 on a ready machine after a remote cycle
-            running = False
+        if "r2" in json:
+            # StartStop is not reliable on these firmwares (see parse_machine_state)
+            running = machine_state not in (
+                DishwasherState.IDLE,
+                DishwasherState.FINISHED,
+            )
+        else:
+            running = (
+                json.get("StartStop") == "1"
+                and machine_state is not DishwasherState.FINISHED
+            )
         return cls(
             running=running,
             half_load=json.get("MetaCarico") == "1",
@@ -392,27 +396,25 @@ class DishwasherStatus:
     def parse_machine_state(json) -> DishwasherState:
         """Parse the cycle state.
 
-        Firmwares reporting r2 (e.g. CDIN 1D360PB) use StatoDWash for the
-        machine state (2 ready, 3 running, 5 finished) and r2 for the phase,
-        with the usual codes (0 waiting for a delayed start). StartStop stays 1
-        after the end of a remotely started cycle, until the next command.
+        Firmwares reporting r2 (e.g. CDIN 1D360PB, CDPN 4D620PX) use StatoDWash
+        for the machine state (2 ready, 3 running, 5 finished) and r2 for the
+        phase, with the usual codes (0 waiting for a delayed start).
+
+        StartStop is not used here: it stays 1 after the end of a remotely
+        started cycle, and it can be 0 while a cycle started from the panel
+        is running.
         """
         if "r2" not in json:
             return DishwasherState.from_code(int(json["StatoDWash"]))
         if json["StatoDWash"] == "5" or json["r2"] == "5":
             return DishwasherState.FINISHED
-        if json.get("StartStop") != "1":
+        if json["StatoDWash"] != "3":
             return DishwasherState.IDLE
         if json["r2"] == "0":
-            # Waiting for a delayed start reports StatoDWash 3 (running). With
-            # another StatoDWash, StartStop is a leftover from the last cycle.
-            if json["StatoDWash"] == "3":
-                return DishwasherState.DELAYED_START
-            return DishwasherState.IDLE
-        try:
+            return DishwasherState.DELAYED_START
+        if json["r2"] in ("1", "2", "3", "4"):
             return DishwasherState.from_code(int(json["r2"]))
-        except ValueError:
-            return DishwasherState.WASH
+        return DishwasherState.WASH
 
     @staticmethod
     def parse_program(json) -> str:
