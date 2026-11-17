@@ -211,6 +211,26 @@ async def test_start_available_with_stale_start_stop(
     )
 
 
+async def test_cycle_started_from_panel(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """A cycle started from the panel reports StartStop=0 while running."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, StatoDWash="3", StartStop="0", r2="2", RemTime="115"),
+    )
+
+    assert hass.states.get("sensor.dishwasher").state == "Wash"
+    assert hass.states.get("sensor.dishwasher_remaining_time").state == "115"
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) == (
+        "unavailable"
+    )
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_STOP_BUTTON) != (
+        "unavailable"
+    )
+
+
 async def test_buttons_unavailable_without_remote_control(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
@@ -396,6 +416,16 @@ def test_start_command_delay_rounds_to_steps():
         ),
         # Unknown phase code while running
         ({"StartStop": "1", "StatoDWash": "3", "r2": "9"}, DishwasherState.WASH, True),
+        # Code 6 is the synthetic delayed start state, not a phase
+        ({"StartStop": "1", "StatoDWash": "3", "r2": "6"}, DishwasherState.WASH, True),
+        # CDPN 4D620PX: cycle started from the panel, StartStop is 0 (issue #19)
+        ({"StartStop": "0", "StatoDWash": "3", "r2": "2"}, DishwasherState.WASH, True),
+        # CDPN 4D620PX: finished, door open (issue #19)
+        (
+            {"StartStop": "1", "StatoDWash": "5", "r2": "5", "OpenDoor": "1"},
+            DishwasherState.FINISHED,
+            False,
+        ),
         # StartStop left at 1 after a remote cycle, machine ready again
         ({"StartStop": "1", "StatoDWash": "2", "r2": "0"}, DishwasherState.IDLE, False),
         ({"StartStop": "1", "StatoDWash": "1", "r2": "0"}, DishwasherState.IDLE, False),
