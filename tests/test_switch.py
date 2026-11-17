@@ -156,6 +156,9 @@ async def test_async_setup_entry_not_full_control(hass: HomeAssistant) -> None:
         entry_id="test_entry_ro",
         data={CONF_KEY_MODE: MODE_READ_ONLY},
     )
+    coord = MagicMock(spec=DataUpdateCoordinator)
+    coord.data = MagicMock(spec=WashingMachineStatus)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {DATA_KEY_COORDINATOR: coord}
     async_add_entities = MagicMock()
     await async_setup_entry(hass, entry, async_add_entities)
     async_add_entities.assert_not_called()

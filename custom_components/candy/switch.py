@@ -21,7 +21,7 @@ from .client import (
     WashingMachineWashProgram,
     parse_wash_programs,
 )
-from .client.model import MachineState
+from .client.model import DishwasherStatus, MachineState
 from .const import (
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MODE,
@@ -40,6 +40,7 @@ from .const import (
     WASH_OPTIONS,
 )
 from .coordinator import CandyDataUpdateCoordinator
+from .dishwasher import dishwasher_switches
 from .helpers import remote_control_enabled, supports_autodose, wash_device_info
 
 
@@ -47,13 +48,17 @@ async def async_setup_entry(
     hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities
 ) -> None:
     config_id = config_entry.entry_id
+    coordinator: CandyDataUpdateCoordinator = hass.data[DOMAIN][config_id][
+        DATA_KEY_COORDINATOR
+    ]
+
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_switches(coordinator, config_entry))
+        return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: CandyDataUpdateCoordinator = hass.data[DOMAIN][config_id][
-        DATA_KEY_COORDINATOR
-    ]
     if not isinstance(coordinator.data, WashingMachineStatus):
         return
 

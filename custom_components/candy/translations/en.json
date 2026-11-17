@@ -208,6 +208,15 @@
       },
       "wash_softener_reserve": {
         "name": "Softener low"
+      },
+      "dishwasher_salt_empty": {
+        "name": "Dishwasher salt empty"
+      },
+      "dishwasher_rinse_aid_empty": {
+        "name": "Dishwasher rinse aid empty"
+      },
+      "dishwasher_door": {
+        "name": "Dishwasher door"
       }
     },
     "sensor": {
@@ -391,6 +400,9 @@
       },
       "tumble_delay": {
         "name": "Dryer delay start"
+      },
+      "dishwasher_error_code": {
+        "name": "Dishwasher error code"
       }
     },
     "light": {
@@ -476,6 +488,21 @@
           "45": "45 minutes",
           "59": "59 minutes"
         }
+      },
+      "dishwasher_program_select": {
+        "name": "Dishwasher program to start",
+        "state": {
+          "panel": "As set on the panel",
+          "eco_45": "ECO 45°C",
+          "intensive_75": "Intensive 75°C",
+          "night_55": "Night 55°C",
+          "universal_60": "Universal 60°C",
+          "auto": "Auto 55-65°C",
+          "glass_45": "Glass 45°C",
+          "zoom_39": "Zoom 39' 60°C",
+          "rapid_24": "Rapid 24' 50°C",
+          "prewash": "Prewash"
+        }
       }
     },
     "number": {
@@ -484,6 +511,9 @@
       },
       "dryer_delay_number": {
         "name": "Delay"
+      },
+      "dishwasher_delay_number": {
+        "name": "Dishwasher start delay"
       }
     },
     "switch": {
@@ -525,6 +555,12 @@
       },
       "wash_extra_dose": {
         "name": "Extra dose"
+      },
+      "dishwasher_eco_switch": {
+        "name": "Dishwasher eco option"
+      },
+      "dishwasher_three_in_one_switch": {
+        "name": "Dishwasher 3in1 tablets"
       }
     },
     "button": {
@@ -542,6 +578,12 @@
       },
       "wash_stop_button": {
         "name": "Stop wash"
+      },
+      "dishwasher_start_button": {
+        "name": "Start dishwasher"
+      },
+      "dishwasher_stop_button": {
+        "name": "Stop dishwasher"
       },
       "wash_full_checkup": {
         "name": "Full check-up"

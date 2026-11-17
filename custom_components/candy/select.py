@@ -26,7 +26,7 @@ from .client import (
     parse_wash_programs,
     resolve_downloadable_programs,
 )
-from .client.model import MachineState, TumbleDryerStatus
+from .client.model import DishwasherStatus, MachineState, TumbleDryerStatus
 from .const import (
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
@@ -69,6 +69,7 @@ from .const import (
     WATER_HARDNESS_OPTIONS,
     WATER_HARDNESS_TO_VALUE,
 )
+from .dishwasher import dishwasher_selects
 from .helpers import (
     dry_target_label_for_interface,
     dryer_device_info,
@@ -87,13 +88,17 @@ async def async_setup_entry(
     hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities
 ) -> None:
     config_id = config_entry.entry_id
+    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
+        DATA_KEY_COORDINATOR
+    ]
+
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_selects(coordinator, config_entry))
+        return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
-        DATA_KEY_COORDINATOR
-    ]
     if isinstance(coordinator.data, TumbleDryerStatus):
         dryer_client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
         raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])

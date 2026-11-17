@@ -1,0 +1,31 @@
+{
+  "statusDWash": {
+    "StatoWiFi": "1",
+    "CodiceErrore": "E0",
+    "StatoDWash": "3",
+    "MetaCarico": "0",
+    "StartStop": "1",
+    "TreinUno": "0",
+    "Eco": "0",
+    "Program": "P17",
+    "ExtraDry": "0",
+    "OpenDoorOpt": "0",
+    "DelayStart": "0",
+    "RemTime": "240",
+    "MissSalt": "0",
+    "MissRinse": "0",
+    "OpenDoor": "0",
+    "Reset": "0",
+    "CheckUp": "0",
+    "r1": "3",
+    "r2": "2",
+    "r3": "1",
+    "r4": "1",
+    "r5": "0",
+    "r6": "1",
+    "r7": "4",
+    "r8": "0",
+    "r9": "NULL",
+    "r15": "1"
+  }
+}

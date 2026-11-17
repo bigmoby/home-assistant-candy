@@ -23,6 +23,7 @@ from .const import (
     CONF_KEY_MODE,
     CONF_KEY_PROGRAMS,
     CONF_KEY_SERIAL_NUMBER,
+    DEVICE_NAME_DISHWASHER,
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WASHER_DRYER,
     DEVICE_NAME_WASHING_MACHINE,
@@ -32,6 +33,7 @@ from .const import (
     DUALTECH_VALUE_TO_DRY_TARGET,
     MODE_FULL_CONTROL,
     SUGGESTED_AREA_BATHROOM,
+    SUGGESTED_AREA_KITCHEN,
     VALUE_TO_DRY_TARGET,
 )
 
@@ -162,13 +164,25 @@ def wash_device_name(config_entry: ConfigEntry) -> str:
 
 
 def wash_device_info(config_entry: ConfigEntry) -> DeviceInfo:
+    return _device_info(
+        config_entry, wash_device_name(config_entry), SUGGESTED_AREA_BATHROOM
+    )
+
+
+def dishwasher_device_info(config_entry: ConfigEntry) -> DeviceInfo:
+    return _device_info(config_entry, DEVICE_NAME_DISHWASHER, SUGGESTED_AREA_KITCHEN)
+
+
+def _device_info(
+    config_entry: ConfigEntry, name: str, suggested_area: str
+) -> DeviceInfo:
     brand = config_entry.data.get(CONF_KEY_BRAND, "candy")
     manufacturer = brand.capitalize() if brand else "Candy"
     info = DeviceInfo(
         identifiers={(DOMAIN, config_entry.entry_id)},
-        name=wash_device_name(config_entry),
+        name=name,
         manufacturer=manufacturer,
-        suggested_area=SUGGESTED_AREA_BATHROOM,
+        suggested_area=suggested_area,
     )
     if config_entry.data.get(CONF_KEY_MAC_ADDRESS):
         info["connections"] = {

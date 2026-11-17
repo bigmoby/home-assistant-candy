@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .client import CandyClient, WashingMachineStatus
-from .client.model import MachineState, TumbleDryerStatus
+from .client.model import DishwasherStatus, MachineState, TumbleDryerStatus
 from .const import (
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MODE,
@@ -24,6 +24,7 @@ from .const import (
     UNIQUE_ID_TUMBLE_DELAY_NUMBER,
     UNIQUE_ID_WASH_DELAY_NUMBER,
 )
+from .dishwasher import dishwasher_numbers
 from .helpers import (
     dryer_device_info,
     is_dualtech,
@@ -36,13 +37,17 @@ async def async_setup_entry(
     hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities
 ) -> None:
     config_id = config_entry.entry_id
+    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
+        DATA_KEY_COORDINATOR
+    ]
+
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_numbers(coordinator, config_entry))
+        return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
-        DATA_KEY_COORDINATOR
-    ]
     if isinstance(coordinator.data, WashingMachineStatus):
         client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
         async_add_entities([WashDelayNumber(coordinator, config_entry, client)])

@@ -5028,6 +5028,7 @@ async def test_button_setup_entry_unsupported_coordinator_data(
     coordinator.data = None
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "coordinator": coordinator,
+        "client": MagicMock(),
     }
     added_entities = []
     await async_setup_entry(hass, entry, added_entities.append)

@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .client.model import TumbleDryerStatus, WashingMachineStatus
+from .client.model import DishwasherStatus, TumbleDryerStatus, WashingMachineStatus
 from .const import (
     CONF_KEY_INTERFACE_TYPE,
     DATA_KEY_COORDINATOR,
@@ -28,6 +28,7 @@ from .const import (
     UNIQUE_ID_WASH_SOFTENER_EMPTY,
     UNIQUE_ID_WASH_SOFTENER_RESERVE,
 )
+from .dishwasher import dishwasher_binary_sensors
 from .helpers import dryer_device_info, supports_autodose, wash_device_info
 
 
@@ -39,7 +40,9 @@ async def async_setup_entry(
     config_id = config_entry.entry_id
     coordinator = hass.data[DOMAIN][config_id][DATA_KEY_COORDINATOR]
 
-    if isinstance(coordinator.data, WashingMachineStatus):
+    if isinstance(coordinator.data, DishwasherStatus):
+        async_add_entities(dishwasher_binary_sensors(coordinator, config_entry))
+    elif isinstance(coordinator.data, WashingMachineStatus):
         entities: list[BinarySensorEntity] = [
             CandyWashRemoteControlBinarySensor(coordinator, config_entry)
         ]

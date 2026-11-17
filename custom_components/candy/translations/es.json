@@ -85,6 +85,12 @@
       },
       "wash_stop_button": {
         "name": "Detener lavado"
+      },
+      "dishwasher_start_button": {
+        "name": "Iniciar lavavajillas"
+      },
+      "dishwasher_stop_button": {
+        "name": "Detener lavavajillas"
       }
     }
   },

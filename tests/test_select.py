@@ -18,10 +18,10 @@ from custom_components.candy.client import (
     parse_wash_programs,
 )
 from custom_components.candy.client.model import (
-    DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
     MachineState,
+    OvenStatus,
     TumbleDryerStatus,
     WashProgramState,
 )
@@ -283,11 +283,11 @@ async def test_async_setup_entry_non_washer_non_dryer(
     """Setup returns early when coordinator data is not WashingMachineStatus (line 143)."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        entry_id="dishwasher_entry",
+        entry_id="oven_entry",
         data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coord = MagicMock(spec=DataUpdateCoordinator)
-    coord.data = MagicMock(spec=DishwasherStatus)
+    coord.data = MagicMock(spec=OvenStatus)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         DATA_KEY_COORDINATOR: coord,
         DATA_KEY_CLIENT: mock_client,
