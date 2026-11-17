@@ -419,6 +419,7 @@ def test_dry_target_value_for_interface(
         (1, "RAPIDO_4DIG_STM", "extra_dry"),
         (2, "RAPIDO_4DIG_STM", "iron_dry"),
         (3, "RAPIDO_4DIG_STM", "cupboard_dry"),
+        (4, "RAPIDO_4DIG_STM", "cooldown"),
         (5, "BIANCA_TOUCH", "120_minutes"),
         (99, "RAPIDO_4DIG_STM", "no_dry"),
         # DualTech platform (3D_DUAL)
@@ -426,6 +427,7 @@ def test_dry_target_value_for_interface(
         (1, "3D_DUAL", "extra_dry"),
         (2, "3D_DUAL", "cupboard_dry"),
         (3, "3D_DUAL", "iron_dry"),
+        (4, "3D_DUAL", "cooldown"),
         (5, "3D_DUAL_NEL", "120_minutes"),
         (99, "3D_DUAL", "no_dry"),
     ],

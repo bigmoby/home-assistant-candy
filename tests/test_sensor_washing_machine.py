@@ -1153,6 +1153,31 @@ async def test_washer_dryer_sensor_wool_dry_target(
     assert dry_target_state.state == "wool_dry"
 
 
+async def test_washer_dryer_sensor_cooldown_target(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test washer dryer dry target sensor reports cooldown when DryT is 4."""
+    fixture = load_fixture("washing_machine/idle.json").replace(
+        '"DryT": "0"', '"DryT": "4"'
+    )
+    await init_integration(
+        hass,
+        aioclient_mock,
+        fixture,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={
+            CONF_KEY_IS_WASHER_DRYER: True,
+            CONF_KEY_BRAND: "hoover",
+        },
+    )
+
+    dry_target_state = hass.states.get(
+        "sensor.washer_dryer_dry_target"
+    ) or hass.states.get("sensor.dry_target")
+    assert dry_target_state is not None
+    assert dry_target_state.state == "cooldown"
+
+
 async def test_washer_dryer_sensor_not_created_for_washing_machine(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):

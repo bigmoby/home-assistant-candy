@@ -128,6 +128,8 @@ DRY_TARGET_90_MIN = "90_minutes"
 DRY_TARGET_60_MIN = "60_minutes"
 DRY_TARGET_30_MIN = "30_minutes"
 DRY_TARGET_WOOL_DRY = "wool_dry"
+# Reported by the appliance during the cool-down phase, never sent as a target
+DRY_TARGET_COOLDOWN = "cooldown"
 
 DRY_TARGET_OPTIONS_FULL: list[str] = [
     DRY_TARGET_NO_DRY,
@@ -170,6 +172,7 @@ VALUE_TO_DRY_TARGET: dict[int, str] = {
     1: DRY_TARGET_EXTRA_DRY,
     2: DRY_TARGET_IRON_DRY,
     3: DRY_TARGET_CUPBOARD_DRY,
+    4: DRY_TARGET_COOLDOWN,
     5: DRY_TARGET_120_MIN,
     6: DRY_TARGET_90_MIN,
     7: DRY_TARGET_60_MIN,
@@ -197,6 +200,7 @@ DUALTECH_VALUE_TO_DRY_TARGET: dict[int, str] = {
     1: DRY_TARGET_EXTRA_DRY,
     2: DRY_TARGET_CUPBOARD_DRY,
     3: DRY_TARGET_IRON_DRY,
+    4: DRY_TARGET_COOLDOWN,
     5: DRY_TARGET_120_MIN,
     6: DRY_TARGET_90_MIN,
     7: DRY_TARGET_60_MIN,
