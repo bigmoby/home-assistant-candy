@@ -14,7 +14,12 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import voluptuous as vol
 
-from .client.model import MachineState, WashingMachineStatistics, WashingMachineStatus
+from .client.model import (
+    MachineState,
+    TumbleDryerStatus,
+    WashingMachineStatistics,
+    WashingMachineStatus,
+)
 from .const import (
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
@@ -36,6 +41,10 @@ TRIGGER_TYPES = frozenset(
     {
         "washing_started",
         "washing_completed",
+        "drying_started",
+        "drying_completed",
+        "clean_filter_needed",
+        "water_tank_full",
         "error_reported",
         "maintenance_full_checkup_due",
         "maintenance_limescale_due",
@@ -54,10 +63,17 @@ def _config_entry_id_for_device(hass: HomeAssistant, device_id: str) -> str | No
     device = dr.async_get(hass).async_get(device_id)
     if device is None:
         return None
-    for entry_id in device.config_entries:
-        entry = hass.config_entries.async_get_entry(entry_id)
+    if hasattr(device, "config_entry_id"):
+        entry_id = device.config_entry_id
+        if entry_id is not None:
+            entry = hass.config_entries.async_get_entry(entry_id)
+            if entry is not None and entry.domain == DOMAIN:
+                return entry_id
+        return None
+    for eid in getattr(device, "config_entries", ()):
+        entry = hass.config_entries.async_get_entry(eid)
         if entry is not None and entry.domain == DOMAIN:
-            return entry_id
+            return eid
     return None
 
 
@@ -82,7 +98,9 @@ async def async_get_triggers(
     coordinator = (
         hass.data.get(DOMAIN, {}).get(config_entry_id, {}).get(DATA_KEY_COORDINATOR)
     )
-    if coordinator is None or not isinstance(coordinator.data, WashingMachineStatus):
+    if coordinator is None or not isinstance(
+        coordinator.data, (WashingMachineStatus, TumbleDryerStatus)
+    ):
         return []
 
     base: dict[str, Any] = {
@@ -90,6 +108,15 @@ async def async_get_triggers(
         CONF_DOMAIN: DOMAIN,
         CONF_DEVICE_ID: device_id,
     }
+
+    if isinstance(coordinator.data, TumbleDryerStatus):
+        return [
+            {**base, CONF_TYPE: "drying_started"},
+            {**base, CONF_TYPE: "drying_completed"},
+            {**base, CONF_TYPE: "clean_filter_needed"},
+            {**base, CONF_TYPE: "water_tank_full"},
+            {**base, CONF_TYPE: "error_reported"},
+        ]
 
     triggers = [
         {**base, CONF_TYPE: "washing_started"},
@@ -140,20 +167,29 @@ async def async_attach_trigger(
     }
     job = HassJob(action, f"candy device trigger {trigger_type}")
 
-    if trigger_type in {"washing_started", "washing_completed", "error_reported"}:
+    @callback
+    def _fire() -> None:
+        hass.async_run_hass_job(job, {"trigger": trigger_variables})
+
+    if trigger_type in {
+        "washing_started",
+        "washing_completed",
+        "drying_started",
+        "drying_completed",
+        "error_reported",
+    }:
         return _attach_state_trigger(
             hass, coordinator, trigger_type, trigger_variables, job
         )
+
+    if trigger_type in {"clean_filter_needed", "water_tank_full"}:
+        return _attach_dryer_warning_trigger(coordinator, trigger_type, _fire)
 
     stats_coordinator: DataUpdateCoordinator[Any] | None = domain_data.get(
         DATA_KEY_STATS_COORDINATOR
     )
     if stats_coordinator is None:
         return lambda: None
-
-    @callback
-    def _fire() -> None:
-        hass.async_run_hass_job(job, {"trigger": trigger_variables})
 
     return _attach_maintenance_trigger(stats_coordinator, entry, trigger_type, _fire)
 
@@ -165,32 +201,65 @@ def _attach_state_trigger(
     trigger_variables: dict[str, Any],
     job: HassJob,
 ) -> CALLBACK_TYPE:
-    initial = cast(WashingMachineStatus | None, coordinator.data)
+    initial = cast(WashingMachineStatus | TumbleDryerStatus | None, coordinator.data)
     prev_state: list[MachineState | None] = [
         initial.machine_state if initial is not None else None
     ]
 
     @callback
     def _on_update() -> None:
-        status = cast(WashingMachineStatus | None, coordinator.data)
+        status = cast(WashingMachineStatus | TumbleDryerStatus | None, coordinator.data)
         if status is None:
             return
         curr = status.machine_state
         prev = prev_state[0]
         prev_state[0] = curr
 
-        if trigger_type == "washing_started":
+        if trigger_type in {"washing_started", "drying_started"}:
             should_fire = curr == MachineState.RUNNING and prev not in {
                 MachineState.RUNNING,
                 MachineState.PAUSED,
             }
-        elif trigger_type == "washing_completed":
+        elif trigger_type in {"washing_completed", "drying_completed"}:
             should_fire = curr in _FINISHED_STATES and prev not in _FINISHED_STATES
         else:  # error_reported
             should_fire = curr == MachineState.ERROR and prev != MachineState.ERROR
 
         if should_fire:
             hass.async_run_hass_job(job, {"trigger": trigger_variables})
+
+    return coordinator.async_add_listener(_on_update)
+
+
+def _attach_dryer_warning_trigger(
+    coordinator: DataUpdateCoordinator[Any],
+    trigger_type: str,
+    fire: Callable[[], None],
+) -> CALLBACK_TYPE:
+    initial = cast(TumbleDryerStatus | None, coordinator.data)
+    initial_val = False
+    if initial is not None:
+        if trigger_type == "clean_filter_needed":
+            initial_val = initial.need_clean_filter
+        else:
+            initial_val = initial.water_tank_full
+
+    prev_val: list[bool] = [initial_val]
+
+    @callback
+    def _on_update() -> None:
+        status = cast(TumbleDryerStatus | None, coordinator.data)
+        if status is None:
+            return
+        if trigger_type == "clean_filter_needed":
+            curr = status.need_clean_filter
+        else:
+            curr = status.water_tank_full
+        prev = prev_val[0]
+        prev_val[0] = curr
+
+        if curr and not prev:
+            fire()
 
     return coordinator.async_add_listener(_on_update)
 

@@ -23,7 +23,9 @@
       "Iron Dry": "Ferro a seco",
       "Hang Dry": "Pendurar a seco",
       "Store Dry": "Armazenar a seco",
-      "Bone Dry": "Completamente seco"
+      "Bone Dry": "Completamente seco",
+      "Pre-heating": "Pré-aquecimento",
+      "Completed": "Concluído"
     }
   }
 }

@@ -28,6 +28,13 @@
           "mode": "Modo"
         }
       },
+      "washer_dryer": {
+        "title": "Lavadora-secadora",
+        "description": "En el modo Solo lectura, los electrodomésticos Candy no se pueden distinguir automáticamente entre una lavadora estándar y una lavadora-secadora. Marca esta casilla si tu electrodoméstico dispone de funciones de secado.",
+        "data": {
+          "is_washer_dryer": "El electrodoméstico es una lavadora-secadora"
+        }
+      },
       "cloud": {
         "title": "Cuenta Simply-Fi",
         "data": {

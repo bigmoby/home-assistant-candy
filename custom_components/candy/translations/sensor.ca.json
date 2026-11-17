@@ -23,7 +23,9 @@
       "Iron Dry": "Assecat per Planxar",
       "Hang Dry": "Assecat per Estendre",
       "Store Dry": "Assecat per Emmagatzemar",
-      "Bone Dry": "Assecat Extra"
+      "Bone Dry": "Assecat Extra",
+      "Pre-heating": "Preescalfament",
+      "Completed": "Completat"
     }
   }
 }

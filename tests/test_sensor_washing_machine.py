@@ -1,11 +1,17 @@
-"""Tests for various sensors."""
+import datetime as dt
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from unittest.mock import patch
-
-from homeassistant.components.sensor import SensorExtraStoredData
+from homeassistant.components.sensor import SensorDeviceClass, SensorExtraStoredData
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, State
-from homeassistant.helpers import device_registry, entity_registry
+from homeassistant.helpers import (
+    device_registry,
+    device_registry as dr,
+    entity_registry,
+    entity_registry as er,
+)
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     load_fixture,
@@ -18,21 +24,51 @@ from custom_components.candy import (
     SCAN_INTERVAL_ACTIVE,
     SCAN_INTERVAL_RESTING,
 )
-from custom_components.candy.client.model import DownloadableProgram
+from custom_components.candy.client.model import DownloadableProgram, MachineState
 from custom_components.candy.const import (
+    CONF_KEY_BRAND,
+    CONF_KEY_CHECKUP_LAST_RESULT,
+    CONF_KEY_DEVICE_MODEL,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
+    CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_WASHER_DRYER,
     CONF_KEY_IS_WASHING_MACHINE,
+    CONF_KEY_MAC_ADDRESS,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FILTER,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAMS,
+    CONF_KEY_PURCHASE_DATE,
+    CONF_KEY_SERIAL_NUMBER,
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
     DOMAIN,
+    MODE_FULL_CONTROL,
+    UNIQUE_ID_WASH_DETERGENT_CYCLES,
     UNIQUE_ID_WASH_LIQUID_DETERGENT,
     UNIQUE_ID_WASH_POWDER_DETERGENT,
+    UNIQUE_ID_WASH_PURCHASE_DATE,
+    UNIQUE_ID_WASH_SOFTENER_CYCLES,
+    UNIQUE_ID_WASHING_MACHINE,
+)
+from custom_components.candy.sensor import (
+    CandyBaseSensor,
+    CandyWashCheckUpResultSensor,
+    CandyWashDetergentCyclesSensor,
+    CandyWashDryTargetSensor,
+    CandyWashErrorSensor,
+    CandyWashingMachineSensor,
+    CandyWashMaintFilterSensor,
+    CandyWashMaintFullCheckupSensor,
+    CandyWashMaintLimescaleSensor,
+    CandyWashPurchaseDateSensor,
+    CandyWashScheduledFinishSensor,
+    CandyWashScheduledStartSensor,
+    CandyWashSoftenerCyclesSensor,
+    async_setup_entry,
 )
 
 from .common import TEST_IP, init_integration
@@ -474,8 +510,9 @@ async def test_main_sensor_off_after_finished(
         "custom_components.candy.client.CandyClient.status",
         side_effect=TimeoutError,
     ):
-        await coordinator.async_refresh()
-        await hass.async_block_till_done()
+        for _ in range(3):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
 
     state = hass.states.get("sensor.washing_machine")
     assert state
@@ -587,8 +624,9 @@ async def test_statistics_not_fetched_when_machine_is_off(
         "custom_components.candy.client.CandyClient.status",
         side_effect=TimeoutError,
     ):
-        await coordinator.async_refresh()
-        await hass.async_block_till_done()
+        for _ in range(3):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
 
     # Now trigger a stats poll; network must NOT be called
     with patch(
@@ -1051,3 +1089,486 @@ async def test_poll_interval_restores_active_on_recovery(
     await hass.async_block_till_done()
 
     assert coordinator.update_interval == SCAN_INTERVAL_ACTIVE
+
+
+async def test_washer_dryer_sensor_setup(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Test washer dryer entities, naming, manufacturer, and dry target sensor."""
+    fixture = load_fixture("washing_machine/idle.json").replace(
+        '"DryT": "0"', '"DryT": "1"'
+    )
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        fixture,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={
+            CONF_KEY_IS_WASHER_DRYER: True,
+            CONF_KEY_BRAND: "hoover",
+        },
+    )
+
+    dev_reg = device_registry.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device is not None
+    assert device.name == "Washer dryer"
+    assert device.manufacturer == "Hoover"
+
+    main_state = hass.states.get("sensor.washer_dryer")
+    assert main_state is not None
+    assert main_state.state == "Idle"
+    assert main_state.attributes["friendly_name"] == "Washer dryer"
+
+    dry_target_state = hass.states.get(
+        "sensor.washer_dryer_dry_target"
+    ) or hass.states.get("sensor.dry_target")
+    assert dry_target_state is not None
+    assert dry_target_state.state == "extra_dry"
+    assert dry_target_state.attributes["friendly_name"] == "Washer dryer Dry target"
+
+
+async def test_washer_dryer_sensor_wool_dry_target(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test washer dryer dry target sensor reports wool_dry when DryT is 9."""
+    fixture = load_fixture("washing_machine/idle.json").replace(
+        '"DryT": "0"', '"DryT": "9"'
+    )
+    await init_integration(
+        hass,
+        aioclient_mock,
+        fixture,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={
+            CONF_KEY_IS_WASHER_DRYER: True,
+            CONF_KEY_BRAND: "hoover",
+        },
+    )
+
+    dry_target_state = hass.states.get(
+        "sensor.washer_dryer_dry_target"
+    ) or hass.states.get("sensor.dry_target")
+    assert dry_target_state is not None
+    assert dry_target_state.state == "wool_dry"
+
+
+async def test_washer_dryer_sensor_not_created_for_washing_machine(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Standard washing machines do not create dry target sensor and keep standard name."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture("washing_machine/idle.json"),
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+    )
+
+    dev_reg = device_registry.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device is not None
+    assert device.name == "Washing machine"
+    assert device.manufacturer == "Candy"
+
+    main_state = hass.states.get("sensor.washing_machine")
+    assert main_state is not None
+    assert main_state.state == "Idle"
+    assert main_state.attributes["friendly_name"] == "Washing machine"
+
+    dry_target_state = (
+        hass.states.get("sensor.washer_dryer_dry_target")
+        or hass.states.get("sensor.washing_machine_dry_target")
+        or hass.states.get("sensor.wash_dry_target")
+    )
+    assert dry_target_state is None
+
+
+async def test_program_sensor_disambiguation_multi_programs_same_selector(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Test wash program sensor correctly disambiguates between drying programs sharing selector 16."""
+    multi_programs = [
+        {
+            "program": {
+                "position": 16,
+                "name": "DUAL_WM_WD_PROGRAM_NAME_HIGH_DRY",
+                "command_parameters": [
+                    {
+                        "command_parameter": {
+                            "name": "selector_position",
+                            "validation": "16",
+                        }
+                    },
+                    {"command_parameter": {"name": "pr_code", "validation": "45"}},
+                ],
+            }
+        },
+        {
+            "program": {
+                "position": 17,
+                "name": "DUAL_WM_WD_PROGRAM_NAME_LOW_DRY",
+                "command_parameters": [
+                    {
+                        "command_parameter": {
+                            "name": "selector_position",
+                            "validation": "16",
+                        }
+                    },
+                    {"command_parameter": {"name": "pr_code", "validation": "75"}},
+                ],
+            }
+        },
+    ]
+
+    # 1. Appliance reports Pr=16 and PrCode=75 (Low Dry)
+    low_dry_payload = (
+        load_fixture("washing_machine/idle.json")
+        .replace('"Pr": "1"', '"Pr": "16"')
+        .replace('"PrCode": "136"', '"PrCode": "75"')
+    )
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        low_dry_payload,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={
+            CONF_KEY_PROGRAMS: multi_programs,
+            CONF_KEY_IS_WASHER_DRYER: True,
+        },
+    )
+
+    state = hass.states.get("sensor.wash_program")
+    assert state is not None
+    assert state.state == "Low Heat Dry"
+
+    # 2. Appliance updates to Pr=16 and PrCode=45 (High Dry)
+    high_dry_payload = (
+        load_fixture("washing_machine/idle.json")
+        .replace('"Pr": "1"', '"Pr": "16"')
+        .replace('"PrCode": "136"', '"PrCode": "45"')
+    )
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0", text=high_dry_payload
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.wash_program")
+    assert state is not None
+    assert state.state == "High Heat Dry"
+
+
+async def test_wash_program_sensor_one_fi_extra(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test wash program sensor displays One-Fi Extra when appliance is set to position 15."""
+    one_fi_program = [
+        {
+            "program": {
+                "position": 15,
+                "name": "DUAL_WM_WD_PROGRAM_NAME_ONE_FI_EXTRA",
+                "command_parameters": [
+                    {
+                        "command_parameter": {
+                            "name": "selector_position",
+                            "validation": "15",
+                        }
+                    },
+                ],
+            }
+        }
+    ]
+
+    idle_pos_15 = (
+        load_fixture("washing_machine/idle.json")
+        .replace('"Pr": "1"', '"Pr": "15"')
+        .replace('"PrCode": "136"', '"PrCode": "0"')
+    )
+    await init_integration(
+        hass,
+        aioclient_mock,
+        idle_pos_15,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={
+            CONF_KEY_PROGRAMS: one_fi_program,
+            CONF_KEY_IS_WASHER_DRYER: True,
+        },
+    )
+
+    state = hass.states.get("sensor.wash_program")
+    assert state is not None
+    assert state.state == "One-Fi Extra"
+
+
+async def test_autodose_cycles_sensors(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    raw_status = load_fixture("washing_machine/idle.json")
+    data = json.loads(raw_status)
+    data["statusLavatrice"]["DPrgCnt"] = "25"
+    data["statusLavatrice"]["SPrgCnt"] = "18"
+    status_with_autodose = json.dumps(data)
+
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        status_with_autodose,
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={CONF_KEY_INTERFACE_TYPE: "red_devil_axi_ad"},
+    )
+
+    registry = er.async_get(hass)
+    det_cycles_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_DETERGENT_CYCLES.format(entry.entry_id)
+    )
+    soft_cycles_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_SOFTENER_CYCLES.format(entry.entry_id)
+    )
+
+    assert det_cycles_id is not None
+    assert soft_cycles_id is not None
+
+    det_state = hass.states.get(det_cycles_id)
+    assert det_state is not None
+    assert det_state.state == "25"
+
+    soft_state = hass.states.get(soft_cycles_id)
+    assert soft_state is not None
+    assert soft_state.state == "18"
+
+
+async def test_async_setup_entry_purchase_date_and_invalid_type(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test setup with purchase date sensor in full control and invalid machine type."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture("washing_machine/idle.json"),
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_PURCHASE_DATE: "2023-01-01",
+        },
+    )
+    reg = er.async_get(hass)
+    entity_id = reg.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_PURCHASE_DATE.format(entry.entry_id)
+    )
+    assert entity_id is not None
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "2023-01-01"
+
+    # Invalid machine type raises TypeError
+    bad_entry = MockConfigEntry(domain=DOMAIN, entry_id="bad_entry", data={})
+    hass.data.setdefault(DOMAIN, {})[bad_entry.entry_id] = {
+        DATA_KEY_COORDINATOR: MagicMock(data="unknown_machine_type")
+    }
+    with pytest.raises(TypeError, match="Unable to determine machine type"):
+        await async_setup_entry(hass, bad_entry, MagicMock())
+
+
+def test_candy_base_sensor_device_info_and_abstractmethods() -> None:
+    """Test CandyBaseSensor device info attributes and abstract method fallbacks."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="test_entry",
+        data={
+            CONF_KEY_MAC_ADDRESS: "AA:BB:CC:DD:EE:FF",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_DEVICE_MODEL: "ModelX",
+            CONF_KEY_SERIAL_NUMBER: "SN12345",
+        },
+    )
+    sensor = CandyWashingMachineSensor(MagicMock(), entry)
+    info = sensor.device_info
+    assert info["connections"] == {(dr.CONNECTION_NETWORK_MAC, "AA:BB:CC:DD:EE:FF")}
+    assert info["model"] == "ModelX"
+    assert info["serial_number"] == "SN12345"
+
+    assert CandyBaseSensor.device_name(sensor) is None
+    assert CandyBaseSensor.suggested_area(sensor) is None
+
+
+def test_candy_washing_machine_sensor_unique_id_washer_dryer_migration(
+    hass: HomeAssistant,
+) -> None:
+    """Test washer-dryer unique_id fallback when old washing machine entity exists."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="wd_entry",
+        data={CONF_KEY_IS_WASHER_DRYER: True},
+    )
+    entry.add_to_hass(hass)
+    sensor = CandyWashingMachineSensor(MagicMock(), entry)
+    sensor.hass = hass
+
+    registry = er.async_get(hass)
+    old_id = UNIQUE_ID_WASHING_MACHINE.format(entry.entry_id)
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        old_id,
+        config_entry=entry,
+        suggested_object_id="candy_washing_machine",
+    )
+    assert sensor.unique_id == old_id
+
+
+def test_candy_wash_dry_target_sensor_none_data() -> None:
+    """Test CandyWashDryTargetSensor returns None when coordinator data is None."""
+    coordinator = MagicMock()
+    coordinator.data = None
+    sensor = CandyWashDryTargetSensor(
+        coordinator, MockConfigEntry(domain=DOMAIN, entry_id="e1", data={})
+    )
+    assert sensor.native_value is None
+
+
+async def test_candy_wash_error_sensor_restoration(hass: HomeAssistant) -> None:
+    """Test error sensor restoration and state fallback when coordinator data is None."""
+    coordinator = MagicMock()
+    coordinator.data = None
+    coordinator.last_update_success = False
+    sensor = CandyWashErrorSensor(
+        coordinator, MockConfigEntry(domain=DOMAIN, entry_id="e1", data={})
+    )
+    sensor.hass = hass
+    last_data = MagicMock()
+    last_data.native_value = 5
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=last_data)
+
+    await sensor.async_added_to_hass()
+    assert sensor.available is True
+    assert sensor.native_value == 5
+
+
+def test_candy_wash_autodose_cycles_sensors_none_data() -> None:
+    """Test detergent and softener cycles sensors return None when coordinator data is None."""
+    coordinator = MagicMock()
+    coordinator.data = None
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="e1", data={})
+
+    det_sensor = CandyWashDetergentCyclesSensor(coordinator, entry)
+    assert det_sensor.native_value is None
+
+    soft_sensor = CandyWashSoftenerCyclesSensor(coordinator, entry)
+    assert soft_sensor.native_value is None
+
+
+async def test_candy_wash_checkup_result_sensor_restoration_and_cached(
+    hass: HomeAssistant,
+) -> None:
+    """Test checkup result restoration and cached result fallback."""
+    coordinator = MagicMock()
+    coordinator.data = None
+    coordinator.last_update_success = False
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="e1",
+        data={CONF_KEY_CHECKUP_LAST_RESULT: 1},
+    )
+    sensor = CandyWashCheckUpResultSensor(coordinator, entry)
+    sensor.hass = hass
+
+    last_data = MagicMock()
+    last_data.native_value = "ok"
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=last_data)
+
+    await sensor.async_added_to_hass()
+    assert sensor.available is True
+    assert sensor._restored_state == "ok"
+
+    # Status has dis_test_res code 0, fallback to cached entry config
+    status = MagicMock()
+    status.dis_test_res = MagicMock(code=0)
+    coordinator.data = status
+    assert sensor.native_value == "ok"
+
+
+def test_candy_wash_purchase_date_sensor() -> None:
+    """Test CandyWashPurchaseDateSensor properties and None handling."""
+    coordinator = MagicMock()
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="e1",
+        data={CONF_KEY_PURCHASE_DATE: "2023-05-20"},
+    )
+    sensor = CandyWashPurchaseDateSensor(coordinator, entry)
+    assert sensor.device_name() is not None
+    assert sensor.suggested_area() is not None
+    assert sensor.available is True
+    assert sensor.unique_id == UNIQUE_ID_WASH_PURCHASE_DATE.format("e1")
+    assert sensor.device_class == SensorDeviceClass.DATE
+    assert sensor.native_value == dt.date(2023, 5, 20)
+    assert sensor.icon == "mdi:calendar"
+
+    empty_sensor = CandyWashPurchaseDateSensor(
+        coordinator,
+        MockConfigEntry(
+            domain=DOMAIN, entry_id="e2", data={CONF_KEY_PURCHASE_DATE: ""}
+        ),
+    )
+    assert empty_sensor.native_value is None
+
+
+async def test_candy_wash_maintenance_sensors_restoration(hass: HomeAssistant) -> None:
+    """Test maintenance sensors restore values properly when coordinator data is None."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="e1", data={})
+    for sensor_cls in (
+        CandyWashMaintFullCheckupSensor,
+        CandyWashMaintLimescaleSensor,
+        CandyWashMaintFilterSensor,
+    ):
+        coordinator = MagicMock()
+        coordinator.data = None
+        coordinator.last_update_success = False
+        sensor = sensor_cls(coordinator, entry)
+        sensor.hass = hass
+        last_data = MagicMock()
+        last_data.native_value = "25"
+        sensor.async_get_last_sensor_data = AsyncMock(return_value=last_data)
+
+        await sensor.async_added_to_hass()
+        assert sensor.available is True
+        assert sensor._restored_value == 25
+        assert sensor.native_value == 25
+
+
+def test_candy_wash_scheduled_start_and_finish_sensors(hass: HomeAssistant) -> None:
+    """Test scheduled start and finish sensors edge cases returning None."""
+    coordinator = MagicMock()
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="e1", data={})
+
+    # Scheduled start with delay <= 0
+    start_sensor = CandyWashScheduledStartSensor(coordinator, entry)
+    start_sensor.hass = hass
+    with patch("custom_components.candy.sensor._read_delay_minutes", return_value=0):
+        assert start_sensor.native_value is None
+
+    # Scheduled finish sensor
+    finish_sensor = CandyWashScheduledFinishSensor(coordinator, entry)
+    finish_sensor.hass = hass
+
+    # Running with remaining minutes <= 0
+    status_running = MagicMock()
+    status_running.machine_state = MachineState.RUNNING
+    status_running.remaining_minutes = 0
+    coordinator.data = status_running
+    assert finish_sensor.native_value is None
+
+    # Idle with estimated duration is None
+    status_idle = MagicMock()
+    status_idle.machine_state = MachineState.IDLE
+    coordinator.data = status_idle
+    with patch.object(finish_sensor, "_estimated_duration_minutes", return_value=None):
+        assert finish_sensor.native_value is None
+
+    # Machine state other
+    status_error = MagicMock()
+    status_error.machine_state = MachineState.ERROR
+    coordinator.data = status_error
+    assert finish_sensor.native_value is None

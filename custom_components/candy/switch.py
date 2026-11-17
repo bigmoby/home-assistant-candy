@@ -23,6 +23,7 @@ from .client import (
 )
 from .client.model import MachineState
 from .const import (
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_PROGRAMS,
@@ -30,12 +31,16 @@ from .const import (
     DATA_KEY_COORDINATOR,
     DOMAIN,
     MODE_FULL_CONTROL,
+    UNIQUE_ID_WASH_DETERGENT_AUTODOSE,
+    UNIQUE_ID_WASH_EXTRA_DOSE_SWITCH,
     UNIQUE_ID_WASH_NFC_SWITCH,
     UNIQUE_ID_WASH_PROGRAM_SELECT,
+    UNIQUE_ID_WASH_SOFTENER_AUTODOSE,
     UNIQUE_ID_WASH_STEAM_SWITCH,
     WASH_OPTIONS,
 )
-from .helpers import remote_control_enabled, wash_device_info
+from .coordinator import CandyDataUpdateCoordinator
+from .helpers import remote_control_enabled, supports_autodose, wash_device_info
 
 
 async def async_setup_entry(
@@ -46,7 +51,7 @@ async def async_setup_entry(
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config_id][
+    coordinator: CandyDataUpdateCoordinator = hass.data[DOMAIN][config_id][
         DATA_KEY_COORDINATOR
     ]
     if not isinstance(coordinator.data, WashingMachineStatus):
@@ -55,7 +60,17 @@ async def async_setup_entry(
     client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
     programs = parse_wash_programs(config_entry.data.get(CONF_KEY_PROGRAMS, []))
 
-    entities: list[_WashSwitchBase] = []
+    entities: list[SwitchEntity] = []
+
+    interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+    if supports_autodose(interface_type):
+        entities.extend(
+            [
+                WashDetergentAutoDoseSwitch(coordinator, config_entry, client),
+                WashSoftenerAutoDoseSwitch(coordinator, config_entry, client),
+                WashExtraDoseSwitch(coordinator, config_entry, client, programs),
+            ]
+        )
 
     if any(p.steam for p in programs):
         entities.append(WashSteamSwitch(coordinator, config_entry, client, programs))
@@ -153,6 +168,13 @@ class _WashSwitchBase(CoordinatorEntity, SwitchEntity):
                     None,
                 )
         status = cast(WashingMachineStatus, self.coordinator.data)
+        if status.program_code is not None:
+            for p in self._programs:
+                if (
+                    p.selector_position == status.program
+                    and p.pr_code == status.program_code
+                ):
+                    return p
         for p in self._programs:
             if p.selector_position == status.program:
                 return p
@@ -188,7 +210,12 @@ class WashSteamSwitch(_WashSwitchBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        if status.machine_state not in {MachineState.IDLE, MachineState.OFF}:
+        if status.machine_state not in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }:
             return False
         prog = self._active_program()
         return prog is not None and prog.steam
@@ -279,7 +306,12 @@ class WashOptionSwitch(_WashSwitchBase):
         if not super().available:
             return False
         status = cast(WashingMachineStatus, self.coordinator.data)
-        if status.machine_state not in {MachineState.IDLE, MachineState.OFF}:
+        if status.machine_state not in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }:
             return False
         prog = self._active_program()
         return prog is not None and bool(prog.available_options & self._bitmask)
@@ -293,5 +325,140 @@ class WashOptionSwitch(_WashSwitchBase):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
+        self._is_on = False
+        self.async_write_ha_state()
+
+
+class WashDetergentAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "wash_detergent_autodose"
+    _attr_icon = "mdi:bottle-tonic-outline"
+
+    def __init__(
+        self,
+        coordinator: CandyDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        client: CandyClient,
+    ) -> None:
+        super().__init__(coordinator)
+        self.coordinator: CandyDataUpdateCoordinator = coordinator
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._client = client
+        self._attr_unique_id = UNIQUE_ID_WASH_DETERGENT_AUTODOSE.format(self.config_id)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return wash_device_info(self.config_entry)
+
+    @property
+    def available(self) -> bool:
+        return super().available and remote_control_enabled(self.coordinator.data)
+
+    @property
+    def is_on(self) -> bool:
+        if self.coordinator.data is None:
+            return False
+        status = cast(WashingMachineStatus, self.coordinator.data)
+        return bool(status.detergent_on)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_detergent_autodose(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_detergent_autodose(False)
+
+
+class WashSoftenerAutoDoseSwitch(CoordinatorEntity, SwitchEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "wash_softener_autodose"
+    _attr_icon = "mdi:bottle-tonic-outline"
+
+    def __init__(
+        self,
+        coordinator: CandyDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        client: CandyClient,
+    ) -> None:
+        super().__init__(coordinator)
+        self.coordinator: CandyDataUpdateCoordinator = coordinator
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._client = client
+        self._attr_unique_id = UNIQUE_ID_WASH_SOFTENER_AUTODOSE.format(self.config_id)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return wash_device_info(self.config_entry)
+
+    @property
+    def available(self) -> bool:
+        return super().available and remote_control_enabled(self.coordinator.data)
+
+    @property
+    def is_on(self) -> bool:
+        if self.coordinator.data is None:
+            return False
+        status = cast(WashingMachineStatus, self.coordinator.data)
+        return bool(status.softener_on)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_softener_autodose(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_softener_autodose(False)
+
+
+class WashExtraDoseSwitch(_WashSwitchBase):
+    _attr_has_entity_name = True
+    _attr_translation_key = "wash_extra_dose"
+    _attr_icon = "mdi:plus-circle-outline"
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        client: CandyClient,
+        programs: list[WashingMachineWashProgram],
+    ) -> None:
+        super().__init__(coordinator, config_entry, client, programs)
+        self._is_on: bool = False
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_WASH_EXTRA_DOSE_SWITCH.format(self.config_id)
+
+    @callback
+    def _on_program_changed(self, event) -> None:
+        self._is_on = False
+        self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        status = cast(WashingMachineStatus, self.coordinator.data)
+        if status.machine_state not in {
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+        }:
+            return False
+        prog = self._active_program()
+        # In Simply-Fi APK (AbProgramOptionsFragment.addExtraDose, classes*.dex), Extra Dose
+        # is only offered if the selected program supports Prewash (available_options & 1).
+        # On AutoDose models, extra dosing dispenses via the prewash hydraulic stage.
+        return prog is not None and bool(prog.available_options & 1)
+
+    @property
+    def is_on(self) -> bool:
+        return self._is_on
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._is_on = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
         self._is_on = False
         self.async_write_ha_state()

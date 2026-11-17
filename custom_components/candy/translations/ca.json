@@ -28,6 +28,13 @@
           "mode": "Mode"
         }
       },
+      "washer_dryer": {
+        "title": "Rentadora-assecadora",
+        "description": "En mode Només lectura, els electrodomèstics Candy no es poden distingir automàticament entre una Rentadora estàndard i una Rentadora-assecadora. Marqueu aquesta casella si el vostre electrodomèstic disposa de funcions d'assecat.",
+        "data": {
+          "is_washer_dryer": "L'aparell és una rentadora-assecadora"
+        }
+      },
       "cloud": {
         "title": "Compte Simply-Fi",
         "data": {

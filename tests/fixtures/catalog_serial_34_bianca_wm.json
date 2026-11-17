@@ -1,0 +1,1448 @@
+{
+  "serial": 34,
+  "model": "GSF 1510LWH3/1-01",
+  "type": "washer",
+  "interface_type": "4D",
+  "programs": [
+    {
+      "serial": 337,
+      "position": 0,
+      "icon": "washer_icon_default",
+      "description": "",
+      "name": "OFF",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "04fe5434-dc82-4ead-8437-2ca59aef509b",
+      "parameters": [
+        {
+          "serial": 6077,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6078,
+          "validation": "0",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6079,
+          "validation": "0",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6080,
+          "validation": "0",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6081,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6082,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6083,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6084,
+          "validation": "0",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6085,
+          "validation": "0",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6086,
+          "validation": "0",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6087,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 338,
+      "position": 1,
+      "icon": "icon_washer_perfect_20_mix_wash",
+      "description": "",
+      "name": "WA_PROG_PERFECT_20_MIX_WASH",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "2a2c782f-728f-407c-a5f1-908069c66ed7",
+      "parameters": [
+        {
+          "serial": 6088,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6089,
+          "validation": "1",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6090,
+          "validation": "20",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6091,
+          "validation": "20",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6092,
+          "validation": "1",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6093,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6094,
+          "validation": "1",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6095,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6096,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6097,
+          "validation": "150",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6098,
+          "validation": "112",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 339,
+      "position": 2,
+      "icon": "icon_washer_intensive_40",
+      "description": "",
+      "name": "WA_PROG_INTENSIVE_40",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "5e7b6eee-4bbb-4649-9cdb-eadf811488bc",
+      "parameters": [
+        {
+          "serial": 6099,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6100,
+          "validation": "1500",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6101,
+          "validation": "1500",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6102,
+          "validation": "2",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6103,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6104,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6105,
+          "validation": "2",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6106,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6107,
+          "validation": "2",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6108,
+          "validation": "150",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6109,
+          "validation": "112",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 340,
+      "position": 3,
+      "icon": "icon_washer_hygiene_60",
+      "description": "",
+      "name": "WA_PROG_HYGIENE_60",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "953f0d13-e38d-4e7d-a201-f49e5aa66abd",
+      "parameters": [
+        {
+          "serial": 6110,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6111,
+          "validation": "1500",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6112,
+          "validation": "1500",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6113,
+          "validation": "3",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6114,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6115,
+          "validation": "3",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6116,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6117,
+          "validation": "145",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6118,
+          "validation": "112",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6119,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6120,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 341,
+      "position": 4,
+      "icon": "icon_washer_perfect_rapid_59",
+      "description": "",
+      "name": "WA_PROG_PERFECT_RAPID_59_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "c91a2ddc-3b18-442e-8580-0afe8287563f",
+      "parameters": [
+        {
+          "serial": 6121,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6122,
+          "validation": "4",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6123,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6124,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6125,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6126,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6127,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6128,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6129,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6130,
+          "validation": "59",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6131,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 342,
+      "position": 5,
+      "icon": "icon_washer_30_min",
+      "description": "",
+      "name": "WA_PROG_RAPID_30_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "5ec71718-b6f4-46f0-934b-460432ba0551",
+      "parameters": [
+        {
+          "serial": 6132,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6133,
+          "validation": "5",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6134,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6135,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6136,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6137,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6138,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6139,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6140,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6141,
+          "validation": "30",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6142,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 343,
+      "position": 6,
+      "icon": "icon_washer_14_min",
+      "description": "",
+      "name": "WA_PROG_RAPID_14_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "2afde2b6-3f9a-4207-bf9f-c8f7c1e401cb",
+      "parameters": [
+        {
+          "serial": 6143,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6144,
+          "validation": "6",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6145,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6146,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6147,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6148,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6149,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6150,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6151,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6152,
+          "validation": "14",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6153,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 344,
+      "position": 7,
+      "icon": "icon_washer_baby",
+      "description": "",
+      "name": "WA_PROG_BABY",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "7ecbe7dd-bd29-4662-95b9-d1b594ca162e",
+      "parameters": [
+        {
+          "serial": 6154,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6155,
+          "validation": "1500",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6156,
+          "validation": "1500",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6157,
+          "validation": "7",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6158,
+          "validation": "60",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6159,
+          "validation": "60",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6160,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6161,
+          "validation": "3",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6162,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6163,
+          "validation": "132",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6164,
+          "validation": "48",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 345,
+      "position": 8,
+      "icon": "icon_washer_rinse",
+      "description": "",
+      "name": "WA_PROG_RINSE",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "720a6b4c-61e8-48d5-aad6-ebbf3968dae0",
+      "parameters": [
+        {
+          "serial": 6165,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6166,
+          "validation": "8",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6167,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6168,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6169,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6170,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6171,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6172,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6173,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6174,
+          "validation": "24",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6175,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 346,
+      "position": 9,
+      "icon": "icon_washer_drain_spin",
+      "description": "",
+      "name": "WA_PROG_DRAIN_SPIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "3bab7edb-1060-4083-b3ca-39325d04facb",
+      "parameters": [
+        {
+          "serial": 6176,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6177,
+          "validation": "1500",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6178,
+          "validation": "1500",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6179,
+          "validation": "9",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6180,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6181,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6182,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6183,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6184,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6185,
+          "validation": "7",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6186,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 347,
+      "position": 10,
+      "icon": "icon_washer_hand_silk",
+      "description": "",
+      "name": "WA_PROG_HAND_SILK",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083027",
+      "updated_at": "20151111083027",
+      "program_id": "c0c22902-5431-4c3e-b6d3-735b67bfbcfa",
+      "parameters": [
+        {
+          "serial": 6187,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6188,
+          "validation": "10",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6189,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6190,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6191,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6192,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6193,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6194,
+          "validation": "800",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6195,
+          "validation": "800",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6196,
+          "validation": "59",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6197,
+          "validation": "24",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 348,
+      "position": 11,
+      "icon": "icon_washer_wool",
+      "description": "",
+      "name": "WA_PROG_WOOL",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "4ed9ed6c-aff9-4ad8-a91d-f0170e5daf26",
+      "parameters": [
+        {
+          "serial": 6198,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6199,
+          "validation": "11",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6200,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6201,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6202,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6203,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6204,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6205,
+          "validation": "800",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6206,
+          "validation": "800",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6207,
+          "validation": "59",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6208,
+          "validation": "24",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 349,
+      "position": 12,
+      "icon": "icon_washer_delicates",
+      "description": "",
+      "name": "WA_PROG_DELICATES",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "39d5e133-1a32-479f-9501-b11f7f910cc6",
+      "parameters": [
+        {
+          "serial": 6209,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6210,
+          "validation": "12",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6211,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6212,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6213,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6214,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6215,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6216,
+          "validation": "400",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6217,
+          "validation": "400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6218,
+          "validation": "68",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6219,
+          "validation": "24",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 350,
+      "position": 13,
+      "icon": "icon_washer_acrylics",
+      "description": "",
+      "name": "WA_PROG_MIXED",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "f237dd04-fedc-4481-b8d2-78a7e18bcdb2",
+      "parameters": [
+        {
+          "serial": 6220,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6221,
+          "validation": "13",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6222,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6223,
+          "validation": "60",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6224,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6225,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6226,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6227,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6228,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6229,
+          "validation": "122",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6230,
+          "validation": "123",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 351,
+      "position": 14,
+      "icon": "icon_washer_cotton",
+      "description": "",
+      "name": "WA_PROG_COTTON",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "0e023c2a-1752-44e4-9cca-abb6f9404f78",
+      "parameters": [
+        {
+          "serial": 6231,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6232,
+          "validation": "1500",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6233,
+          "validation": "1500",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6234,
+          "validation": "14",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6235,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6236,
+          "validation": "60",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6237,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6238,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6239,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6240,
+          "validation": "207",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6241,
+          "validation": "115",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 352,
+      "position": 15,
+      "icon": "icon_washer_resistant_cotton",
+      "description": "",
+      "name": "WA_PROG_RESISTANT_COTTON",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "a2924a4f-ed42-4a13-85a6-17c6f67db5ed",
+      "parameters": [
+        {
+          "serial": 6242,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6243,
+          "validation": "15",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6244,
+          "validation": "60",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6245,
+          "validation": "90",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6246,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6247,
+          "validation": "2",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6248,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6249,
+          "validation": "178",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6250,
+          "validation": "115",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6251,
+          "validation": "1500",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6252,
+          "validation": "1500",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 353,
+      "position": 16,
+      "icon": "icon_washer_tumbling",
+      "description": "",
+      "name": "WA_PROG_TUMBLING",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "e5323b99-d1c7-464e-826e-e5a108815eef",
+      "parameters": [
+        {
+          "serial": 6253,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6254,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6255,
+          "validation": "16",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6256,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6257,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6258,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6259,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6260,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6261,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6262,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6263,
+          "validation": "255",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 354,
+      "position": 17,
+      "icon": "icon_washer_maintenance",
+      "description": "",
+      "name": "WA_PROG_MAINTENANCE",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20151111083028",
+      "updated_at": "20151111083028",
+      "program_id": "c26055f1-6511-4039-a77b-e04f70028052",
+      "parameters": [
+        {
+          "serial": 6264,
+          "validation": "",
+          "name": "default_duration",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6265,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6266,
+          "validation": "17",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6267,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6268,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6269,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6270,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6271,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6272,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6273,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6274,
+          "validation": "255",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        }
+      ]
+    }
+  ]
+}

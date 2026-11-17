@@ -41,6 +41,8 @@ class CloudApplianceData:
     programs: list[dict]
     interface_type: str
     downloadable_programs: list[dict]
+    brand: str
+    appliance_type: str
 
 
 class SimplyFiCloudError(Exception):
@@ -212,11 +214,7 @@ def _match_appliance(
                 "ensure the device is registered in the Simply-Fi app."
             )
 
-    encryption_key = matched.get("encryption_key", "")
-    if not encryption_key:
-        raise SimplyFiCloudError(
-            "Appliance data missing encryption_key — cannot proceed with Full Control setup"
-        )
+    encryption_key = matched.get("encryption_key") or ""
 
     programs = matched.get("programs", [])
     if not programs:
@@ -233,4 +231,6 @@ def _match_appliance(
         programs=programs,
         interface_type=matched.get("interface_type", ""),
         downloadable_programs=downloadable_programs,
+        brand=matched.get("brand", ""),
+        appliance_type=matched.get("appliance_type", ""),
     )
