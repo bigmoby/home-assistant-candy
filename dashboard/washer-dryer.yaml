@@ -1,0 +1,574 @@
+# --------------------------------------------------------------------------------------------------
+# Home Assistant Dashboard Card: Candy / Hoover Washer-Dryer Combo (Full Control)
+# --------------------------------------------------------------------------------------------------
+# Requirements:
+#   - piitaya/lovelace-mushroom (custom:mushroom-template-card, custom:mushroom-chips-card)
+#
+# Instructions:
+#   Copy the contents of this file into a Manual Card on your dashboard.
+#   Replace every occurrence of `<machine_name>` with your washer-dryer entity ID prefix
+#   (e.g. `washer_dryer` or `my_washer_dryer`).
+#
+# Note:
+#   For standard washing machines (without drying capability), use `washing-machine.yaml` instead.
+# --------------------------------------------------------------------------------------------------
+type: vertical-stack
+cards:
+  - type: custom:mushroom-template-card
+    primary: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} Running
+      {% elif state == 'paused' %} Paused
+      {% elif state == 'finished' %} Cycle finished
+      {% elif 'delayed' in state %} Delayed start
+      {% elif 'sending' in state %} Sending command...
+      {% elif state in ['idle', 'stopped'] %} Ready
+      {% else %} Off {% endif %}
+    secondary: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% set raw_phase = states('sensor.<machine_name>_wash_cycle_status') %}
+      {% set phase = raw_phase | lower %}
+      {% set prog = states('sensor.<machine_name>_wash_program') %}
+      {% set ptype = states('select.<machine_name>_program_type') | lower %}
+      {% set dry_tgt = states('sensor.<machine_name>_dry_target') | lower %}
+      {% if state == 'running' %}
+        {% if phase in ['stopped', 'idle', 'unknown', 'unavailable', ''] %}
+          Starting...
+        {% elif dry_tgt == 'cooldown' or 'cooldown' in phase %}
+          Cooling down
+        {% elif 'dry' in phase and dry_tgt not in ['unknown', 'unavailable', 'no_dry', ''] %}
+          Drying ({{ dry_tgt | replace('_', ' ') | title }})
+        {% elif ptype == 'wash_and_dry' %}
+          {{ raw_phase }} · Wash & Dry
+        {% else %}
+          {{ raw_phase }}
+        {% endif %}
+      {% elif 'delayed' in state %}
+        Starts at {{ states('sensor.<machine_name>_wash_scheduled_start') | as_timestamp(default=none) | timestamp_custom('%H:%M', default='--:--') }}
+      {% elif state == 'finished' %}
+        Collect your laundry
+      {% elif state in ['idle', 'stopped'] and prog not in ['unknown', 'unavailable', ''] %}
+        {% if ptype == 'wash_and_dry' %}
+          {{ prog }} + Dry
+        {% elif ptype == 'drying' %}
+          {{ prog }} (Drying)
+        {% else %}
+          {{ prog }}
+        {% endif %}
+      {% else %}
+        —
+      {% endif %}
+    icon: >-
+      {% set phase = states('sensor.<machine_name>_wash_cycle_status') | lower %}
+      {% set ptype = states('select.<machine_name>_program_type') | lower %}
+      {% set dry_tgt = states('sensor.<machine_name>_dry_target') | lower %}
+      {% if 'dry' in phase or dry_tgt == 'cooldown' or 'cooldown' in phase or ptype == 'drying' %}
+        mdi:tumble-dryer
+      {% else %}
+        mdi:washing-machine
+      {% endif %}
+    badge_icon: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} mdi:play-circle
+      {% elif state == 'paused' %} mdi:pause-circle
+      {% elif state == 'finished' %} mdi:check-circle
+      {% elif state == 'error' %} mdi:alert-circle
+      {% elif 'delayed' in state %} mdi:timer-outline
+      {% elif 'sending' in state %} mdi:loading
+      {% else %} '' {% endif %}
+    badge_color: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
+    entity: sensor.<machine_name>
+    tap_action:
+      action: more-info
+    color: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
+    features_position: bottom
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - Idle
+          - idle
+    card:
+      type: custom:mushroom-chips-card
+      chips:
+        - type: template
+          icon: >-
+            {% set phase = states('sensor.<machine_name>_wash_cycle_status') | lower %}
+            {% set ptype = states('select.<machine_name>_program_type') | lower %}
+            {% set dry_tgt = states('sensor.<machine_name>_dry_target') | lower %}
+            {% if 'dry' in phase or dry_tgt == 'cooldown' or 'cooldown' in phase or ptype == 'drying' %}
+              mdi:tumble-dryer
+            {% else %}
+              mdi:washing-machine
+            {% endif %}
+          content: Prog. {{ states('sensor.<machine_name>_wash_program') }}
+          icon_color: blue
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_wash_program
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: select.<machine_name>_program_type
+              state_not: drying
+          chip:
+            type: template
+            icon: mdi:thermometer
+            content: "{{ states('sensor.<machine_name>_wash_temperature') }} °C"
+            icon_color: orange
+            tap_action:
+              action: more-info
+              entity: sensor.<machine_name>_wash_temperature
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: select.<machine_name>_program_type
+              state_not: drying
+          chip:
+            type: template
+            icon: mdi:rotate-right
+            content: "{{ states('sensor.<machine_name>_wash_spin_speed') }} rpm"
+            icon_color: teal
+            tap_action:
+              action: more-info
+              entity: sensor.<machine_name>_wash_spin_speed
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>_dry_target
+              state_not: unavailable
+            - condition: state
+              entity: sensor.<machine_name>_dry_target
+              state_not: no_dry
+          chip:
+            type: template
+            icon: >-
+              {% set t = states('sensor.<machine_name>_dry_target') | lower %}
+              {% if 'cooldown' in t %} mdi:fan
+              {% elif 'minutes' in t %} mdi:timer-sand
+              {% else %} mdi:tumble-dryer {% endif %}
+            content: >-
+              {% set t = states('sensor.<machine_name>_dry_target') %}
+              {% if t not in ['unknown', 'unavailable', 'no_dry', ''] %}
+                {{ t | replace('_', ' ') | title }}
+              {% else %}—{% endif %}
+            icon_color: amber
+            tap_action:
+              action: more-info
+              entity: sensor.<machine_name>_dry_target
+        - type: template
+          icon: mdi:progress-clock
+          content: >-
+            {% set m = states('sensor.<machine_name>_wash_cycle_remaining_time') | int(0) %}
+            {% if m > 0 %}{{ m }} min{% else %}—{% endif %}
+          icon_color: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% if state == 'paused' %} orange {% else %} blue {% endif %}
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_wash_cycle_remaining_time
+        - type: template
+          icon: mdi:weight
+          content: >-
+            {% set pct = states('sensor.<machine_name>_wash_fill_level') | int(-1) %}
+            {% if pct >= 0 %}{{ pct }}%{% else %}—{% endif %}
+          icon_color: teal
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_wash_fill_level
+        - type: template
+          icon: mdi:tune-variant
+          content: >-
+            {% set parts = [] %}
+            {% set stain = states('sensor.<machine_name>_wash_stain_level') %}
+            {% if stain not in ['unknown', 'unavailable', '0', ''] %}
+              {% set parts = parts + ['Stain: ' ~ stain] %}
+            {% endif %}
+            {% if is_state('switch.<machine_name>_wash_steam', 'on') %}
+              {% set parts = parts + ['Steam'] %}
+            {% endif %}
+            {% for opt, label in [
+              ('switch.<machine_name>_prewash', 'Prewash'),
+              ('switch.<machine_name>_hygiene', 'Hygiene'),
+              ('switch.<machine_name>_anti_crease', 'Anti-crease'),
+              ('switch.<machine_name>_good_night', 'Quiet'),
+              ('switch.<machine_name>_extra_rinse_1', '+1 Rinse'),
+              ('switch.<machine_name>_extra_rinse_2', '+2 Rinses'),
+              ('switch.<machine_name>_extra_rinse_3', '+3 Rinses'),
+              ('switch.<machine_name>_aquaplus', 'AquaPlus')
+            ] %}
+              {% if is_state(opt, 'on') %}
+                {% set parts = parts + [label] %}
+              {% endif %}
+            {% endfor %}
+            {% if parts | length > 0 %}{{ parts | join(' · ') }}{% else %}—{% endif %}
+          icon_color: indigo
+          tap_action:
+            action: none
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+      - condition: state
+        entity: sensor.<machine_name>_wash_liquid_detergent_dose
+        state_not: unavailable
+    card:
+      type: custom:mushroom-chips-card
+      chips:
+        - type: template
+          icon: >-
+            {% set v = states('sensor.<machine_name>_wash_liquid_detergent_dose') | regex_replace('/.*', '') | int(-1) %}
+            {% if v >= 4 %} mdi:circle-slice-8
+            {% elif v == 3 %} mdi:circle-slice-6
+            {% elif v == 2 %} mdi:circle-slice-4
+            {% elif v == 1 %} mdi:circle-slice-2
+            {% else %} mdi:circle-outline
+            {% endif %}
+          content: >-
+            {% set raw = states('sensor.<machine_name>_wash_liquid_detergent_dose') %}
+            {% if raw not in ['unknown', 'unavailable', ''] %}Liquid {{ raw }}{% else %}—{% endif %}
+          icon_color: >-
+            {% set v = states('sensor.<machine_name>_wash_liquid_detergent_dose') | regex_replace('/.*', '') | int(-1) %}
+            {% if v <= 0 %} grey {% elif v == 1 %} orange {% else %} blue {% endif %}
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_wash_liquid_detergent_dose
+        - type: template
+          icon: >-
+            {% set v = states('sensor.<machine_name>_wash_powder_detergent_dose') | regex_replace('/.*', '') | int(-1) %}
+            {% if v >= 4 %} mdi:circle-slice-8
+            {% elif v == 3 %} mdi:circle-slice-6
+            {% elif v == 2 %} mdi:circle-slice-4
+            {% elif v == 1 %} mdi:circle-slice-2
+            {% else %} mdi:circle-outline
+            {% endif %}
+          content: >-
+            {% set raw = states('sensor.<machine_name>_wash_powder_detergent_dose') %}
+            {% if raw not in ['unknown', 'unavailable', ''] %}Powder {{ raw }}{% else %}—{% endif %}
+          icon_color: >-
+            {% set v = states('sensor.<machine_name>_wash_powder_detergent_dose') | regex_replace('/.*', '') | int(-1) %}
+            {% if v <= 0 %} grey {% elif v == 1 %} orange {% else %} teal {% endif %}
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_wash_powder_detergent_dose
+        - type: template
+          icon: mdi:clock-outline
+          content: >-
+            {% set m = states('sensor.<machine_name>_estimated_cycle_duration') | int(0) %}
+            {% if m >= 60 %}{{ m // 60 }}h {{ m % 60 }}min
+            {% elif m > 0 %}{{ m }} min
+            {% else %}—{% endif %}
+          icon_color: grey
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_estimated_cycle_duration
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: select.<machine_name>_wash_program
+        state_not: unavailable
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+    card:
+      type: vertical-stack
+      cards:
+        - type: tile
+          entity: select.<machine_name>_program_type
+          name: Program type
+          icon: mdi:tune-vertical
+          vertical: false
+          features:
+            - type: select-options
+        - type: tile
+          entity: select.<machine_name>_wash_program
+          name: Program
+          icon: mdi:washing-machine
+          vertical: false
+          features:
+            - type: select-options
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: select.<machine_name>_program_description
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Program description
+            secondary: "{{ states('select.<machine_name>_program_description') }}"
+            multiline_secondary: true
+            icon: mdi:information-outline
+            icon_color: blue
+            entity: select.<machine_name>_program_description
+            tap_action:
+              action: more-info
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: switch.<machine_name>_special_programs
+              state_not: unavailable
+          card:
+            type: tile
+            entity: switch.<machine_name>_special_programs
+            name: Special programs
+            icon: mdi:playlist-plus
+        - type: horizontal-stack
+          cards:
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: select.<machine_name>_wash_temperature
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: select.<machine_name>_wash_temperature
+                name: Temperature
+                icon: mdi:thermometer
+                features:
+                  - type: select-options
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: select.<machine_name>_wash_spin_speed
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: select.<machine_name>_wash_spin_speed
+                name: Spin speed
+                icon: mdi:rotate-right
+                features:
+                  - type: select-options
+        - type: horizontal-stack
+          cards:
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: select.<machine_name>_wash_stain_level
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: select.<machine_name>_wash_stain_level
+                name: Stain level
+                icon: mdi:water-opacity
+                features:
+                  - type: select-options
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: switch.<machine_name>_wash_steam
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: switch.<machine_name>_wash_steam
+                name: Steam
+                icon: mdi:weather-fog
+        - type: tile
+          entity: select.<machine_name>_dry_setting
+          name: Dry setting
+          icon: mdi:tumble-dryer
+          vertical: false
+          features:
+            - type: select-options
+        - type: tile
+          entity: number.<machine_name>_wash_delay
+          name: Start delay
+          icon: mdi:timer-outline
+          hide_state: false
+          vertical: false
+          features:
+            - style: buttons
+              type: numeric-input
+          features_position: bottom
+  - type: horizontal-stack
+    cards:
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.<machine_name>_wash_scheduled_start
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          entity: sensor.<machine_name>_wash_scheduled_start
+          primary: Starts
+          secondary: >-
+            {{ states('sensor.<machine_name>_wash_scheduled_start') |
+            as_timestamp(default=none) | timestamp_custom('%H:%M', default='--:--') }}
+          icon: mdi:clock-start
+          icon_color: purple
+          tap_action:
+            action: more-info
+      - type: conditional
+        conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: sensor.<machine_name>_wash_scheduled_finish
+                state_not: unavailable
+              - condition: state
+                entity: sensor.<machine_name>
+                state: running
+              - condition: state
+                entity: sensor.<machine_name>
+                state: Running
+        card:
+          type: custom:mushroom-template-card
+          entity: sensor.<machine_name>
+          primary: Finishes
+          secondary: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% set sched = states('sensor.<machine_name>_wash_scheduled_finish') %}
+            {% set rem = states('sensor.<machine_name>_wash_cycle_remaining_time') | int(-1) %}
+            {% if rem > 0 and state == 'running' %}
+              {{ (as_timestamp(now()) + (rem * 60)) | timestamp_custom('%H:%M', default='--:--') }}
+            {% elif sched not in ['unavailable', 'unknown', ''] %}
+              {{ sched | as_timestamp(default=none) | timestamp_custom('%H:%M', default='--:--') }}
+            {% else %}
+              Calculating...
+            {% endif %}
+          icon: mdi:clock-end
+          icon_color: green
+          tap_action:
+            action: more-info
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: binary_sensor.<machine_name>_remote_control
+        state: "on"
+    card:
+      type: horizontal-stack
+      cards:
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - Running
+                - running
+                - Paused
+                - paused
+                - Delayed start programmed
+                - delayed_start_programmed
+                - delayed
+                - Delayed
+                - Finished
+                - finished
+                - "Off"
+                - "off"
+                - Sending command
+                - sending command
+                - sending_command
+          card:
+            type: custom:mushroom-template-card
+            primary: Start
+            icon: mdi:play-circle-outline
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_start_wash
+            vertical: true
+            features_position: bottom
+            color: green
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Running
+                - running
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - "Off"
+                - "off"
+            - condition: state
+              entity: button.<machine_name>_pause_wash
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Pause
+            icon: mdi:pause-circle-outline
+            icon_color: orange
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_pause_wash
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Paused
+                - paused
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - "Off"
+                - "off"
+            - condition: state
+              entity: button.<machine_name>_resume_wash
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Resume
+            icon: mdi:play-circle-outline
+            icon_color: green
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_resume_wash
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - Idle
+                - idle
+                - Finished
+                - finished
+                - "Off"
+                - "off"
+                - Sending command
+                - sending command
+                - sending_command
+          card:
+            type: custom:mushroom-template-card
+            primary: Stop
+            icon: mdi:stop-circle-outline
+            icon_color: red
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_stop_wash
+

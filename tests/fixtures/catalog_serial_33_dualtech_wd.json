@@ -1,0 +1,3074 @@
+{
+  "serial": 33,
+  "model": "GVFW 4118TWHC-47",
+  "type": "washer_dryer",
+  "interface_type": "3D_DUAL",
+  "programs": [
+    {
+      "serial": 316,
+      "position": 0,
+      "icon": "",
+      "description": "",
+      "name": "OFF",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023109",
+      "updated_at": "20170331023109",
+      "program_id": "3abc8aa6-5ffd-4127-b4ea-3e086c79851d",
+      "parameters": [
+        {
+          "serial": 5615,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5616,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5617,
+          "validation": "0",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5618,
+          "validation": "0",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5619,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5620,
+          "validation": "0",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5621,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5622,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5623,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5624,
+          "validation": "0",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5625,
+          "validation": "0",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5626,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5627,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5628,
+          "validation": "0",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5629,
+          "validation": "0",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5630,
+          "validation": "0",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5631,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5632,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5633,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5634,
+          "validation": "",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5635,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5636,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 317,
+      "position": 1,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_EASY_IRON_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_EASY_IRON",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023109",
+      "updated_at": "20170331023109",
+      "program_id": "dfef6cdd-45b2-4443-99cf-731f7f4a60e3",
+      "parameters": [
+        {
+          "serial": 5637,
+          "validation": "1",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5638,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5639,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5640,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5641,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5642,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5643,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5644,
+          "validation": "29",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5645,
+          "validation": "29",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5646,
+          "validation": "29",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5647,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5648,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5649,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5650,
+          "validation": "255",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5651,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5652,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5653,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5654,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5655,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5656,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5657,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5658,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 318,
+      "position": 2,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_PERFECT_MIX_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_PERFECT_MIX",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023109",
+      "updated_at": "20170331023109",
+      "program_id": "33f180fa-e7a5-457e-8b5e-09a2e614b937",
+      "parameters": [
+        {
+          "serial": 5659,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5660,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5661,
+          "validation": "2",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5662,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5663,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5664,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5665,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5666,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5667,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5668,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5669,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5670,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5671,
+          "validation": "117",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5672,
+          "validation": "107",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5673,
+          "validation": "77",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5674,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5675,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5676,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5677,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5678,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5679,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5680,
+          "validation": "129",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 319,
+      "position": 3,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_ANTIALLERGY_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_ANTIALLERGY",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023109",
+      "updated_at": "20170331023109",
+      "program_id": "80585308-3533-4cb1-9951-e7cfe844df7b",
+      "parameters": [
+        {
+          "serial": 5681,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5682,
+          "validation": "3",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5683,
+          "validation": "60",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5684,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5685,
+          "validation": "60",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5686,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5687,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5688,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5689,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5690,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5691,
+          "validation": "101",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5692,
+          "validation": "101",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5693,
+          "validation": "101",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5694,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5695,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5696,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5697,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5698,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5699,
+          "validation": "13",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5700,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5701,
+          "validation": "130",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5702,
+          "validation": "1400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 320,
+      "position": 4,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_PERFECT_RAPID_59_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_PERFECT_RAPID_59",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023109",
+      "updated_at": "20170331023109",
+      "program_id": "fc64699c-f08a-4a48-b731-045fff3654fd",
+      "parameters": [
+        {
+          "serial": 5703,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5704,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5705,
+          "validation": "4",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5706,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5707,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5708,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5709,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5710,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5711,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5712,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5713,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5714,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5715,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5716,
+          "validation": "59",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5717,
+          "validation": "59",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5718,
+          "validation": "59",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5719,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5720,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5721,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5722,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5723,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5724,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 321,
+      "position": 5,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_RAPID_14_MIN_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_14_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023110",
+      "updated_at": "20170331023110",
+      "program_id": "6c10c40a-2188-4ad4-a326-298e86e24cbd",
+      "parameters": [
+        {
+          "serial": 5725,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5726,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5727,
+          "validation": "5",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5728,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5729,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5730,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5731,
+          "validation": "1",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5732,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5733,
+          "validation": "1",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5734,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5735,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5736,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5737,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5738,
+          "validation": "14",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5739,
+          "validation": "14",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5740,
+          "validation": "14",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5741,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5742,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5743,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5744,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5745,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5746,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 322,
+      "position": 6,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_RAPID_30_MIN_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_30_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023110",
+      "updated_at": "20170331023110",
+      "program_id": "4ea217bd-ae1e-447c-96be-bb3189ce038a",
+      "parameters": [
+        {
+          "serial": 5747,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5748,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5749,
+          "validation": "5",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5750,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5751,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5752,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5753,
+          "validation": "9",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5754,
+          "validation": "2",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5755,
+          "validation": "2",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5756,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5757,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5758,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5759,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5760,
+          "validation": "30",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5761,
+          "validation": "30",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5762,
+          "validation": "30",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5763,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5764,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5765,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5766,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5767,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5768,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 323,
+      "position": 7,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_RAPID_44_MIN_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_44_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023110",
+      "updated_at": "20170331023110",
+      "program_id": "bf4c26d4-e9a4-408b-91dc-8ca61de98cba",
+      "parameters": [
+        {
+          "serial": 5769,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5770,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5771,
+          "validation": "5",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5772,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5773,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5774,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5775,
+          "validation": "3",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5776,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5777,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5778,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5779,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5780,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5781,
+          "validation": "44",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5782,
+          "validation": "44",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5783,
+          "validation": "44",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5784,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5785,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5786,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5787,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5788,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5789,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5790,
+          "validation": "9",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 324,
+      "position": 8,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_COTTONS_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_COTTONS",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023110",
+      "updated_at": "20170331023110",
+      "program_id": "a4b7dfa0-2bc2-42ae-a763-e2129808ee3d",
+      "parameters": [
+        {
+          "serial": 5791,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5792,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5793,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5794,
+          "validation": "116",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5795,
+          "validation": "13",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5796,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5797,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5798,
+          "validation": "151",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5799,
+          "validation": "231",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5800,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5801,
+          "validation": "3",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5802,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5803,
+          "validation": "3",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5804,
+          "validation": "90",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5805,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5806,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5807,
+          "validation": "6",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5808,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5809,
+          "validation": "131",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5810,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5811,
+          "validation": "1400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5812,
+          "validation": "1400",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 325,
+      "position": 9,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_DELICATES_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_DELICATES",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023110",
+      "updated_at": "20170331023110",
+      "program_id": "89d56961-dc8d-47ef-846b-393c9552d959",
+      "parameters": [
+        {
+          "serial": 5813,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5814,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5815,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5816,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5817,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5818,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5819,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5820,
+          "validation": "7",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5821,
+          "validation": "40",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5822,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5823,
+          "validation": "40",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5824,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5825,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5826,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5827,
+          "validation": "400",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5828,
+          "validation": "400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5829,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5830,
+          "validation": "56",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5831,
+          "validation": "56",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5832,
+          "validation": "56",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5833,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5834,
+          "validation": "128",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 326,
+      "position": 10,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_RINSE_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_RINSE",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023110",
+      "updated_at": "20170331023110",
+      "program_id": "6a3da311-c323-421c-886d-49026aa6dcea",
+      "parameters": [
+        {
+          "serial": 5835,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5836,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5837,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5838,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5839,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5840,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5841,
+          "validation": "28",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5842,
+          "validation": "28",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5843,
+          "validation": "28",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5844,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5845,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5846,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5847,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5848,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5849,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5850,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5851,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5852,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5853,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5854,
+          "validation": "8",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5855,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5856,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 327,
+      "position": 11,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_DRAIN_SPIN_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_DRAIN_SPIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "a909b623-5000-4e42-b783-80d9aff18135",
+      "parameters": [
+        {
+          "serial": 5857,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5858,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5859,
+          "validation": "9",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5860,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5861,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5862,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5863,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5864,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5865,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5866,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5867,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5868,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5869,
+          "validation": "10",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5870,
+          "validation": "10",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5871,
+          "validation": "10",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5872,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5873,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5874,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5875,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5876,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5877,
+          "validation": "13",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5878,
+          "validation": "1400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 328,
+      "position": 12,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_WOOL_DRY_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_WOOL_AND_SILK",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "72a167a6-5c66-4473-b1e3-5c07ba715c48",
+      "parameters": [
+        {
+          "serial": 5879,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5880,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5881,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5882,
+          "validation": "10",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5883,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5884,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5885,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5886,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5887,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5888,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5889,
+          "validation": "800",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5890,
+          "validation": "800",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5891,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5892,
+          "validation": "48",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5893,
+          "validation": "48",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5894,
+          "validation": "48",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5895,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5896,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5897,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5898,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5899,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5900,
+          "validation": "128",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 329,
+      "position": 13,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_WOOL_DRY_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_WOOL_DRY",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "c2e57438-a8c0-4d6d-85a6-286b2c1d4a79",
+      "parameters": [
+        {
+          "serial": 5901,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5902,
+          "validation": "11",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5903,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5904,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5905,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5906,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5907,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5908,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5909,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5910,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5911,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5912,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5913,
+          "validation": "120",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5914,
+          "validation": "120",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5915,
+          "validation": "120",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5916,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5917,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5918,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5919,
+          "validation": "D",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5920,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5921,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5922,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 330,
+      "position": 14,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_DRY_HIGH_HEAT_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_DRY_LOW_HEAT",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "336e3a4e-7cec-462e-a0e1-39e8b1c57eb0",
+      "parameters": [
+        {
+          "serial": 5923,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5924,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5925,
+          "validation": "12",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5926,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5927,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5928,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5929,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5930,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5931,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5932,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5933,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5934,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5935,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5936,
+          "validation": "170",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5937,
+          "validation": "170",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5938,
+          "validation": "170",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5939,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5940,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5941,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5942,
+          "validation": "D",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5943,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5944,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 331,
+      "position": 15,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_DRY_HIGH_HEAT_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_DRY_HIGH_HEAT",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "e6c08f1e-ff35-4628-b241-a264ef39e4d5",
+      "parameters": [
+        {
+          "serial": 5945,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5946,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5947,
+          "validation": "13",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5948,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5949,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5950,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5951,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5952,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5953,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5954,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5955,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5956,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5957,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5958,
+          "validation": "230",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5959,
+          "validation": "230",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5960,
+          "validation": "230",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5961,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5962,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5963,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5964,
+          "validation": "D",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5965,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5966,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 332,
+      "position": 16,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_RAPID_WASH_AND_DRY_59_MIN_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_RAPID_WASH_AND_DRY_59_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "ab44bf6c-d6a8-4ebc-94c9-4371dd2634a0",
+      "parameters": [
+        {
+          "serial": 5967,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5968,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5969,
+          "validation": "14",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5970,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5971,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5972,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5973,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5974,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5975,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5976,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5977,
+          "validation": "1000",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5978,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5979,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5980,
+          "validation": "59",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5981,
+          "validation": "59",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5982,
+          "validation": "59",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5983,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5984,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5985,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5986,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5987,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5988,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 333,
+      "position": 17,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_SMART_FI_PLUS_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_SMART_FI_PLUS",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023111",
+      "updated_at": "20170331023111",
+      "program_id": "d1ff1266-4b18-4fb6-bd19-565267df341d",
+      "parameters": [
+        {
+          "serial": 5989,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5990,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5991,
+          "validation": "15",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5992,
+          "validation": "90",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5993,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5994,
+          "validation": "90",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5995,
+          "validation": "1",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5996,
+          "validation": "1",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5997,
+          "validation": "1",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5998,
+          "validation": "400",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 5999,
+          "validation": "400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6000,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6001,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6002,
+          "validation": "116",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6003,
+          "validation": "116",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6004,
+          "validation": "116",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6005,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6006,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6007,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6008,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6009,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6010,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 334,
+      "position": 18,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_TUMBLING_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_TUMBLING",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023112",
+      "updated_at": "20170331023112",
+      "program_id": "10881054-f93c-45f9-bde2-ddab5ed6b120",
+      "parameters": [
+        {
+          "serial": 6011,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6012,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6013,
+          "validation": "16",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6014,
+          "validation": "255",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6015,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6016,
+          "validation": "255",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6017,
+          "validation": "255",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6018,
+          "validation": "255",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6019,
+          "validation": "255",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6020,
+          "validation": "255",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6021,
+          "validation": "255",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6022,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6023,
+          "validation": "0",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6024,
+          "validation": "255",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6025,
+          "validation": "255",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6026,
+          "validation": "255",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6027,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6028,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6029,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6030,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6031,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6032,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 335,
+      "position": 19,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_SILK_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_SILK",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023112",
+      "updated_at": "20170331023112",
+      "program_id": "05fe2ded-d8a8-4930-b887-1b49168c140d",
+      "parameters": [
+        {
+          "serial": 6033,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6034,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6035,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6036,
+          "validation": "",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6037,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6038,
+          "validation": "0",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6039,
+          "validation": "17",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6040,
+          "validation": "30",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6041,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6042,
+          "validation": "30",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6043,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6044,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6045,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6046,
+          "validation": "0",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6047,
+          "validation": "0",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6048,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6049,
+          "validation": "48",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6050,
+          "validation": "48",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6051,
+          "validation": "48",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6052,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6053,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6054,
+          "validation": "128",
+          "name": "available_options",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 336,
+      "position": 20,
+      "icon": "",
+      "description": "DUAL_WM_WD_PROGRAM_NAME_DAILY_59_MIN_DESCRIPTION",
+      "name": "DUAL_WM_WD_PROGRAM_NAME_DAILY_59_MIN",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20170331023112",
+      "updated_at": "20170331023112",
+      "program_id": "554aab50-c1a0-445e-a816-ad290ebccdc5",
+      "parameters": [
+        {
+          "serial": 6055,
+          "validation": "0",
+          "name": "steam",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6056,
+          "validation": "255",
+          "name": "dry",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6057,
+          "validation": "18",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6058,
+          "validation": "60",
+          "name": "default_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6059,
+          "validation": "",
+          "name": "interface_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6060,
+          "validation": "60",
+          "name": "maximum_temperature",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6061,
+          "validation": "0",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6062,
+          "validation": "0",
+          "name": "minimum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6063,
+          "validation": "0",
+          "name": "maximum_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6064,
+          "validation": "1000",
+          "name": "default_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6065,
+          "validation": "1400",
+          "name": "maximum_spin_speed",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6066,
+          "validation": "",
+          "name": "remaining_time_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6067,
+          "validation": "2",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6068,
+          "validation": "59",
+          "name": "remaining_time_soil_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6069,
+          "validation": "59",
+          "name": "remaining_time_soil_medium",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6070,
+          "validation": "59",
+          "name": "remaining_time_soil_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6071,
+          "validation": "",
+          "name": "av2",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6072,
+          "validation": "",
+          "name": "av1",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6073,
+          "validation": "",
+          "name": "av0",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6074,
+          "validation": "W",
+          "name": "program_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6075,
+          "validation": "",
+          "name": "drying_type",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 6076,
+          "validation": "12",
+          "name": "selector_position_dry",
+          "datatype": "mixed"
+        }
+      ]
+    }
+  ]
+}

@@ -59,7 +59,9 @@ _STATUS_PAUSED = """{
   }
 }"""
 
-_STATS_OK = '{"statusCounters": {"Temp0to30": "42"}}'
+_STATS_OK = (
+    '{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}'
+)
 
 
 async def _setup(

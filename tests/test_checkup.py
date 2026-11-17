@@ -15,7 +15,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.candy import CONF_KEY_USE_ENCRYPTION, DOMAIN
 from custom_components.candy.button import _should_send_checkup
-from custom_components.candy.client.model import CheckUpResult
+from custom_components.candy.client.model import CheckUpResult, MachineState
 from custom_components.candy.const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_MONTHLY,
@@ -23,6 +23,7 @@ from custom_components.candy.const import (
     CONF_KEY_CHECKUP_ENABLED,
     CONF_KEY_CHECKUP_LAST_DATE,
     CONF_KEY_CHECKUP_LAST_RESULT,
+    CONF_KEY_CHECKUP_PENDING,
     CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_MODE,
     CONF_KEY_PROGRAMS,
@@ -36,44 +37,26 @@ from custom_components.candy.const import (
 from .common import TEST_IP
 
 # ---------------------------------------------------------------------------
-# Minimal program entry (no steam)
+# Minimal program entry (SPECIAL_39 matching Pr=1 PrCode=136)
 # ---------------------------------------------------------------------------
 
-_COTTON = {
+_SPECIAL_39 = {
     "program": {
         "position": 1,
-        "name": "DUAL_WM_WD_PROGRAM_NAME_COTTON",
+        "name": "DUAL_WM_WD_PROGRAM_NAME_SPECIAL_39",
         "command_parameters": [
             {"command_parameter": {"name": "selector_position", "validation": "1"}},
             {"command_parameter": {"name": "pr_code", "validation": "136"}},
-            {"command_parameter": {"name": "maximum_temperature", "validation": "90"}},
+            {"command_parameter": {"name": "maximum_temperature", "validation": "40"}},
             {"command_parameter": {"name": "default_temperature", "validation": "40"}},
-            {"command_parameter": {"name": "maximum_spin_speed", "validation": "1400"}},
+            {"command_parameter": {"name": "maximum_spin_speed", "validation": "1200"}},
             {"command_parameter": {"name": "default_spin_speed", "validation": "800"}},
-            {"command_parameter": {"name": "minimum_soil_level", "validation": "1"}},
-            {"command_parameter": {"name": "maximum_soil_level", "validation": "3"}},
-            {"command_parameter": {"name": "default_soil_level", "validation": "2"}},
+            {"command_parameter": {"name": "minimum_soil_level", "validation": "0"}},
+            {"command_parameter": {"name": "maximum_soil_level", "validation": "0"}},
+            {"command_parameter": {"name": "default_soil_level", "validation": "0"}},
             {"command_parameter": {"name": "steam", "validation": "0"}},
-            {"command_parameter": {"name": "default_duration", "validation": "90"}},
-            {
-                "command_parameter": {
-                    "name": "remaining_time_soil_max",
-                    "validation": "120",
-                }
-            },
-            {
-                "command_parameter": {
-                    "name": "remaining_time_soil_medium",
-                    "validation": "90",
-                }
-            },
-            {
-                "command_parameter": {
-                    "name": "remaining_time_soil_min",
-                    "validation": "60",
-                }
-            },
-            {"command_parameter": {"name": "available_options", "validation": "0"}},
+            {"command_parameter": {"name": "default_duration", "validation": "39"}},
+            {"command_parameter": {"name": "available_options", "validation": "240"}},
         ],
     }
 }
@@ -110,7 +93,9 @@ _IDLE_WITH_DIS_TEST_RES_2 = """{
   }
 }"""
 
-_STATS_OK = '{"statusCounters": {"Temp0to30": "40"}}'
+_STATS_OK = (
+    '{"statusCounters": {"Temp0to30": "318", "Temp40": "70", "Temp60to90": "0"}}'
+)
 
 _NOW = datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC)
 
@@ -126,7 +111,7 @@ def _make_entry(**extra) -> MockConfigEntry:
         CONF_KEY_USE_ENCRYPTION: False,
         CONF_PASSWORD: "",
         CONF_KEY_MODE: MODE_FULL_CONTROL,
-        CONF_KEY_PROGRAMS: [_COTTON],
+        CONF_KEY_PROGRAMS: [_SPECIAL_39],
     }
     data.update(extra)
     return MockConfigEntry(domain=DOMAIN, unique_id="test-checkup", data=data)
@@ -580,10 +565,10 @@ async def test_checkup_listener_returns_early_when_prev_code_none(
 # ---------------------------------------------------------------------------
 
 
-async def test_start_button_weekly_no_last_date_records_checkup(
+async def test_start_button_weekly_no_last_date_records_pending(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """Weekly schedule, no prior date: pressing Start sends StartCheckUp=1 and records the date."""
+    """Weekly schedule, no prior date: pressing Start sends StartCheckUp=1 and sets pending flag, not date."""
     entry = await _setup(
         hass,
         aioclient_mock,
@@ -609,7 +594,8 @@ async def test_start_button_weekly_no_last_date_records_checkup(
 
     query_string: str = mock_send.call_args[0][0]
     assert "StartCheckUp=1" in query_string
-    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is not None
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
 
 
 async def test_start_button_weekly_recent_date_skips_checkup(
@@ -643,12 +629,13 @@ async def test_start_button_weekly_recent_date_skips_checkup(
     query_string: str = mock_send.call_args[0][0]
     assert "StartCheckUp=0" in query_string
     assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) == three_days_ago
+    assert not entry.data.get(CONF_KEY_CHECKUP_PENDING, False)
 
 
 async def test_start_button_command_failure_does_not_record_checkup(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """Failed start command must not advance the checkup schedule clock."""
+    """Failed start command must not advance the checkup schedule clock or set pending."""
     entry = await _setup(
         hass,
         aioclient_mock,
@@ -676,4 +663,328 @@ async def test_start_button_command_failure_does_not_record_checkup(
             "button", "press", {"entity_id": start_entity_id}, blocking=True
         )
 
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
+    assert not entry.data.get(CONF_KEY_CHECKUP_PENDING, False)
+
+
+async def test_checkup_recorded_on_cycle_completion_when_pending(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """When a wash with pending checkup finishes, records timestamp and clears pending."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Running wash
+    running_status = copy.copy(coordinator.data)
+    running_status.machine_state = MachineState.RUNNING
+    running_status.dis_test_res = CheckUpResult.NOT_RUN
+    coordinator.async_set_updated_data(running_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
+
+    # Wash completes with OK checkup result
+    finished_status = copy.copy(coordinator.data)
+    finished_status.machine_state = MachineState.FINISHED1
+    finished_status.dis_test_res = CheckUpResult.OK
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is not None
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT) == CheckUpResult.OK.code
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+
+
+async def test_checkup_delayed_wash_defers_timestamp_until_finished(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Delayed wash keeps previous timestamp through delay and running, records on finish."""
+    initial_date = (datetime.now(UTC) - timedelta(days=10)).timestamp()
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_LAST_DATE: initial_date,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # State: Delayed start programmed
+    delayed_status = copy.copy(coordinator.data)
+    delayed_status.machine_state = MachineState.DELAYED_START_PROGRAMMED
+    delayed_status.dis_test_res = CheckUpResult.NOT_RUN
+    coordinator.async_set_updated_data(delayed_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) == initial_date
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
+
+    # State: Wash running
+    running_status = copy.copy(coordinator.data)
+    running_status.machine_state = MachineState.RUNNING
+    running_status.dis_test_res = CheckUpResult.NOT_RUN
+    coordinator.async_set_updated_data(running_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) == initial_date
+
+    # State: Wash finished
+    finished_status = copy.copy(coordinator.data)
+    finished_status.machine_state = MachineState.FINISHED1
+    finished_status.dis_test_res = CheckUpResult.OK
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) > initial_date
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+
+
+async def test_checkup_ordinary_wash_does_not_reset_weekly_schedule_clock(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Ordinary wash with weekly schedule and DisTestRes=1 does not overwrite last checkup date."""
+    three_days_ago = (datetime.now(UTC) - timedelta(days=3)).timestamp()
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_LAST_DATE: three_days_ago,
+            CONF_KEY_CHECKUP_PENDING: False,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Ordinary wash finishes
+    finished_status = copy.copy(coordinator.data)
+    finished_status.machine_state = MachineState.FINISHED1
+    finished_status.dis_test_res = CheckUpResult.OK
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    # Date remains 3 days ago, result is cached
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) == three_days_ago
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT) == CheckUpResult.OK.code
+
+
+async def test_checkup_aborted_wash_clears_pending_without_advancing_clock(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Aborted wash (transitioning RUNNING -> IDLE without finishing) clears pending flag."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Running wash
+    running_status = copy.copy(coordinator.data)
+    running_status.machine_state = MachineState.RUNNING
+    coordinator.async_set_updated_data(running_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
+
+    # User cancels/stops wash -> transitions back to IDLE
+    idle_status = copy.copy(coordinator.data)
+    idle_status.machine_state = MachineState.IDLE
+    coordinator.async_set_updated_data(idle_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
+
+
+async def test_checkup_every_cycle_records_on_completion(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Every cycle schedule records date on completion even if pending flag was not explicitly set."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_EVERY_CYCLE,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Running wash
+    running_status = copy.copy(coordinator.data)
+    running_status.machine_state = MachineState.RUNNING
+    coordinator.async_set_updated_data(running_status)
+    await hass.async_block_till_done()
+
+    # Finishes with OK
+    finished_status = copy.copy(coordinator.data)
+    finished_status.machine_state = MachineState.FINISHED1
+    finished_status.dis_test_res = CheckUpResult.OK
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is not None
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT) == CheckUpResult.OK.code
+
+
+async def test_checkup_error_state_clears_pending_without_recording(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Wash encountering an error then powered off clears pending flag without recording."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Machine enters error state
+    error_status = copy.copy(coordinator.data)
+    error_status.machine_state = MachineState.ERROR
+    coordinator.async_set_updated_data(error_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
+
+    # Machine turned off
+    off_status = copy.copy(coordinator.data)
+    off_status.machine_state = MachineState.OFF
+    coordinator.async_set_updated_data(off_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
+
+
+async def test_checkup_finished_state_poll_idempotent(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Multiple coordinator updates while machine remains in FINISHED state do not re-record date."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # First update: reaches FINISHED1
+    finished_status = copy.copy(coordinator.data)
+    finished_status.machine_state = MachineState.FINISHED1
+    finished_status.dis_test_res = CheckUpResult.OK
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    first_recorded_date = entry.data.get(CONF_KEY_CHECKUP_LAST_DATE)
+    assert first_recorded_date is not None
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+
+    # Second update: still in FINISHED1
+    coordinator.async_set_updated_data(copy.copy(finished_status))
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) == first_recorded_date
+
+    # Third update: transitions to OFF
+    off_status = copy.copy(coordinator.data)
+    off_status.machine_state = MachineState.OFF
+    coordinator.async_set_updated_data(off_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) == first_recorded_date
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+
+
+async def test_checkup_zero_result_finished_clears_pending_on_power_off(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Cycle finishing with DisTestRes=0 does not record date, and clears pending upon power off."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Reaches FINISHED1 with NOT_RUN (0)
+    finished_status = copy.copy(coordinator.data)
+    finished_status.machine_state = MachineState.FINISHED1
+    finished_status.dis_test_res = CheckUpResult.NOT_RUN
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    # Did not record since code == 0
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
+
+    # Machine powers off
+    off_status = copy.copy(coordinator.data)
+    off_status.machine_state = MachineState.OFF
+    coordinator.async_set_updated_data(off_status)
+    await hass.async_block_till_done()
+
+    # Pending cleared without recording
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is False
+    assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None
+
+
+async def test_checkup_initial_idle_poll_preserves_pending(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Immediate poll after start where machine reports IDLE does not prematurely clear pending."""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _IDLE_JSON,
+        **{
+            CONF_KEY_CHECKUP_ENABLED: True,
+            CONF_KEY_CHECKUP_SCHEDULE: CHECKUP_SCHEDULE_WEEKLY,
+            CONF_KEY_CHECKUP_PENDING: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    # Poll still reports IDLE
+    idle_status = copy.copy(coordinator.data)
+    idle_status.machine_state = MachineState.IDLE
+    coordinator.async_set_updated_data(idle_status)
+    await hass.async_block_till_done()
+
+    assert entry.data.get(CONF_KEY_CHECKUP_PENDING) is True
     assert entry.data.get(CONF_KEY_CHECKUP_LAST_DATE) is None

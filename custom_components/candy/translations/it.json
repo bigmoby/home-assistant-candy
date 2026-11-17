@@ -28,6 +28,13 @@
           "mode": "Modalità"
         }
       },
+      "washer_dryer": {
+        "title": "Lavasciuga",
+        "description": "In modalità Solo lettura, gli elettrodomestici Candy non possono essere distinti automaticamente tra una Lavatrice standard e una Lavasciuga. Seleziona questa casella se il tuo elettrodomestico dispone di funzioni di asciugatura.",
+        "data": {
+          "is_washer_dryer": "L'elettrodomestico è una Lavasciuga"
+        }
+      },
       "cloud": {
         "title": "Account Simply-Fi",
         "data": {
@@ -36,8 +43,8 @@
         }
       },
       "language": {
-        "title": "Lingua dei programmi",
-        "description": "Scegli la lingua da usare per i nomi dei programmi nell'interfaccia. Può essere diversa dalla lingua di Home Assistant.",
+        "title": "Lingua dell'elettrodomestico",
+        "description": "Scegli la lingua per i nomi dei programmi e i messaggi dell'elettrodomestico (promemoria, errori e risultati del check-up). Può essere diversa dalla lingua di Home Assistant.",
         "data": {
           "program_language": "Lingua"
         }
@@ -84,6 +91,21 @@
       },
       "wash_program_description": {
         "name": "Descrizione programma"
+      },
+      "wash_dry_target": {
+        "name": "Target asciugatura",
+        "state": {
+          "no_dry": "Nessuna asciugatura",
+          "extra_dry": "Extra asciutto",
+          "iron_dry": "Pronto stiro",
+          "cupboard_dry": "Pronto armadio",
+          "cooldown": "Raffreddamento",
+          "120_minutes": "120 minuti",
+          "90_minutes": "90 minuti",
+          "60_minutes": "60 minuti",
+          "30_minutes": "30 minuti",
+          "wool_dry": "Asciugatura lana"
+        }
       },
       "tumble_dryer": {
         "name": "Asciugatrice"
@@ -141,6 +163,14 @@
       }
     },
     "select": {
+      "wash_program_type": {
+        "name": "Tipologia programma",
+        "state": {
+          "washing": "Lavaggio",
+          "drying": "Asciugatura",
+          "wash_and_dry": "Lavaggio - asciugatura"
+        }
+      },
       "wash_program_select": {
         "name": "Programma di lavaggio"
       },
@@ -152,6 +182,19 @@
       },
       "wash_soil_select": {
         "name": "Livello di sporco"
+      },
+      "wash_dry_select": {
+        "name": "Impostazione asciugatura",
+        "state": {
+          "no_dry": "Nessuna asciugatura",
+          "extra_dry": "Extra asciutto",
+          "iron_dry": "Pronto stiro",
+          "cupboard_dry": "Pronto armadio",
+          "120_minutes": "120 minuti",
+          "90_minutes": "90 minuti",
+          "60_minutes": "60 minuti",
+          "30_minutes": "30 minuti"
+        }
       },
       "dishwasher_program_select": {
         "name": "Programma da avviare",
@@ -180,6 +223,12 @@
     "button": {
       "wash_start_button": {
         "name": "Avvia lavaggio"
+      },
+      "wash_pause_button": {
+        "name": "Pausa lavaggio"
+      },
+      "wash_resume_button": {
+        "name": "Riprendi lavaggio"
       },
       "wash_stop_button": {
         "name": "Ferma lavaggio"

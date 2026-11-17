@@ -114,7 +114,7 @@ def find_key(encrypted_response: bytes) -> str | None:
     for kp in KNOWN_PLAINTEXTS:
         key = find_xor_key(encrypted_response, kp)
         if key:
-            _LOGGER.info("Potential key found: %s", key)
+            _LOGGER.debug("Potential encryption key found")
             return key
 
     return None

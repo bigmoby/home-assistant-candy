@@ -28,6 +28,13 @@
           "mode": "Modo"
         }
       },
+      "washer_dryer": {
+        "title": "Lavadora-secadora",
+        "description": "En el modo Solo lectura, los electrodomésticos Candy no se pueden distinguir automáticamente entre una lavadora estándar y una lavadora-secadora. Marca esta casilla si tu electrodoméstico dispone de funciones de secado.",
+        "data": {
+          "is_washer_dryer": "El electrodoméstico es una lavadora-secadora"
+        }
+      },
       "cloud": {
         "title": "Cuenta Simply-Fi",
         "data": {
@@ -36,8 +43,8 @@
         }
       },
       "language": {
-        "title": "Idioma de los programas",
-        "description": "Elige el idioma para los nombres de programas en la interfaz. Puede diferir del idioma de Home Assistant.",
+        "title": "Idioma del electrodoméstico",
+        "description": "Elige el idioma para los nombres de programas y los mensajes del electrodoméstico (recordatorios, errores y resultados de comprobación). Puede diferir del idioma de Home Assistant.",
         "data": {
           "program_language": "Idioma"
         }

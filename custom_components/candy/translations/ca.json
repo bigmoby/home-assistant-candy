@@ -28,6 +28,13 @@
           "mode": "Mode"
         }
       },
+      "washer_dryer": {
+        "title": "Rentadora-assecadora",
+        "description": "En mode Només lectura, els electrodomèstics Candy no es poden distingir automàticament entre una Rentadora estàndard i una Rentadora-assecadora. Marqueu aquesta casella si el vostre electrodomèstic disposa de funcions d'assecat.",
+        "data": {
+          "is_washer_dryer": "L'aparell és una rentadora-assecadora"
+        }
+      },
       "cloud": {
         "title": "Compte Simply-Fi",
         "data": {
@@ -36,8 +43,8 @@
         }
       },
       "language": {
-        "title": "Idioma dels programes",
-        "description": "Trieu l'idioma per als noms dels programes a la interfície. Pot ser diferent de l'idioma de Home Assistant.",
+        "title": "Idioma de l'aparell",
+        "description": "Trieu l'idioma per als noms dels programes i els missatges de l'aparell (recordatoris, errors i resultats de comprovació). Pot ser diferent de l'idioma de Home Assistant.",
         "data": {
           "program_language": "Idioma"
         }

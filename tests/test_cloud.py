@@ -52,11 +52,24 @@ def _appliance_entry(ip=None, key="secret-key", programs=None):
     appliance = {
         "mac_address": "AA:BB:CC:DD:EE:FF",
         "encryption_key": key,
-        "appliance_model": "TestModel",
+        "appliance_model": "RO41274DWMSE/1-S",
         "sixteen_digits_code": "SN12345678901234",
         "purchase_date": "2024-01-01",
-        "interface_type": "Bianca",
-        "programs": programs if programs is not None else [{"id": 1, "name": "Cotton"}],
+        "interface_type": "RAPIDO_4DIG_STM_NEL",
+        "brand": "candy",
+        "appliance_type": "washer",
+        "programs": (
+            programs
+            if programs is not None
+            else [
+                {
+                    "program": {
+                        "id": "7e661414-b751-4483-b537-9bf8cf19ea00",
+                        "name": "RESISTANT_COTTONS",
+                    }
+                }
+            ]
+        ),
         "current_status_parameters": {"ip_address": ip} if ip else {},
     }
     return {"appliance": appliance}
@@ -69,6 +82,8 @@ def test_match_appliance_by_ip():
     assert result.mac_address == "AA:BB:CC:DD:EE:FF"
     assert result.encryption_key == "secret-key"
     assert result.downloadable_programs == []
+    assert result.brand == "candy"
+    assert result.appliance_type == "washer"
 
 
 def test_match_appliance_single_fallback():
@@ -78,6 +93,15 @@ def test_match_appliance_single_fallback():
     assert result.downloadable_programs == [{"id": 99}]
 
 
+def test_match_appliance_washer_dryer_hoover():
+    entry = _appliance_entry(ip="10.0.0.1")
+    entry["appliance"]["brand"] = "hoover"
+    entry["appliance"]["appliance_type"] = "washer_dryer"
+    result = _match_appliance([entry], "10.0.0.1", [])
+    assert result.brand == "hoover"
+    assert result.appliance_type == "washer_dryer"
+
+
 def test_match_appliance_no_match_multiple():
     appliances = [_appliance_entry(ip="10.0.0.1"), _appliance_entry(ip="10.0.0.2")]
     with pytest.raises(SimplyFiCloudError, match="No Simply-Fi appliance matched"):
@@ -85,9 +109,14 @@ def test_match_appliance_no_match_multiple():
 
 
 def test_match_appliance_missing_encryption_key():
+    """Missing or empty encryption_key in cloud data is allowed (local transport governs)."""
     appliances = [_appliance_entry(ip="10.0.0.1", key="")]
-    with pytest.raises(SimplyFiCloudError, match="missing encryption_key"):
-        _match_appliance(appliances, "10.0.0.1", [])
+    result = _match_appliance(appliances, "10.0.0.1", [])
+    assert result.encryption_key == ""
+
+    appliances_none = [_appliance_entry(ip="10.0.0.1", key=None)]
+    result_none = _match_appliance(appliances_none, "10.0.0.1", [])
+    assert result_none.encryption_key == ""
 
 
 def test_match_appliance_missing_programs():
@@ -203,17 +232,59 @@ async def test_fetch_appliances_non_list_response():
 
 
 async def test_fetch_downloadable_programs_list_response():
-    programs = [{"wm_wd_program": {"id": 1}}, {"wm_wd_program": {"id": 2}}]
+    programs = [
+        {
+            "wm_wd_program": {
+                "id": "899838a1-1d15-4d15-814e-a6894c279be6",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_BED_LINEN",
+            }
+        },
+        {
+            "wm_wd_program": {
+                "id": "e40658f7-883e-42ab-8255-5aff9bfa528c",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_NEW_CLOTHES",
+            }
+        },
+    ]
     session = _make_session(get_resps=[_make_resp(200, programs)])
     result = await _fetch_downloadable_programs(session, _TOKENS)
-    assert result == [{"id": 1}, {"id": 2}]
+    assert result == [
+        {
+            "id": "899838a1-1d15-4d15-814e-a6894c279be6",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_BED_LINEN",
+        },
+        {
+            "id": "e40658f7-883e-42ab-8255-5aff9bfa528c",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_NEW_CLOTHES",
+        },
+    ]
 
 
 async def test_fetch_downloadable_programs_dict_wrapper():
-    data = {"wm_wd_programs": [{"id": 10}, {"id": 20}]}
+    data = {
+        "wm_wd_programs": [
+            {
+                "id": "52ab9121-e1be-47db-b419-1f468e5ad830",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_CASHMERE",
+            },
+            {
+                "id": "2db4e142-ff5b-42ea-a417-10ffb6a3ce28",
+                "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_GYM_FIT",
+            },
+        ]
+    }
     session = _make_session(get_resps=[_make_resp(200, data)])
     result = await _fetch_downloadable_programs(session, _TOKENS)
-    assert result == [{"id": 10}, {"id": 20}]
+    assert result == [
+        {
+            "id": "52ab9121-e1be-47db-b419-1f468e5ad830",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_CASHMERE",
+        },
+        {
+            "id": "2db4e142-ff5b-42ea-a417-10ffb6a3ce28",
+            "name": "DUAL_WM_WD_PROGRAM_DOWNLOAD_NAME_GYM_FIT",
+        },
+    ]
 
 
 async def test_fetch_downloadable_programs_non_200():
