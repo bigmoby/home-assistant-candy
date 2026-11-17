@@ -1015,7 +1015,7 @@ async def test_options_flow_maintenance_settings(
     assert result["step_id"] == "maintenance_baselines"
 
     # stats coordinator not available in this test (setup bypassed) → total_cycles=0
-    # last_reset = max(0, 0 - (threshold - remaining)) = 0 for any positive remaining
+    # last_reset = total - (threshold - remaining) preserves virtual historical baseline
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={
@@ -1028,9 +1028,9 @@ async def test_options_flow_maintenance_settings(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     updated = hass.config_entries.async_get_entry(entry.entry_id)
     assert updated.data[CONF_KEY_WATER_HARDNESS] == 5
-    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 0
-    assert updated.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 0
-    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 0
+    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == -50
+    assert updated.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == -45
+    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == -40
 
 
 async def test_options_flow_maintenance_settings_disable(
@@ -1927,8 +1927,9 @@ async def test_full_control_dualtech_skips_counter_types_when_maintenance_enable
 
 def test_remaining_to_last_reset_and_current_remaining_cycles(hass):
     """Test helper functions in config_flow."""
-    # 1. total == 0 returns 0 (line 164)
-    assert _remaining_to_last_reset(50, 0, 100) == 0
+    # 1. total == 0 calculates virtual baseline properly
+    assert _remaining_to_last_reset(50, 0, 100) == -50
+    assert _remaining_to_last_reset(100, 0, 100) == 0
 
     # 2. total > 0 calculates properly, including negative values
     assert _remaining_to_last_reset(80, 10, 100) == -10

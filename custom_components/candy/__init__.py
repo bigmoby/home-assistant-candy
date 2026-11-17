@@ -356,9 +356,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     ip_address = config_entry.data[CONF_IP_ADDRESS]
     encryption_key = config_entry.data.get(CONF_PASSWORD, "")
     use_encryption = config_entry.data.get(CONF_KEY_USE_ENCRYPTION, True)
+    interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
 
     session = async_get_clientsession(hass)
-    client = CandyClient(session, ip_address, encryption_key, use_encryption)
+    client = CandyClient(
+        session, ip_address, encryption_key, use_encryption, interface_type
+    )
 
     @callback
     def _migrate_unique_ids(entry: er.RegistryEntry) -> dict[str, Any] | None:
@@ -1178,7 +1181,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        entry_data = hass.data[DOMAIN].pop(entry.entry_id, {})
+        entry_data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, {})
         for key in (
             DATA_KEY_MAINT_UNSUB,
             DATA_KEY_CHECKUP_UNSUB,
@@ -1193,6 +1196,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             unsub = entry_data.get(key)
             if unsub is not None:
                 unsub()
-        if not hass.data[DOMAIN]:
+        if DOMAIN in hass.data and not hass.data[DOMAIN]:
             del hass.data[DOMAIN]
     return unload_ok

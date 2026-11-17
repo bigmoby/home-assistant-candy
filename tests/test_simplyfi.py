@@ -190,3 +190,39 @@ def test_main_legacy_diagnose_raw() -> None:
         mock_diagnose.assert_called_once_with(
             "192.168.1.50", 80, "legacy_key", False, 10
         )
+
+
+def test_fetch_new_statistics_json() -> None:
+    """Test fetch_new_statistics_json parses valid statusCounters payload."""
+    with patch(
+        "simplyfi.send_write_command_payload",
+        return_value='{"statusCounters": {"Program1": "10"}}',
+    ):
+        result = simplyfi.fetch_new_statistics_json("192.168.1.50", 80, "key", True, 5)
+        assert result == {"statusCounters": {"Program1": "10"}}
+
+
+def test_run_stats_falls_back_to_getstat() -> None:
+    """Test run_stats probes GetStat=1 when legacy handshake fails."""
+    stdout_buf = io.StringIO()
+    with (
+        patch(
+            "simplyfi.fetch_or_discover_telemetry",
+            return_value=({"statusLavatrice": {}}, "key", True),
+        ),
+        patch("time.sleep"),
+        patch(
+            "simplyfi.fetch_statistics_json",
+            side_effect=simplyfi.CandyProtocolError("Legacy disconnected"),
+        ),
+        patch(
+            "simplyfi.fetch_new_statistics_json",
+            return_value={"statusCounters": {"Program1": "15"}},
+        ),
+        contextlib.redirect_stdout(stdout_buf),
+    ):
+        simplyfi.run_stats("192.168.1.50", 80, "key", 5)
+
+    captured = stdout_buf.getvalue()
+    assert "Legacy statistics handshake failed" in captured
+    assert "Protocol: Modern Write (GetStat=1)" in captured

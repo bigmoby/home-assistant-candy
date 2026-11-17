@@ -469,6 +469,24 @@ def fetch_statistics_json(
         raise CandyProtocolError(f"Invalid JSON in statistics response: {exc}") from exc
 
 
+def fetch_new_statistics_json(
+    device_ip: str, port: int, key: str, use_encryption: bool, timeout_sec: int
+) -> dict[str, Any]:
+    """Fetch cycle statistics via modern GetStat=1 command on /http-write.json (Smart Pro, H-WASH 300, X-Care)."""
+    resp_text = send_write_command_payload(
+        device_ip, port, key, use_encryption, "GetStat=1", timeout_sec
+    )
+    if not resp_text:
+        raise CandyProtocolError("Empty statistics payload returned from GetStat=1")
+    try:
+        data = json.loads(resp_text)
+        if isinstance(data, dict) and "statusCounters" in data:
+            return data
+        raise CandyProtocolError(f"Unexpected response structure from GetStat=1: {data}")
+    except json.JSONDecodeError as exc:
+        raise CandyProtocolError(f"Invalid JSON in GetStat=1 response: {exc}") from exc
+
+
 def send_write_command_payload(
     device_ip: str,
     port: int,
@@ -1239,8 +1257,14 @@ def run_stats(device_ip: str, port: int, key: str, timeout_sec: int) -> None:
     print_header(sys.stdout)
     _, resolved_key, use_enc = fetch_or_discover_telemetry(device_ip, port, key, timeout_sec)
     time.sleep(1.0)
-    print("Executing statistics handshake (prepareStatistics -> getStatistics)...")
-    stats = fetch_statistics_json(device_ip, port, resolved_key, use_enc, timeout_sec)
+    print("Executing statistics query (probing legacy handshake then GetStat=1)...")
+    try:
+        stats = fetch_statistics_json(device_ip, port, resolved_key, use_enc, timeout_sec)
+        print("Protocol: Legacy Handshake (prepareStatistics -> getStatistics)")
+    except Exception as err:
+        print(f"Legacy statistics handshake failed: {err}. Probing GetStat=1 over /http-write.json...")
+        stats = fetch_new_statistics_json(device_ip, port, resolved_key, use_enc, timeout_sec)
+        print("Protocol: Modern Write (GetStat=1)")
     print(json.dumps(stats, indent=2))
 
 
@@ -1277,7 +1301,10 @@ def run_diagnose(device_ip: str, port: int, key: str, sanitize: bool, timeout_se
         try:
             stats_dict = fetch_statistics_json(device_ip, port, resolved_key, use_enc, 3)
         except Exception:
-            stats_dict = {"status": "Statistics counters not available or not supported on this model"}
+            try:
+                stats_dict = fetch_new_statistics_json(device_ip, port, resolved_key, use_enc, 3)
+            except Exception:
+                stats_dict = {"status": "Statistics counters not available or not supported on this model"}
     else:
         stats_dict = {"status": "Not applicable for this appliance family"}
 
