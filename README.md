@@ -17,7 +17,7 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
   - 🧺 Washing Machine — with optional **Full Remote Control** (see below)
   - 🔄 Washer Dryer combo — with optional **Full Remote Control** (see below)
   - 🌫️ Tumble Dryer - with optional **Full Remote Control** (see below)
-  - 🔪 Dishwasher
+  - 🔪 Dishwasher — with remote **Start/Stop** (see [Dishwasher Remote Control](#dishwasher-remote-control))
   - 🍳 Oven
   - 🍷 Wine Cooler / Cellar
 - **Full Remote Control:** Complete interactive control panel for **washing machines**, **washer-dryer combos** and **tumble dryers** (see the [compatibility matrix](#compatibility-note) for supported and tested models). Select localized programs, adjust wash & dry parameters (temp, spin speed, soil level, drying mode), start/pause/stop cycles, and track remote status.
@@ -71,8 +71,18 @@ The remote control functionality has been implemented for several physical appli
 | Washer Dryer | Candy RapidÓ (`ROW` series) | Yes | Reference Hardware ( `CSOW 4963TWCE-80`). |
 | Washing Machine / Washer Dryer | Candy Bianca (`BIANCA`, `BWD` series) | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by Bianca hardware. |
 | Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. |
+| Dishwasher | Candy (local API) | Yes | Reference hardware (`CDIN 1D360PB`). The program list is tested only on this model. |
 
 Other appliance series may not behave correctly. If you encounter issues or unexpected behaviour, please open an [Issue](https://github.com/bigmoby/home-assistant-candy/issues) and attach the output of the `simplyfi.py`  tool. Feedback is very welcome.
+
+### Dishwasher Remote Control
+
+Dishwashers can be started and stopped from Home Assistant.
+
+- **Every mode:** the controls are available also in Read-Only mode. No cloud data is needed, and the dishwasher accepts commands only when the remote control button on its panel is enabled.
+- **Entities:** Start and Stop buttons, program to start, Eco and 3in1 switches, start delay, salt, rinse aid, door and remote control sensors, error code.
+- **Program list:** tested only on a Candy `CDIN 1D360PB`. On other models a program could start a different cycle. If you have another model, keep the default `panel` option: it starts the program set on the dishwasher.
+- **After a restart:** the program, options and delay chosen in Home Assistant are not saved. They go back to `panel` and to the settings of the dishwasher.
 
 ---
 
