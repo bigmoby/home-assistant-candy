@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 import pytest
@@ -28,6 +29,7 @@ from custom_components.candy.const import (
 )
 from custom_components.candy.dishwasher import (
     DishwasherStartOptions,
+    _DishwasherOptionSwitch,
     dishwasher_start_command,
 )
 
@@ -300,6 +302,45 @@ async def test_stop_sends_reset(
     assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_STOP_BUTTON) == "Reset=1"
 
 
+async def test_failed_command_releases_buttons(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """A failed command is raised, and the buttons are not left blocked."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+
+    with (
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+            side_effect=aiohttp.ClientError("boom"),
+        ),
+        patch(
+            "custom_components.candy.dishwasher.asyncio.sleep", new_callable=AsyncMock
+        ),
+        pytest.raises(aiohttp.ClientError),
+    ):
+        await _call(
+            hass,
+            "button",
+            "press",
+            {
+                "entity_id": _entity_id(
+                    hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON
+                )
+            },
+        )
+    await hass.async_block_till_done()
+
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) != (
+        "unavailable"
+    )
+
+
+def test_option_switch_base_has_no_panel_value():
+    with pytest.raises(NotImplementedError):
+        _DishwasherOptionSwitch._panel_value(MagicMock())
+
+
 def test_start_command_keeps_other_panel_options():
     status = _status(_READY, MetaCarico="1", ExtraDry="1", OpenDoorOpt="1")
 
@@ -353,6 +394,8 @@ def test_start_command_delay_rounds_to_steps():
             DishwasherState.FINISHED,
             False,
         ),
+        # Unknown phase code while running
+        ({"StartStop": "1", "StatoDWash": "3", "r2": "9"}, DishwasherState.WASH, True),
         # StartStop left at 1 after a remote cycle, machine ready again
         ({"StartStop": "1", "StatoDWash": "2", "r2": "0"}, DishwasherState.IDLE, False),
         ({"StartStop": "1", "StatoDWash": "1", "r2": "0"}, DishwasherState.IDLE, False),
