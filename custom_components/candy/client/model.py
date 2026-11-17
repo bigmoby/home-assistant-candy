@@ -359,9 +359,15 @@ class DishwasherStatus:
     @classmethod
     def from_json(cls, json):
         machine_state = DishwasherStatus.parse_machine_state(json)
+        running = (
+            json.get("StartStop") == "1"
+            and machine_state is not DishwasherState.FINISHED
+        )
+        if "r2" in json and machine_state is DishwasherState.IDLE:
+            # StartStop can stay 1 on a ready machine after a remote cycle
+            running = False
         return cls(
-            running=json.get("StartStop") == "1"
-            and machine_state is not DishwasherState.FINISHED,
+            running=running,
             half_load=json.get("MetaCarico") == "1",
             extra_dry=json.get("ExtraDry") == "1",
             three_in_one=json.get("TreinUno") == "1",
@@ -398,7 +404,11 @@ class DishwasherStatus:
         if json.get("StartStop") != "1":
             return DishwasherState.IDLE
         if json["r2"] == "0":
-            return DishwasherState.DELAYED_START
+            # Waiting for a delayed start reports StatoDWash 3 (running). With
+            # another StatoDWash, StartStop is a leftover from the last cycle.
+            if json["StatoDWash"] == "3":
+                return DishwasherState.DELAYED_START
+            return DishwasherState.IDLE
         try:
             return DishwasherState.from_code(int(json["r2"]))
         except ValueError:

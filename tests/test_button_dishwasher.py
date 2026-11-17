@@ -193,6 +193,22 @@ async def test_start_available_with_stale_delay(
     )
 
 
+async def test_start_available_with_stale_start_stop(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """StartStop can stay 1 on a ready machine: it must not block Start."""
+    entry = await init_integration(
+        hass, aioclient_mock, _fixture(_READY, StartStop="1", StatoDWash="2", r2="0")
+    )
+
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) != (
+        "unavailable"
+    )
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_STOP_BUTTON) == (
+        "unavailable"
+    )
+
+
 async def test_buttons_unavailable_without_remote_control(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
@@ -337,6 +353,9 @@ def test_start_command_delay_rounds_to_steps():
             DishwasherState.FINISHED,
             False,
         ),
+        # StartStop left at 1 after a remote cycle, machine ready again
+        ({"StartStop": "1", "StatoDWash": "2", "r2": "0"}, DishwasherState.IDLE, False),
+        ({"StartStop": "1", "StatoDWash": "1", "r2": "0"}, DishwasherState.IDLE, False),
     ],
 )
 def test_state_from_phase(overrides: dict, state: DishwasherState, running: bool):
