@@ -17,8 +17,11 @@ from homeassistant.helpers.update_coordinator import (
 
 from .client import (
     CandyClient,
+    DishwasherProgram,
     WashingMachineStatus,
     WashingMachineWashProgram,
+    is_open_door_supported,
+    parse_dish_programs,
     parse_wash_programs,
 )
 from .client.model import DishwasherStatus, MachineState
@@ -29,8 +32,15 @@ from .const import (
     CONF_KEY_PROGRAMS,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DISHWASHER_PROGRAM_PANEL,
     DOMAIN,
     MODE_FULL_CONTROL,
+    UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
+    UNIQUE_ID_DISHWASHER_ECO_SWITCH,
+    UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH,
+    UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH,
+    UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
+    UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH,
     UNIQUE_ID_WASH_DETERGENT_AUTODOSE,
     UNIQUE_ID_WASH_EXTRA_DOSE_SWITCH,
     UNIQUE_ID_WASH_NFC_SWITCH,
@@ -40,8 +50,12 @@ from .const import (
     WASH_OPTIONS,
 )
 from .coordinator import CandyDataUpdateCoordinator
-from .dishwasher import dishwasher_switches
-from .helpers import remote_control_enabled, supports_autodose, wash_device_info
+from .helpers import (
+    dishwasher_device_info,
+    remote_control_enabled,
+    supports_autodose,
+    wash_device_info,
+)
 
 
 async def async_setup_entry(
@@ -53,7 +67,22 @@ async def async_setup_entry(
     ]
 
     if isinstance(coordinator.data, DishwasherStatus):
-        async_add_entities(dishwasher_switches(coordinator, config_entry))
+        raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
+        dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
+        interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+
+        switches: list[SwitchEntity] = [
+            DishwasherEcoSwitch(coordinator, config_entry, dish_programs, 4),
+            DishwasherThreeInOneSwitch(coordinator, config_entry, dish_programs, 8),
+            DishwasherHalfLoadSwitch(coordinator, config_entry, dish_programs, 2),
+            DishwasherExtraDrySwitch(coordinator, config_entry, dish_programs, 1),
+        ]
+        if is_open_door_supported(interface_type):
+            switches.append(
+                DishwasherAutoDoorSwitch(coordinator, config_entry, dish_programs, 16)
+            )
+
+        async_add_entities(switches)
         return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
@@ -467,3 +496,164 @@ class WashExtraDoseSwitch(_WashSwitchBase):
     async def async_turn_off(self, **kwargs: Any) -> None:
         self._is_on = False
         self.async_write_ha_state()
+
+
+class _CandyDishwasherSwitchBase(CoordinatorEntity, SwitchEntity):
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        programs: list[DishwasherProgram],
+        bitmask: int,
+    ) -> None:
+        super().__init__(coordinator)
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._programs = programs
+        self._bitmask = bitmask
+        self._user_value: bool | None = None
+
+    @property
+    def status(self) -> DishwasherStatus:
+        return cast(DishwasherStatus, self.coordinator.data)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return dishwasher_device_info(self.config_entry)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        registry = er.async_get(self.hass)
+        target_unique_id = UNIQUE_ID_DISHWASHER_PROGRAM_SELECT.format(self.config_id)
+
+        @callback
+        def _on_state_changed(event: Any) -> None:
+            entity_id: str = event.data.get("entity_id", "")
+            if not entity_id.startswith("select."):
+                return
+            entry = registry.async_get(entity_id)
+            if entry is not None and entry.config_entry_id == self.config_id:
+                if entry.unique_id == target_unique_id:
+                    self.async_write_ha_state()
+
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_STATE_CHANGED, _on_state_changed)
+        )
+
+    def _active_program(self) -> DishwasherProgram | None:
+        registry = er.async_get(self.hass)
+        entity_id = registry.async_get_entity_id(
+            "select",
+            DOMAIN,
+            UNIQUE_ID_DISHWASHER_PROGRAM_SELECT.format(self.config_id),
+        )
+        if entity_id is not None:
+            state = self.hass.states.get(entity_id)
+            if state is not None and state.state not in (
+                "unavailable",
+                "unknown",
+                DISHWASHER_PROGRAM_PANEL,
+            ):
+                lang = self.config_entry.data.get(
+                    CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+                )
+                return next(
+                    (
+                        p
+                        for p in self._programs
+                        if p.localized_name(lang) == state.state
+                        or p.name == state.state
+                    ),
+                    None,
+                )
+        return None
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        if self.status.running:
+            return False
+        prog = self._active_program()
+        if prog is not None and self._bitmask > 0:
+            return (prog.available_options & self._bitmask) != 0
+        return True
+
+    def _panel_value(self) -> bool:
+        raise NotImplementedError
+
+    @property
+    def is_on(self) -> bool:
+        if self._user_value is not None:
+            return self._user_value
+        return self._panel_value()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._user_value = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._user_value = False
+        self.async_write_ha_state()
+
+
+class DishwasherEcoSwitch(_CandyDishwasherSwitchBase):
+    _attr_translation_key = "dishwasher_eco_switch"
+    _attr_icon = "mdi:leaf"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_ECO_SWITCH.format(self.config_id)
+
+    def _panel_value(self) -> bool:
+        return self.status.eco_mode
+
+
+class DishwasherThreeInOneSwitch(_CandyDishwasherSwitchBase):
+    _attr_translation_key = "dishwasher_three_in_one_switch"
+    _attr_icon = "mdi:pill"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH.format(self.config_id)
+
+    def _panel_value(self) -> bool:
+        return self.status.three_in_one
+
+
+class DishwasherHalfLoadSwitch(_CandyDishwasherSwitchBase):
+    _attr_translation_key = "dishwasher_half_load_switch"
+    _attr_icon = "mdi:fraction-one-half"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH.format(self.config_id)
+
+    def _panel_value(self) -> bool:
+        return self.status.half_load
+
+
+class DishwasherExtraDrySwitch(_CandyDishwasherSwitchBase):
+    _attr_translation_key = "dishwasher_extra_dry_switch"
+    _attr_icon = "mdi:weather-sunny"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH.format(self.config_id)
+
+    def _panel_value(self) -> bool:
+        return self.status.extra_dry
+
+
+class DishwasherAutoDoorSwitch(_CandyDishwasherSwitchBase):
+    _attr_translation_key = "dishwasher_auto_door_switch"
+    _attr_icon = "mdi:door-open"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH.format(self.config_id)
+
+    def _panel_value(self) -> bool:
+        return bool(self.status.door_open_allowed)

@@ -56,6 +56,9 @@ class MachineState(StatusCode):
     FINISHED1 = (7, "Finished")
     FINISHED2 = (8, "Finished")
 
+    DELAYED_START = DELAYED_START_PROGRAMMED
+    FINISHED = FINISHED1
+
 
 class CheckUpResult(StatusCode):
     NOT_RUN = (0, "Not run")
@@ -324,8 +327,18 @@ class TumbleDryerStatus:
         return int(raw) if raw.isdigit() else None
 
 
+class DishwasherProgramPhase(StatusCode):
+    """Dishwasher program execution phase (register r2)."""
+
+    PRE_WASH = (1, "Pre-wash")
+    WASH = (2, "Wash")
+    RINSE = (3, "Rinse")
+    DRYING = (4, "Drying")
+    FINISHED = (5, "Finished")
+
+
 class DishwasherState(StatusCode):
-    """Dishwashers have a single state combining the machine state and program state."""
+    """Legacy dishwasher state enum combining machine and cycle state."""
 
     IDLE = (0, "Idle")
     PRE_WASH = (1, "Pre-wash")
@@ -333,93 +346,228 @@ class DishwasherState(StatusCode):
     RINSE = (3, "Rinse")
     DRYING = (4, "Drying")
     FINISHED = (5, "Finished")
-    # Not reported as such by the machine: derived from the phase in r2
     DELAYED_START = (6, "Delayed start programmed")
 
 
 @dataclass
 class DishwasherStatus:
-    machine_state: DishwasherState
+    machine_state: MachineState
+    program_phase: DishwasherProgramPhase | None
     program: str
     remaining_minutes: int
-    delayed_start_hours: int | None
+    delayed_start_minutes: int | None
     door_open: bool
     door_open_allowed: bool | None
     eco_mode: bool
     remote_control: bool
     salt_empty: bool
     rinse_aid_empty: bool
-    running: bool = False
-    # Panel options, sent back unchanged with a remote start command
-    half_load: bool = False
-    extra_dry: bool = False
-    three_in_one: bool = False
-    error_code: str | None = None
+    running: bool
+    half_load: bool
+    extra_dry: bool
+    three_in_one: bool
+    error_code: str | None
+    buzzer_level: int | None
+    water_hardness: int | None
+    last_cycle_counter: int | None
+    auto_clean_warning: bool
+    checkup_state: CheckUpState | None
+    r15: int
+
+    @property
+    def delayed_start_hours(self) -> int | None:
+        """Compatibility property for delay start in hours."""
+        if self.delayed_start_minutes is None:
+            return None
+        return self.delayed_start_minutes // 60
 
     @classmethod
-    def from_json(cls, json):
-        machine_state = DishwasherStatus.parse_machine_state(json)
+    def from_json(cls, json: dict[str, Any]) -> DishwasherStatus:
+        machine_state = cls.parse_machine_state(json)
+        program_phase = (
+            cls.parse_program_phase(json)
+            if machine_state
+            not in (MachineState.IDLE, MachineState.OFF, MachineState.ERROR)
+            else None
+        )
         if "r2" in json:
-            # StartStop is not reliable on these firmwares (see parse_machine_state)
-            running = machine_state not in (
-                DishwasherState.IDLE,
-                DishwasherState.FINISHED,
+            running = machine_state in (
+                MachineState.RUNNING,
+                MachineState.DELAYED_START_PROGRAMMED,
             )
         else:
             running = (
-                json.get("StartStop") == "1"
-                and machine_state is not DishwasherState.FINISHED
+                json.get("StartStop") == "1" or machine_state is MachineState.RUNNING
+            ) and machine_state not in (
+                MachineState.IDLE,
+                MachineState.PAUSED,
+                MachineState.FINISHED1,
+                MachineState.FINISHED2,
+                MachineState.ERROR,
+                MachineState.OFF,
             )
+
+        rem_time_str = json.get("RemTime", "0")
+        try:
+            rem_time = int(rem_time_str)
+        except (ValueError, TypeError):
+            rem_time = 0
+
+        if machine_state in (
+            MachineState.IDLE,
+            MachineState.OFF,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+            MachineState.DELAYED_START_PROGRAMMED,
+        ):
+            remaining_minutes = 0
+        else:
+            remaining_minutes = rem_time
+
+        r15_val: int = 0
+        if "r15" in json:
+            try:
+                r15_val = int(json["r15"])
+            except (ValueError, TypeError):
+                r15_val = 0
+
+        delayed_start_minutes: int | None = None
+        raw_delay_str = json.get("DelayStart")
+        if raw_delay_str and raw_delay_str != "0":
+            try:
+                raw_delay = int(raw_delay_str)
+                if r15_val > 0:
+                    delayed_start_minutes = raw_delay
+                else:
+                    delayed_start_minutes = raw_delay * 60
+            except (ValueError, TypeError):
+                delayed_start_minutes = None
+
+        door_open_allowed: bool | None = None
+        if "OpenDoorOpt" in json:
+            door_open_allowed = json["OpenDoorOpt"] == "1"
+
+        buzzer_level: int | None = None
+        if "r6" in json:
+            try:
+                buzzer_level = int(json["r6"])
+            except (ValueError, TypeError):
+                buzzer_level = None
+
+        water_hardness: int | None = None
+        if "r7" in json:
+            try:
+                water_hardness = int(json["r7"])
+            except (ValueError, TypeError):
+                water_hardness = None
+
+        last_cycle_counter: int | None = None
+        if "r8" in json:
+            try:
+                last_cycle_counter = int(json["r8"])
+            except (ValueError, TypeError):
+                last_cycle_counter = None
+
+        r9_val = str(json.get("r9", ""))
+        auto_clean_warning = bool(r9_val and r9_val.startswith("H_"))
+
+        checkup_state: CheckUpState | None = None
+        if "CheckUp" in json:
+            try:
+                checkup_state = CheckUpState.from_code(int(json["CheckUp"]))
+            except (ValueError, TypeError):
+                checkup_state = None
+
         return cls(
+            machine_state=machine_state,
+            program_phase=program_phase,
+            program=cls.parse_program(json),
+            remaining_minutes=remaining_minutes,
+            delayed_start_minutes=delayed_start_minutes,
+            door_open=json.get("OpenDoor") != "0",
+            door_open_allowed=door_open_allowed,
+            eco_mode=json.get("Eco") != "0",
+            remote_control=json.get("StatoWiFi") == "1",
+            salt_empty=json.get("MissSalt") == "1",
+            rinse_aid_empty=json.get("MissRinse") == "1",
             running=running,
             half_load=json.get("MetaCarico") == "1",
             extra_dry=json.get("ExtraDry") == "1",
             three_in_one=json.get("TreinUno") == "1",
             error_code=json.get("CodiceErrore"),
-            machine_state=machine_state,
-            program=DishwasherStatus.parse_program(json),
-            remaining_minutes=int(json["RemTime"]),
-            delayed_start_hours=int(json["DelayStart"])
-            if json["DelayStart"] != "0"
-            else None,
-            door_open=json["OpenDoor"] != "0",
-            door_open_allowed=json["OpenDoorOpt"] == "1"
-            if "OpenDoorOpt" in json
-            else None,
-            eco_mode=json["Eco"] != "0",
-            remote_control=json["StatoWiFi"] == "1",
-            salt_empty=json["MissSalt"] == "1",
-            rinse_aid_empty=json["MissRinse"] == "1",
+            buzzer_level=buzzer_level,
+            water_hardness=water_hardness,
+            last_cycle_counter=last_cycle_counter,
+            auto_clean_warning=auto_clean_warning,
+            checkup_state=checkup_state,
+            r15=r15_val,
         )
 
     @staticmethod
-    def parse_machine_state(json) -> DishwasherState:
-        """Parse the cycle state.
+    def parse_machine_state(json: dict[str, Any]) -> MachineState:
+        """Parse the machine execution state.
 
-        Firmwares reporting r2 (e.g. CDIN 1D360PB, CDPN 4D620PX) use StatoDWash
-        for the machine state (2 ready, 3 running, 5 finished) and r2 for the
-        phase, with the usual codes (0 waiting for a delayed start).
+        On modern models reporting r2 (CDIN 1D360PB, CDPN 4D620PX, etc.):
+        - StatoDWash 0, 1, 2: IDLE
+        - StatoDWash 3: RUNNING (or DELAYED_START_PROGRAMMED if r2 == "0")
+        - StatoDWash 4: PAUSED
+        - StatoDWash 5 or r2 == "5": FINISHED1
+        - StatoDWash 6: ERROR
+        - StatoDWash 99: DELAYED_START_PROGRAMMED
 
-        StartStop is not used here: it stays 1 after the end of a remotely
-        started cycle, and it can be 0 while a cycle started from the panel
-        is running.
+        On legacy firmwares not reporting r2:
+        - StatoDWash 0: IDLE
+        - StatoDWash 1, 2, 3, 4: RUNNING (Pre-wash, Wash, Rinse, Drying)
+        - StatoDWash 5: FINISHED1
+        - StatoDWash 6: ERROR
         """
+        stato_str = json.get("StatoDWash", "0")
+        try:
+            stato = int(stato_str)
+        except (ValueError, TypeError):
+            stato = 0
+
         if "r2" not in json:
-            return DishwasherState.from_code(int(json["StatoDWash"]))
-        if json["StatoDWash"] == "5" or json["r2"] == "5":
-            return DishwasherState.FINISHED
-        if json["StatoDWash"] != "3":
-            return DishwasherState.IDLE
-        if json["r2"] == "0":
-            return DishwasherState.DELAYED_START
-        if json["r2"] in ("1", "2", "3", "4"):
-            return DishwasherState.from_code(int(json["r2"]))
-        return DishwasherState.WASH
+            if stato == 0:
+                return MachineState.IDLE
+            if stato in (1, 2, 3, 4):
+                return MachineState.RUNNING
+            if stato == 5:
+                return MachineState.FINISHED1
+            if stato == 6:
+                return MachineState.ERROR
+            return MachineState.IDLE
+
+        r2_str = json.get("r2", "")
+        if stato == 5 or r2_str == "5":
+            return MachineState.FINISHED1
+        if stato == 6:
+            return MachineState.ERROR
+        if stato == 4:
+            return MachineState.PAUSED
+        if stato == 99 or (stato == 3 and r2_str == "0"):
+            return MachineState.DELAYED_START_PROGRAMMED
+        if stato == 3:
+            return MachineState.RUNNING
+        return MachineState.IDLE
 
     @staticmethod
-    def parse_program(json) -> str:
+    def parse_program_phase(json: dict[str, Any]) -> DishwasherProgramPhase | None:
+        """Parse cycle phase from register r2 (or StatoDWash on legacy firmwares)."""
+        if "r2" in json:
+            r2_str = json.get("r2", "")
+            if r2_str in ("1", "2", "3", "4", "5"):
+                return DishwasherProgramPhase.from_code(int(r2_str))
+            return None
+        stato_str = json.get("StatoDWash", "")
+        if stato_str in ("1", "2", "3", "4", "5"):
+            return DishwasherProgramPhase.from_code(int(stato_str))
+        return None
+
+    @staticmethod
+    def parse_program(json: dict[str, Any]) -> str:
         """Parse final program label, like P1, P1+, P1-."""
-        program = json["Program"]
+        program = json.get("Program", "")
         # Some dishwashers don't include the OpzProg field
         option = json.get("OpzProg")
         if option == "p":
@@ -709,6 +857,94 @@ class TumbleDryerProgram:
             duration=_int("duration", 0),
             mask1=_int("mask1", 0),
             mask2=_int("mask2", 0),
+        )
+
+    @property
+    def display_name(self) -> str:
+        return self.localized_name("en")
+
+    def localized_name(self, language: str) -> str:
+        """Return the program name in the given BCP-47 language code."""
+        translations = _PROGRAM_NAMES.get(self.name, {})
+        return (
+            translations.get(language)
+            or translations.get("en")
+            or self.name.replace("_", " ").title()
+        )
+
+    def localized_description(self, language: str) -> str | None:
+        """Return the program description in the given BCP-47 language code, or None."""
+        translations = _PROGRAM_NAMES.get(self.name + "_DESCRIPTION", {})
+        return translations.get(language) or translations.get("en") or None
+
+
+@dataclass
+class DishwasherProgram:
+    position: int
+    selector_position: int
+    name: str
+    cycle_id: int
+    default_duration: int
+    temperature: int
+    available_options: int
+    default_soil_level: str | None
+    interface_type: str | None
+
+    @classmethod
+    def from_dict(cls, program_dict: dict[str, Any]) -> DishwasherProgram:
+        """Parse a dishwasher program entry from Simply-Fi cloud appliance JSON or local catalog."""
+        p = program_dict.get("program", program_dict)
+        raw_params = p.get("command_parameters") or p.get("parameters") or []
+        params: dict[str, str] = {}
+        if isinstance(raw_params, dict):
+            params = {k: str(v) for k, v in raw_params.items()}
+        elif isinstance(raw_params, list):
+            for cp in raw_params:
+                if "command_parameter" in cp:
+                    params[cp["command_parameter"]["name"]] = str(
+                        cp["command_parameter"]["validation"]
+                    )
+                elif "name" in cp:
+                    params[cp["name"]] = str(cp["validation"])
+
+        def _int(key: str, fallback: int) -> int:
+            val = params.get(key, p.get(key, ""))
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return fallback
+
+        raw_name: str = p.get("name", "")
+        for prefix in (
+            "DW_WIFI_PROG_NAME_",
+            "DW_PROG_TITLE_",
+            "DW_PROG_NAME_",
+            "DW_",
+        ):
+            if raw_name.startswith(prefix):
+                raw_name = raw_name[len(prefix) :]
+                break
+
+        cycle_id = _int("cycle_name", _int("cycleId", _int("cycle_id", 0)))
+        default_duration = _int(
+            "duration_timing", _int("default_duration", _int("duration", 0))
+        )
+        temperature = _int("temp", _int("temperature", _int("default_temperature", 0)))
+        available_options = _int("available_options", 0)
+        default_soil_level = params.get(
+            "default_soil_level", p.get("default_soil_level")
+        )
+
+        return cls(
+            position=int(p.get("position", 0)),
+            selector_position=_int("selector_position", int(p.get("position", 0))),
+            name=raw_name,
+            cycle_id=cycle_id,
+            default_duration=default_duration,
+            temperature=temperature,
+            available_options=available_options,
+            default_soil_level=default_soil_level,
+            interface_type=params.get("interface_type", p.get("interface_type")),
         )
 
     @property

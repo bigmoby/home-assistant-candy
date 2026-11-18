@@ -210,13 +210,16 @@
         "name": "Softener low"
       },
       "dishwasher_salt_empty": {
-        "name": "Dishwasher salt empty"
+        "name": "Salt empty"
       },
       "dishwasher_rinse_aid_empty": {
-        "name": "Dishwasher rinse aid empty"
+        "name": "Rinse aid empty"
       },
       "dishwasher_door": {
-        "name": "Dishwasher door"
+        "name": "Door"
+      },
+      "dishwasher_maint_clean": {
+        "name": "Maintenance clean warning"
       }
     },
     "sensor": {
@@ -354,10 +357,22 @@
         "name": "Dishwasher"
       },
       "dishwasher_program": {
-        "name": "Dishwasher program"
+        "name": "Program"
       },
       "dishwasher_remaining_time": {
-        "name": "Dishwasher remaining time"
+        "name": "Remaining time"
+      },
+      "dishwasher_cycle_status": {
+        "name": "Cycle status"
+      },
+      "dishwasher_water_hardness": {
+        "name": "Water hardness"
+      },
+      "dishwasher_buzzer": {
+        "name": "Buzzer volume"
+      },
+      "dishwasher_lifetime_cycles": {
+        "name": "Completed cycles"
       },
       "wine_cooler": {
         "name": "Wine cooler"
@@ -402,7 +417,7 @@
         "name": "Dryer delay start"
       },
       "dishwasher_error_code": {
-        "name": "Dishwasher error code"
+        "name": "Error code"
       }
     },
     "light": {
@@ -490,7 +505,7 @@
         }
       },
       "dishwasher_program_select": {
-        "name": "Dishwasher program to start",
+        "name": "Program",
         "state": {
           "panel": "As set on the panel",
           "eco_45": "ECO 45°C",
@@ -513,7 +528,7 @@
         "name": "Delay"
       },
       "dishwasher_delay_number": {
-        "name": "Dishwasher start delay"
+        "name": "Delay"
       }
     },
     "switch": {
@@ -557,10 +572,19 @@
         "name": "Extra dose"
       },
       "dishwasher_eco_switch": {
-        "name": "Dishwasher eco option"
+        "name": "Eco option"
       },
       "dishwasher_three_in_one_switch": {
-        "name": "Dishwasher 3in1 tablets"
+        "name": "3in1 tablets"
+      },
+      "dishwasher_half_load_switch": {
+        "name": "Half load"
+      },
+      "dishwasher_extra_dry_switch": {
+        "name": "Extra dry"
+      },
+      "dishwasher_auto_door_switch": {
+        "name": "Auto open door"
       }
     },
     "button": {
@@ -580,10 +604,22 @@
         "name": "Stop wash"
       },
       "dishwasher_start_button": {
-        "name": "Start dishwasher"
+        "name": "Start"
       },
       "dishwasher_stop_button": {
-        "name": "Stop dishwasher"
+        "name": "Stop"
+      },
+      "dishwasher_pause_button": {
+        "name": "Pause"
+      },
+      "dishwasher_resume_button": {
+        "name": "Resume"
+      },
+      "dishwasher_open_door_button": {
+        "name": "Open door"
+      },
+      "dishwasher_checkup_button": {
+        "name": "Check-up"
       },
       "wash_full_checkup": {
         "name": "Full check-up"

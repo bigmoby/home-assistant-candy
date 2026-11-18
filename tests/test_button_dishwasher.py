@@ -1,9 +1,9 @@
-"""Tests for the dishwasher remote controls (start/stop and next-start settings)."""
+"""Tests for the dishwasher remote controls (start/stop/pause/resume and settings)."""
 
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -13,24 +13,41 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, load_f
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import DOMAIN
-from custom_components.candy.client.model import DishwasherState, DishwasherStatus
+from custom_components.candy.client import (
+    LegacyTouchDishwasherCommandBuilder,
+    ModernDishwasherCommandBuilder,
+    get_dishwasher_command_builder,
+    is_open_door_supported,
+)
+from custom_components.candy.client.model import (
+    DishwasherProgramPhase,
+    DishwasherStatus,
+    MachineState,
+)
 from custom_components.candy.const import (
+    UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
+    UNIQUE_ID_DISHWASHER_BUZZER,
+    UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
+    UNIQUE_ID_DISHWASHER_CYCLE_STATUS,
     UNIQUE_ID_DISHWASHER_DELAY_NUMBER,
     UNIQUE_ID_DISHWASHER_DOOR,
     UNIQUE_ID_DISHWASHER_ECO_SWITCH,
     UNIQUE_ID_DISHWASHER_ERROR,
+    UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH,
+    UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH,
+    UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES,
+    UNIQUE_ID_DISHWASHER_MAINT_CLEAN,
+    UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON,
+    UNIQUE_ID_DISHWASHER_PAUSE_BUTTON,
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
     UNIQUE_ID_DISHWASHER_REMOTE_CONTROL,
+    UNIQUE_ID_DISHWASHER_RESUME_BUTTON,
     UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY,
     UNIQUE_ID_DISHWASHER_SALT_EMPTY,
     UNIQUE_ID_DISHWASHER_START_BUTTON,
     UNIQUE_ID_DISHWASHER_STOP_BUTTON,
     UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH,
-)
-from custom_components.candy.dishwasher import (
-    DishwasherStartOptions,
-    _DishwasherOptionSwitch,
-    dishwasher_start_command,
+    UNIQUE_ID_DISHWASHER_WATER_HARDNESS,
 )
 
 from .common import init_integration
@@ -39,8 +56,8 @@ _READY = "dishwasher/remote_ready.json"
 _RUNNING = "dishwasher/remote_running.json"
 
 _PANEL_START = (
-    "DelayStart=0&ExtraDry=0&OpenDoorOpt=0&TreinUno=0&Eco=0&Program=P17"
-    "&MetaCarico=0&OpzProg=0&w1=1&StartStop=1"
+    "DelayStart=0&ExtraDry=0&TreinUno=0&Eco=0&Program=P17"
+    "&MetaCarico=0&OpzProg=0&w1=17&StartStop=1"
 )
 
 
@@ -88,9 +105,7 @@ async def _press(hass: HomeAssistant, entry: MockConfigEntry, unique_id: str) ->
             "custom_components.candy.client.CandyClient.send_command",
             new_callable=AsyncMock,
         ) as mock_send,
-        patch(
-            "custom_components.candy.dishwasher.asyncio.sleep", new_callable=AsyncMock
-        ),
+        patch("custom_components.candy.button.asyncio.sleep", new_callable=AsyncMock),
     ):
         await _call(
             hass,
@@ -115,15 +130,25 @@ async def test_entities_created_in_read_only_mode(
     for domain, unique_id in [
         ("button", UNIQUE_ID_DISHWASHER_START_BUTTON),
         ("button", UNIQUE_ID_DISHWASHER_STOP_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_PAUSE_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_RESUME_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON),
         ("select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT),
         ("switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH),
         ("switch", UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH),
+        ("switch", UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH),
+        ("switch", UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH),
         ("number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER),
         ("binary_sensor", UNIQUE_ID_DISHWASHER_SALT_EMPTY),
         ("binary_sensor", UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY),
         ("binary_sensor", UNIQUE_ID_DISHWASHER_DOOR),
         ("binary_sensor", UNIQUE_ID_DISHWASHER_REMOTE_CONTROL),
+        ("binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN),
         ("sensor", UNIQUE_ID_DISHWASHER_ERROR),
+        ("sensor", UNIQUE_ID_DISHWASHER_CYCLE_STATUS),
+        ("sensor", UNIQUE_ID_DISHWASHER_WATER_HARDNESS),
+        ("sensor", UNIQUE_ID_DISHWASHER_BUZZER),
+        ("sensor", UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES),
     ]:
         _entity_id(hass, entry, domain, unique_id)
 
@@ -132,7 +157,16 @@ async def test_status_sensors(hass: HomeAssistant, aioclient_mock: AiohttpClient
     entry = await init_integration(
         hass,
         aioclient_mock,
-        _fixture(_READY, MissSalt="1", OpenDoor="1", CodiceErrore="E4"),
+        _fixture(
+            _READY,
+            MissSalt="1",
+            OpenDoor="1",
+            CodiceErrore="E4",
+            r9="H_1",
+            r6="2",
+            r7="3",
+            r8="120",
+        ),
     )
 
     assert _state(hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_SALT_EMPTY) == "on"
@@ -145,19 +179,31 @@ async def test_status_sensors(hass: HomeAssistant, aioclient_mock: AiohttpClient
         _state(hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_REMOTE_CONTROL)
         == "on"
     )
+    assert (
+        _state(hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN) == "on"
+    )
     assert _state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_ERROR) == "E4"
+    assert _state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_BUZZER) == "2"
+    assert _state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_WATER_HARDNESS) == "3"
+    assert _state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES) == "120"
 
 
 async def test_settings_default_to_panel(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, _fixture(_READY, TreinUno="1"))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, TreinUno="1", MetaCarico="1", ExtraDry="0"),
+    )
 
     assert _state(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT) == "panel"
     assert _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH) == "off"
     assert (
         _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH) == "on"
     )
+    assert _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH) == "on"
+    assert _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH) == "off"
     assert float(_state(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)) == 0
 
 
@@ -221,12 +267,19 @@ async def test_cycle_started_from_panel(
         _fixture(_READY, StatoDWash="3", StartStop="0", r2="2", RemTime="115"),
     )
 
-    assert hass.states.get("sensor.dishwasher").state == "Wash"
+    assert hass.states.get("sensor.dishwasher").state == "Running"
+    assert hass.states.get("sensor.dishwasher_cycle_status").state == "Wash"
     assert hass.states.get("sensor.dishwasher_remaining_time").state == "115"
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) == (
         "unavailable"
     )
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_STOP_BUTTON) != (
+        "unavailable"
+    )
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_PAUSE_BUTTON) != (
+        "unavailable"
+    )
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_RESUME_BUTTON) == (
         "unavailable"
     )
 
@@ -306,11 +359,9 @@ async def test_start_with_chosen_settings(
     await _call(hass, "number", "set_value", {"entity_id": delay, "value": 90})
 
     assert await _press_start(hass, entry) == (
-        "DelayStart=3&ExtraDry=0&OpenDoorOpt=0&TreinUno=0&Eco=1&Program=P20"
-        "&MetaCarico=0&OpzProg=0&w1=1&StartStop=1"
+        "DelayStart=90&ExtraDry=0&TreinUno=0&Eco=1&Program=P20"
+        "&MetaCarico=0&OpzProg=4&w1=20&StartStop=1"
     )
-    # The delay is used once; the other settings are kept for the next start
-    assert float(hass.states.get(delay).state) == 0
     assert hass.states.get(select).state == "rapid_24"
 
 
@@ -320,6 +371,56 @@ async def test_stop_sends_reset(
     entry = await init_integration(hass, aioclient_mock, load_fixture(_RUNNING))
 
     assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_STOP_BUTTON) == "Reset=1"
+
+
+async def test_pause_and_resume(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, StatoDWash="3", StartStop="1", r2="2"),
+    )
+
+    assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_PAUSE_BUTTON) == "Pa=1"
+
+    # Simulate paused status
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        "http://192.168.0.66/http-read.json?encrypted=0",
+        text=_fixture(_READY, StatoDWash="4", StartStop="1", r2="2"),
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    await coordinator.async_refresh()
+
+    assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_RESUME_BUTTON) == "Pa=0"
+
+
+async def test_checkup_button(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+
+    assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON) == "CheckUp=1"
+
+
+async def test_open_door_button_on_od_interface(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, StatoDWash="5", r2="5"),
+        extra_config_data={"interface_type": "BRAVA_BI_DIGIT_OD"},
+    )
+    assert _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH) == (
+        "off"
+    )
+    assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON) != (
+        "unavailable"
+    )
+    assert (
+        await _press(hass, entry, UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON)
+        == "OpenDoorOpt=7"
+    )
 
 
 async def test_failed_command_releases_buttons(
@@ -334,9 +435,7 @@ async def test_failed_command_releases_buttons(
             new_callable=AsyncMock,
             side_effect=aiohttp.ClientError("boom"),
         ),
-        patch(
-            "custom_components.candy.dishwasher.asyncio.sleep", new_callable=AsyncMock
-        ),
+        patch("custom_components.candy.button.asyncio.sleep", new_callable=AsyncMock),
         pytest.raises(aiohttp.ClientError),
     ):
         await _call(
@@ -356,125 +455,138 @@ async def test_failed_command_releases_buttons(
     )
 
 
-def test_option_switch_base_has_no_panel_value():
-    with pytest.raises(NotImplementedError):
-        _DishwasherOptionSwitch._panel_value(MagicMock())
+# ---------------------------------------------------------------------------
+# Command Builders & Unit Tests
+# ---------------------------------------------------------------------------
 
 
-def test_start_command_keeps_other_panel_options():
-    status = _status(_READY, MetaCarico="1", ExtraDry="1", OpenDoorOpt="1")
-
-    query_string = dishwasher_start_command(status, DishwasherStartOptions())
-
-    assert "ExtraDry=1" in query_string
-    assert "OpenDoorOpt=1" in query_string
-    assert "MetaCarico=1" in query_string
-
-
-def test_start_command_program_modifier():
-    options = DishwasherStartOptions()
-    assert "Program=P2&MetaCarico=0&OpzProg=p" in dishwasher_start_command(
-        _status(_READY, Program="P2", OpzProg="p"), options
+def test_command_builders_delay_scaling_and_mask():
+    assert is_open_door_supported("BRAVA_BI_DIGIT_OD") is True
+    assert is_open_door_supported("DW_WIFI_FS") is False
+    assert isinstance(
+        get_dishwasher_command_builder("BRAVA_BI_DIGIT_OD"),
+        ModernDishwasherCommandBuilder,
     )
-    assert "Program=P2&MetaCarico=0&OpzProg=m" in dishwasher_start_command(
-        _status(_READY, Program="P2", OpzProg="m"), options
+    assert isinstance(
+        get_dishwasher_command_builder("DishwasherInterfaceTypeFSTouch"),
+        LegacyTouchDishwasherCommandBuilder,
     )
 
+    modern = ModernDishwasherCommandBuilder(open_door_supported=True)
+    # r15 == 0 -> delay in hours (90 min // 60 = 1 hour)
+    params_h = modern.build_start(
+        program_code="P8",
+        position=1,
+        delay_minutes=90,
+        r15=0,
+        three_in_one=True,
+        eco=True,
+        half_load=True,
+        extra_dry=True,
+        open_door=True,
+    )
+    assert params_h["DelayStart"] == 1
+    # ExtraDry(1) + MetaCarico(2) + Eco(4) + TreinUno(8) + OpenDoorOpt(16) = 31
+    assert params_h["OpzProg"] == 31
+    assert params_h["OpenDoorOpt"] == 1
+    assert params_h["w1"] == 1
 
-def test_start_command_delay_rounds_to_steps():
-    options = DishwasherStartOptions(delay_minutes=45)
+    # r15 > 0 -> delay in minutes
+    params_m = modern.build_start(
+        program_code="P8",
+        position=1,
+        delay_minutes=45,
+        r15=1,
+        three_in_one=False,
+        eco=False,
+        half_load=False,
+        extra_dry=False,
+        open_door=False,
+    )
+    assert params_m["DelayStart"] == 45
+    assert params_m["OpzProg"] == 0
 
-    assert "DelayStart=1&" in dishwasher_start_command(_status(_READY), options)
+    legacy = LegacyTouchDishwasherCommandBuilder(open_door_supported=False)
+    legacy_params = legacy.build_start(
+        program_code="P1+",
+        position=1,
+        delay_minutes=60,
+        r15=0,
+        three_in_one=False,
+        eco=False,
+        half_load=False,
+        extra_dry=False,
+        open_door=False,
+    )
+    assert "w1" not in legacy_params
+    assert legacy_params["Program"] == "P1"
+    assert legacy_params["OpzProg"] == "p"
+    assert legacy.build_pause() == {"StartStop": 0}
+    assert legacy.build_resume() == {"StartStop": 1}
 
 
 # ---------------------------------------------------------------------------
-# State, from a full cycle logged on a CDIN 1D360PB (phase in r2)
+# State & Phase resolution
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("overrides", "state", "running"),
+    ("overrides", "machine_state", "program_phase", "running"),
     [
-        ({}, DishwasherState.IDLE, False),
-        ({"StatoDWash": "1", "Reset": "1"}, DishwasherState.IDLE, False),
-        ({"StartStop": "1", "StatoDWash": "3", "r2": "2"}, DishwasherState.WASH, True),
-        ({"StartStop": "1", "StatoDWash": "3", "r2": "3"}, DishwasherState.RINSE, True),
+        ({}, MachineState.IDLE, None, False),
+        ({"StatoDWash": "1", "Reset": "1"}, MachineState.IDLE, None, False),
+        (
+            {"StartStop": "1", "StatoDWash": "3", "r2": "2"},
+            MachineState.RUNNING,
+            DishwasherProgramPhase.WASH,
+            True,
+        ),
+        (
+            {"StartStop": "1", "StatoDWash": "3", "r2": "3"},
+            MachineState.RUNNING,
+            DishwasherProgramPhase.RINSE,
+            True,
+        ),
         (
             {"StartStop": "1", "StatoDWash": "3", "r2": "4"},
-            DishwasherState.DRYING,
+            MachineState.RUNNING,
+            DishwasherProgramPhase.DRYING,
             True,
         ),
         (
             {"StartStop": "1", "StatoDWash": "3", "r2": "0", "DelayStart": "60"},
-            DishwasherState.DELAYED_START,
+            MachineState.DELAYED_START_PROGRAMMED,
+            None,
             True,
         ),
         (
             {"StartStop": "1", "StatoDWash": "5", "r2": "5", "RemTime": "95"},
-            DishwasherState.FINISHED,
+            MachineState.FINISHED1,
+            DishwasherProgramPhase.FINISHED,
             False,
         ),
-        # Unknown phase code while running
-        ({"StartStop": "1", "StatoDWash": "3", "r2": "9"}, DishwasherState.WASH, True),
-        # Code 6 is the synthetic delayed start state, not a phase
-        ({"StartStop": "1", "StatoDWash": "3", "r2": "6"}, DishwasherState.WASH, True),
-        # CDPN 4D620PX: cycle started from the panel, StartStop is 0 (issue #19)
-        ({"StartStop": "0", "StatoDWash": "3", "r2": "2"}, DishwasherState.WASH, True),
-        # CDPN 4D620PX: finished, door open (issue #19)
         (
-            {"StartStop": "1", "StatoDWash": "5", "r2": "5", "OpenDoor": "1"},
-            DishwasherState.FINISHED,
+            {"StartStop": "1", "StatoDWash": "4", "r2": "2"},
+            MachineState.PAUSED,
+            DishwasherProgramPhase.WASH,
             False,
         ),
-        # StartStop left at 1 after a remote cycle, machine ready again
-        ({"StartStop": "1", "StatoDWash": "2", "r2": "0"}, DishwasherState.IDLE, False),
-        ({"StartStop": "1", "StatoDWash": "1", "r2": "0"}, DishwasherState.IDLE, False),
+        (
+            {"StartStop": "1", "StatoDWash": "6", "CodiceErrore": "E3"},
+            MachineState.ERROR,
+            None,
+            False,
+        ),
     ],
 )
-def test_state_from_phase(overrides: dict, state: DishwasherState, running: bool):
+def test_state_from_phase(
+    overrides: dict,
+    machine_state: MachineState,
+    program_phase: DishwasherProgramPhase | None,
+    running: bool,
+):
     status = _status(_READY, **overrides)
 
-    assert status.machine_state is state
+    assert status.machine_state is machine_state
+    assert status.program_phase is program_phase
     assert status.running is running
-
-
-def test_state_without_phase_uses_stato_dwash():
-    data = json.loads(load_fixture(_READY))["statusDWash"]
-    del data["r2"]
-
-    assert DishwasherStatus.from_json(data).machine_state is DishwasherState.WASH
-
-
-async def test_finished_cycle(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
-    """StartStop stays 1 after the end: the machine is not running any more."""
-    await init_integration(
-        hass,
-        aioclient_mock,
-        _fixture(_RUNNING, StatoDWash="5", r2="5", RemTime="95"),
-    )
-
-    assert hass.states.get("sensor.dishwasher").state == "Finished"
-    assert hass.states.get("sensor.dishwasher_remaining_time").state == "0"
-    assert hass.states.get("button.start_dishwasher").state != "unavailable"
-    assert hass.states.get("button.stop_dishwasher").state == "unavailable"
-
-
-async def test_running_cycle_sensors(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-):
-    await init_integration(
-        hass, aioclient_mock, _fixture(_RUNNING, r2="3", RemTime="55")
-    )
-
-    assert hass.states.get("sensor.dishwasher").state == "Rinse"
-    assert hass.states.get("sensor.dishwasher_remaining_time").state == "55"
-
-
-async def test_ready_remaining_time(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-):
-    """RemTime is the program duration while ready, not a remaining time."""
-    await init_integration(hass, aioclient_mock, load_fixture(_READY))
-
-    assert hass.states.get("sensor.dishwasher").state == "Idle"
-    assert hass.states.get("sensor.dishwasher_remaining_time").state == "0"

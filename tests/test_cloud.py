@@ -77,7 +77,7 @@ def _appliance_entry(ip=None, key="secret-key", programs=None):
 
 def test_match_appliance_by_ip():
     appliances = [_appliance_entry(ip="10.0.0.1"), _appliance_entry(ip="10.0.0.2")]
-    result = _match_appliance(appliances, "10.0.0.1", [])
+    result = _match_appliance(appliances, "10.0.0.1", [], [])
     assert isinstance(result, CloudApplianceData)
     assert result.mac_address == "AA:BB:CC:DD:EE:FF"
     assert result.encryption_key == "secret-key"
@@ -88,7 +88,7 @@ def test_match_appliance_by_ip():
 
 def test_match_appliance_single_fallback():
     appliances = [_appliance_entry(ip=None)]
-    result = _match_appliance(appliances, "192.168.1.100", [{"id": 99}])
+    result = _match_appliance(appliances, "192.168.1.100", [{"id": 99}], [])
     assert isinstance(result, CloudApplianceData)
     assert result.downloadable_programs == [{"id": 99}]
 
@@ -97,32 +97,40 @@ def test_match_appliance_washer_dryer_hoover():
     entry = _appliance_entry(ip="10.0.0.1")
     entry["appliance"]["brand"] = "hoover"
     entry["appliance"]["appliance_type"] = "washer_dryer"
-    result = _match_appliance([entry], "10.0.0.1", [])
+    result = _match_appliance([entry], "10.0.0.1", [], [])
     assert result.brand == "hoover"
     assert result.appliance_type == "washer_dryer"
+
+
+def test_match_appliance_dishwasher():
+    entry = _appliance_entry(ip="10.0.0.1")
+    entry["appliance"]["appliance_type"] = "dishwasher"
+    result = _match_appliance([entry], "10.0.0.1", [], [{"id": 42}])
+    assert result.appliance_type == "dishwasher"
+    assert result.downloadable_programs == [{"id": 42}]
 
 
 def test_match_appliance_no_match_multiple():
     appliances = [_appliance_entry(ip="10.0.0.1"), _appliance_entry(ip="10.0.0.2")]
     with pytest.raises(SimplyFiCloudError, match="No Simply-Fi appliance matched"):
-        _match_appliance(appliances, "10.0.0.99", [])
+        _match_appliance(appliances, "10.0.0.99", [], [])
 
 
 def test_match_appliance_missing_encryption_key():
     """Missing or empty encryption_key in cloud data is allowed (local transport governs)."""
     appliances = [_appliance_entry(ip="10.0.0.1", key="")]
-    result = _match_appliance(appliances, "10.0.0.1", [])
+    result = _match_appliance(appliances, "10.0.0.1", [], [])
     assert result.encryption_key == ""
 
     appliances_none = [_appliance_entry(ip="10.0.0.1", key=None)]
-    result_none = _match_appliance(appliances_none, "10.0.0.1", [])
+    result_none = _match_appliance(appliances_none, "10.0.0.1", [], [])
     assert result_none.encryption_key == ""
 
 
 def test_match_appliance_missing_programs():
     appliances = [_appliance_entry(ip="10.0.0.1", programs=[])]
     with pytest.raises(SimplyFiCloudError, match="missing programs"):
-        _match_appliance(appliances, "10.0.0.1", [])
+        _match_appliance(appliances, "10.0.0.1", [], [])
 
 
 # ---------------------------------------------------------------------------

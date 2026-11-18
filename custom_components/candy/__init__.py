@@ -28,7 +28,6 @@ from homeassistant.util import dt as dt_util
 from .client import CandyClient, get_dryer_command_builder, parse_wash_programs
 from .client.model import (
     CheckUpState,
-    DishwasherState,
     DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
@@ -109,10 +108,10 @@ _LOGGER = logging.getLogger(__name__)
 # Machine states that strongly suggest the user powered off the device intentionally.
 # In these cases, a timeout is treated as "Off" rather than "unavailable".
 _OFF_INFERRED_STATES = {
+    MachineState.FINISHED,
     MachineState.FINISHED1,
     MachineState.FINISHED2,
     MachineState.IDLE,
-    DishwasherState.IDLE,
     OvenState.IDLE,
     WineCoolerState.OFF,
 }
@@ -150,9 +149,8 @@ def _make_off_status(
         | WineCoolerStatus
     )
     if isinstance(last_status, DishwasherStatus):
-        # Dishwasher uses its own DishwasherState enum — use IDLE as the "Off" equivalent
         off_status = copy.copy(last_status)
-        off_status.machine_state = DishwasherState.IDLE
+        off_status.machine_state = MachineState.OFF
         off_status.remaining_minutes = 0
     elif isinstance(last_status, OvenStatus):
         off_status = copy.copy(last_status)
@@ -308,18 +306,30 @@ def _offline_tumble_dryer() -> TumbleDryerStatus:
 
 
 def _offline_dishwasher() -> DishwasherStatus:
-    """Minimal DishwasherStatus for an offline device (shows Idle in sensors)."""
+    """Minimal DishwasherStatus for an offline device (shows Off in sensors)."""
     return DishwasherStatus(
-        machine_state=DishwasherState.IDLE,
+        machine_state=MachineState.OFF,
+        program_phase=None,
         program="",
         remaining_minutes=0,
-        delayed_start_hours=None,
+        delayed_start_minutes=None,
         door_open=False,
         door_open_allowed=None,
         eco_mode=False,
         remote_control=False,
         salt_empty=False,
         rinse_aid_empty=False,
+        running=False,
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=None,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        r15=0,
     )
 
 

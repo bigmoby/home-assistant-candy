@@ -40,7 +40,7 @@ async def test_program_sensor_idle(
     assert state
     assert state.state == "P1+"
     assert state.attributes == {
-        "friendly_name": "Dishwasher program",
+        "friendly_name": "Dishwasher Program",
         "icon": "mdi:glass-wine",
     }
 
@@ -53,18 +53,18 @@ async def test_main_sensor_wash(
     state = hass.states.get("sensor.dishwasher")
 
     assert state
-    assert state.state == "Wash"
-    assert state.attributes == {
-        "program": "P2-",
-        "remaining_minutes": 68,
-        "eco_mode": True,
-        "door_open": False,
-        "remote_control": False,
-        "salt_empty": True,
-        "rinse_aid_empty": True,
-        "friendly_name": "Dishwasher",
-        "icon": "mdi:glass-wine",
-    }
+    assert state.state == "Running"
+    assert state.attributes["program"] == "P2-"
+    assert state.attributes["remaining_minutes"] == 68
+    assert state.attributes["eco_mode"] is True
+    assert state.attributes["door_open"] is False
+    assert state.attributes["remote_control"] is False
+    assert state.attributes["salt_empty"] is True
+    assert state.attributes["rinse_aid_empty"] is True
+
+    phase_state = hass.states.get("sensor.dishwasher_cycle_status")
+    assert phase_state
+    assert phase_state.state == "Wash"
 
 
 async def test_main_sensor_wash_no_opzprog(
@@ -77,18 +77,18 @@ async def test_main_sensor_wash_no_opzprog(
     state = hass.states.get("sensor.dishwasher")
 
     assert state
-    assert state.state == "Wash"
-    assert state.attributes == {
-        "program": "P2",
-        "remaining_minutes": 68,
-        "eco_mode": True,
-        "door_open": False,
-        "remote_control": False,
-        "salt_empty": False,
-        "rinse_aid_empty": False,
-        "friendly_name": "Dishwasher",
-        "icon": "mdi:glass-wine",
-    }
+    assert state.state == "Running"
+    assert state.attributes["program"] == "P2"
+    assert state.attributes["remaining_minutes"] == 68
+    assert state.attributes["eco_mode"] is True
+    assert state.attributes["door_open"] is False
+    assert state.attributes["remote_control"] is False
+    assert state.attributes["salt_empty"] is False
+    assert state.attributes["rinse_aid_empty"] is False
+
+    phase_state = hass.states.get("sensor.dishwasher_cycle_status")
+    assert phase_state
+    assert phase_state.state == "Wash"
 
 
 async def test_main_sensor_drying_optional_params(
@@ -101,20 +101,20 @@ async def test_main_sensor_drying_optional_params(
     state = hass.states.get("sensor.dishwasher")
 
     assert state
-    assert state.state == "Drying"
-    assert state.attributes == {
-        "program": "P2",
-        "remaining_minutes": 58,
-        "delayed_start_hours": 4,
-        "eco_mode": True,
-        "door_open": False,
-        "door_open_allowed": True,
-        "remote_control": True,
-        "salt_empty": False,
-        "rinse_aid_empty": True,
-        "friendly_name": "Dishwasher",
-        "icon": "mdi:glass-wine",
-    }
+    assert state.state == "Running"
+    assert state.attributes["program"] == "P2"
+    assert state.attributes["remaining_minutes"] == 58
+    assert state.attributes["delayed_start_hours"] == 4
+    assert state.attributes["eco_mode"] is True
+    assert state.attributes["door_open"] is False
+    assert state.attributes["door_open_allowed"] is True
+    assert state.attributes["remote_control"] is True
+    assert state.attributes["salt_empty"] is False
+    assert state.attributes["rinse_aid_empty"] is True
+
+    phase_state = hass.states.get("sensor.dishwasher_cycle_status")
+    assert phase_state
+    assert phase_state.state == "Drying"
 
 
 async def test_remaining_time_sensor_idle(
@@ -128,7 +128,7 @@ async def test_remaining_time_sensor_idle(
     assert state.state == "0"
     assert state.attributes == {
         "device_class": "duration",
-        "friendly_name": "Dishwasher remaining time",
+        "friendly_name": "Dishwasher Remaining time",
         "icon": "mdi:progress-clock",
         "unit_of_measurement": "min",
     }
@@ -145,7 +145,7 @@ async def test_remaining_time_sensor_wash(
     assert state.state == "68"
     assert state.attributes == {
         "device_class": "duration",
-        "friendly_name": "Dishwasher remaining time",
+        "friendly_name": "Dishwasher Remaining time",
         "icon": "mdi:progress-clock",
         "unit_of_measurement": "min",
     }
@@ -184,3 +184,24 @@ async def test_sensors_device_info(
     assert main_device
     assert time_device
     assert main_device == time_device
+
+
+async def test_dishwasher_hardware_sensors(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    fixture_data = load_fixture("dishwasher/idle.json").replace(
+        '"statusDWash": {',
+        '"statusDWash": {"r6": "3", "r7": "4", "r8": "150", ',
+    )
+    await init_integration(hass, aioclient_mock, fixture_data)
+
+    buzzer = hass.states.get("sensor.dishwasher_buzzer_volume")
+    hardness = hass.states.get("sensor.dishwasher_water_hardness")
+    cycles = hass.states.get("sensor.dishwasher_completed_cycles")
+
+    assert buzzer
+    assert buzzer.state == "3"
+    assert hardness
+    assert hardness.state == "4"
+    assert cycles
+    assert cycles.state == "150"

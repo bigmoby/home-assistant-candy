@@ -131,11 +131,23 @@
       "dishwasher": {
         "name": "Lavastoviglie"
       },
-      "dishwasher_remaining_time": {
-        "name": "Tempo rimanente lavastoviglie"
-      },
       "dishwasher_program": {
-        "name": "Programma lavastoviglie"
+        "name": "Programma"
+      },
+      "dishwasher_remaining_time": {
+        "name": "Tempo rimanente"
+      },
+      "dishwasher_cycle_status": {
+        "name": "Fase ciclo"
+      },
+      "dishwasher_water_hardness": {
+        "name": "Durezza acqua"
+      },
+      "dishwasher_buzzer": {
+        "name": "Volume segnale acustico"
+      },
+      "dishwasher_lifetime_cycles": {
+        "name": "Cicli completati"
       },
       "wine_cooler": {
         "name": "Cantinetta vino"
@@ -159,7 +171,7 @@
         "name": "Wash scheduled finish"
       },
       "dishwasher_error_code": {
-        "name": "Codice errore lavastoviglie"
+        "name": "Codice errore"
       }
     },
     "select": {
@@ -217,7 +229,7 @@
         "name": "Ritardo partenza"
       },
       "dishwasher_delay_number": {
-        "name": "Partenza ritardata lavastoviglie"
+        "name": "Partenza ritardata"
       }
     },
     "button": {
@@ -234,10 +246,22 @@
         "name": "Ferma lavaggio"
       },
       "dishwasher_start_button": {
-        "name": "Avvia lavastoviglie"
+        "name": "Avvia"
       },
       "dishwasher_stop_button": {
-        "name": "Ferma lavastoviglie"
+        "name": "Ferma"
+      },
+      "dishwasher_pause_button": {
+        "name": "Pausa"
+      },
+      "dishwasher_resume_button": {
+        "name": "Riprendi"
+      },
+      "dishwasher_open_door_button": {
+        "name": "Apri sportello"
+      },
+      "dishwasher_checkup_button": {
+        "name": "Diagnosi"
       }
     },
     "light": {
@@ -247,10 +271,19 @@
     },
     "switch": {
       "dishwasher_eco_switch": {
-        "name": "Opzione eco lavastoviglie"
+        "name": "Opzione eco"
       },
       "dishwasher_three_in_one_switch": {
         "name": "Pastiglie 3in1"
+      },
+      "dishwasher_half_load_switch": {
+        "name": "Mezzo carico"
+      },
+      "dishwasher_extra_dry_switch": {
+        "name": "Extra asciutto"
+      },
+      "dishwasher_auto_door_switch": {
+        "name": "Apertura automatica sportello"
       }
     },
     "binary_sensor": {
@@ -261,7 +294,10 @@
         "name": "Brillantante esaurito"
       },
       "dishwasher_door": {
-        "name": "Sportello lavastoviglie"
+        "name": "Sportello"
+      },
+      "dishwasher_maint_clean": {
+        "name": "Avviso lavaggio di manutenzione"
       },
       "remote_control": {
         "name": "Controllo remoto"

@@ -27,7 +27,7 @@ from custom_components.candy import (
     _restore_last_known_status,
 )
 from custom_components.candy.client.model import (
-    DishwasherState,
+    DishwasherProgramPhase,
     DishwasherStatus,
     MachineState,
     OvenState,
@@ -138,19 +138,31 @@ _STATS_OK = (
 
 def test_make_off_status_dishwasher():
     status = DishwasherStatus(
-        machine_state=DishwasherState.WASH,
+        machine_state=MachineState.RUNNING,
+        program_phase=DishwasherProgramPhase.WASH,
         program="P1+",
         remaining_minutes=30,
-        delayed_start_hours=None,
+        delayed_start_minutes=None,
         door_open=False,
         door_open_allowed=None,
         eco_mode=False,
         remote_control=True,
         salt_empty=False,
         rinse_aid_empty=False,
+        running=True,
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=None,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        r15=0,
     )
     result = _make_off_status(status)
-    assert result.machine_state == DishwasherState.IDLE
+    assert result.machine_state == MachineState.OFF
     assert result.remaining_minutes == 0
     assert result.program == "P1+"
 
@@ -218,7 +230,7 @@ async def test_restore_last_known_status_dishwasher(hass: HomeAssistant):
     )
     result = _restore_last_known_status(hass, entry.entry_id)
     assert isinstance(result, DishwasherStatus)
-    assert result.machine_state == DishwasherState.IDLE
+    assert result.machine_state == MachineState.OFF
 
 
 async def test_restore_last_known_status_oven(hass: HomeAssistant):

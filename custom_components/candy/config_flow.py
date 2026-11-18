@@ -29,7 +29,7 @@ from .client import (
 )
 from .client.cloud import SimplyFiCloudError, fetch_appliance_data
 from .client.decryption import Encryption
-from .client.model import TumbleDryerStatus, WashingMachineStatus
+from .client.model import DishwasherStatus, TumbleDryerStatus, WashingMachineStatus
 from .const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_MONTHLY,
@@ -42,6 +42,7 @@ from .const import (
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_DISHWASHER,
     CONF_KEY_IS_TUMBLE_DRYER,
     CONF_KEY_IS_WASHER_DRYER,
     CONF_KEY_IS_WASHING_MACHINE,
@@ -60,6 +61,7 @@ from .const import (
     CONF_KEY_USE_ENCRYPTION,
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_STATS_COORDINATOR,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DOMAIN,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
@@ -732,6 +734,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._config_data: dict[str, Any] = {}  # accumulated config entry data
         self._is_washing_machine: bool = False
         self._is_tumble_dryer: bool = False
+        self._is_dishwasher: bool = False
         self._total_cycles: int = (
             0  # fetched once after device probe; used for baselines
         )
@@ -834,6 +837,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 status = await client.status()
             self._is_washing_machine = isinstance(status, WashingMachineStatus)
             self._is_tumble_dryer = isinstance(status, TumbleDryerStatus)
+            self._is_dishwasher = isinstance(status, DishwasherStatus)
             if self._is_washing_machine:
                 try:
                     async with async_timeout.timeout(20):
@@ -848,11 +852,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             _LOGGER.debug("Device type probe failed, assuming non-controllable machine")
             self._is_washing_machine = False
             self._is_tumble_dryer = False
+            self._is_dishwasher = False
 
         if self._is_washing_machine:
             self._config_data[CONF_KEY_IS_WASHING_MACHINE] = True
         if self._is_tumble_dryer:
             self._config_data[CONF_KEY_IS_TUMBLE_DRYER] = True
+        if self._is_dishwasher:
+            self._config_data[CONF_KEY_IS_DISHWASHER] = True
 
         return await self.async_step_mode()
 
@@ -860,7 +867,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Ask the user whether they want Read-Only or Full Control mode."""
-        if not (self._is_washing_machine or self._is_tumble_dryer):
+        if not (
+            self._is_washing_machine or self._is_tumble_dryer or self._is_dishwasher
+        ):
             self._config_data[CONF_KEY_MODE] = MODE_READ_ONLY
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
@@ -878,6 +887,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         # Read-only washing machine: ask whether appliance is a washer-dryer
         if self._is_washing_machine:
             return await self.async_step_washer_dryer()
+
+        if self._is_dishwasher:
+            self._config_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
+            return self.async_create_entry(
+                title=CONF_INTEGRATION_TITLE, data=self._config_data
+            )
 
         return self.async_create_entry(
             title=CONF_INTEGRATION_TITLE, data=self._config_data
@@ -974,6 +989,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
             except (KeyError, TypeError, ValueError):
                 pass
+        if self._is_dishwasher and not appliance.programs:
+            self._config_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
         if self._is_tumble_dryer:
             if not is_dualtech_dryer(appliance.interface_type):
                 _LOGGER.warning(
@@ -1003,6 +1020,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._config_data[CONF_KEY_PROGRAM_LANGUAGE] = user_input[
             CONF_KEY_PROGRAM_LANGUAGE
         ]
+        if self._is_dishwasher:
+            return self.async_create_entry(
+                title=CONF_INTEGRATION_TITLE, data=self._config_data
+            )
         if self._is_tumble_dryer:
             interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
             if self._config_data.get(

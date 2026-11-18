@@ -21,14 +21,18 @@ from homeassistant.util import dt as dt_util
 
 from .client import (
     CandyClient,
+    DishwasherProgram,
     DownloadableProgram,
     TumbleDryerProgram,
     TumbleDryerStatus,
     WashingMachineStatistics,
     WashingMachineStatus,
     WashingMachineWashProgram,
+    get_dishwasher_command_builder,
     get_dryer_command_builder,
+    is_open_door_supported,
     load_downloadable_programs,
+    parse_dish_programs,
     parse_dryer_programs,
     parse_wash_programs,
     resolve_downloadable_programs,
@@ -57,6 +61,8 @@ from .const import (
     DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WRITE_PENDING,
+    DISHWASHER_PROGRAM_PANEL,
+    DISHWASHER_PROGRAMS,
     DOMAIN,
     DRY_LEVEL_TO_VALUE,
     DRY_TARGET_TO_VALUE,
@@ -66,6 +72,19 @@ from .const import (
     PROGRAM_TYPE_WASH_AND_DRY,
     RAPID_LEVEL_TO_VALUE,
     SOIL_LABELS_REVERSE,
+    UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
+    UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
+    UNIQUE_ID_DISHWASHER_DELAY_NUMBER,
+    UNIQUE_ID_DISHWASHER_ECO_SWITCH,
+    UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH,
+    UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH,
+    UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON,
+    UNIQUE_ID_DISHWASHER_PAUSE_BUTTON,
+    UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
+    UNIQUE_ID_DISHWASHER_RESUME_BUTTON,
+    UNIQUE_ID_DISHWASHER_START_BUTTON,
+    UNIQUE_ID_DISHWASHER_STOP_BUTTON,
+    UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH,
     UNIQUE_ID_TUMBLE_ANTI_CREASE_BUTTON,
     UNIQUE_ID_TUMBLE_CHECKUP_BUTTON,
     UNIQUE_ID_TUMBLE_DELAY_NUMBER,
@@ -100,9 +119,9 @@ from .const import (
     UNIQUE_ID_WASH_TEMP_SELECT,
     WASH_OPTIONS,
 )
-from .dishwasher import dishwasher_buttons
 from .helpers import (
     command_settling_delay,
+    dishwasher_device_info,
     dry_target_value_for_interface,
     dryer_device_info,
     is_dualtech,
@@ -143,7 +162,25 @@ async def async_setup_entry(
     # Dishwashers need no cloud data: remote start/stop only requires the local
     # key, and the machine itself gates commands with its remote control switch.
     if isinstance(coordinator.data, DishwasherStatus):
-        async_add_entities(dishwasher_buttons(coordinator, config_entry, client))
+        raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
+        dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
+        interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+
+        dish_buttons: list[ButtonEntity] = [
+            CandyDishwasherStartButton(
+                coordinator, config_entry, client, dish_programs
+            ),
+            CandyDishwasherStopButton(coordinator, config_entry, client),
+            CandyDishwasherPauseButton(coordinator, config_entry, client),
+            CandyDishwasherResumeButton(coordinator, config_entry, client),
+            CandyDishwasherCheckUpButton(coordinator, config_entry, client),
+        ]
+        if is_open_door_supported(interface_type):
+            dish_buttons.append(
+                CandyDishwasherOpenDoorButton(coordinator, config_entry, client)
+            )
+
+        async_add_entities(dish_buttons)
         return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
@@ -1327,3 +1364,307 @@ class CandyDryerResetWarningsButton(CandyDryerButtonBase):
         )
         params = builder.build_reset_warnings()
         await self._send_command_and_refresh(urlencode(params, quote_via=quote))
+
+
+class CandyDishwasherButtonBase(CoordinatorEntity, ButtonEntity):
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        client: CandyClient,
+    ) -> None:
+        super().__init__(coordinator)
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._client = client
+
+    @property
+    def status(self) -> DishwasherStatus:
+        return cast(DishwasherStatus, self.coordinator.data)
+
+    @property
+    def available(self) -> bool:
+        return (
+            super().available
+            and self.hass.data[DOMAIN][self.config_id].get(DATA_KEY_WRITE_PENDING, 0)
+            == 0
+            and remote_control_enabled(self.coordinator.data)
+        )
+
+    async def _send_command_and_refresh(self, query_string: str) -> None:
+        data = self.hass.data[DOMAIN][self.config_id]
+        data[DATA_KEY_WRITE_PENDING] = data.get(DATA_KEY_WRITE_PENDING, 0) + 1
+        self.coordinator.async_update_listeners()
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        settling_delay = command_settling_delay(interface_type)
+        try:
+            await self._client.send_command(query_string)
+            await asyncio.sleep(settling_delay)
+        except Exception:
+            await asyncio.sleep(settling_delay)
+            raise
+        finally:
+            data[DATA_KEY_WRITE_PENDING] -= 1
+            if data[DATA_KEY_WRITE_PENDING] == 0:
+                await self.coordinator.async_request_refresh()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return dishwasher_device_info(self.config_entry)
+
+
+class CandyDishwasherStartButton(CandyDishwasherButtonBase):
+    _attr_translation_key = "dishwasher_start_button"
+    _attr_icon = "mdi:play-circle-outline"
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        client: CandyClient,
+        programs: list[DishwasherProgram],
+    ) -> None:
+        super().__init__(coordinator, config_entry, client)
+        self._programs = programs
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_START_BUTTON.format(self.config_id)
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        return not self.status.running and not self.status.door_open
+
+    async def async_press(self) -> None:
+        registry = er.async_get(self.hass)
+
+        def _get_select_state(unique_id_template: str) -> str | None:
+            entity_id = registry.async_get_entity_id(
+                "select", DOMAIN, unique_id_template.format(self.config_id)
+            )
+            if entity_id is None:
+                return None
+            state = self.hass.states.get(entity_id)
+            return (
+                state.state
+                if state and state.state not in ("unavailable", "unknown")
+                else None
+            )
+
+        def _get_number_state(unique_id_template: str) -> float:
+            entity_id = registry.async_get_entity_id(
+                "number", DOMAIN, unique_id_template.format(self.config_id)
+            )
+            if entity_id is None:
+                return 0.0
+            state = self.hass.states.get(entity_id)
+            try:
+                return (
+                    float(state.state)
+                    if state and state.state not in ("unavailable", "unknown")
+                    else 0.0
+                )
+            except (ValueError, TypeError):
+                return 0.0
+
+        def _get_switch_state(unique_id_template: str, default_val: bool) -> bool:
+            entity_id = registry.async_get_entity_id(
+                "switch", DOMAIN, unique_id_template.format(self.config_id)
+            )
+            if entity_id is None:
+                return default_val
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in ("unavailable", "unknown"):
+                return default_val
+            return state.state == "on"
+
+        program_option = _get_select_state(UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
+        delay_minutes = int(_get_number_state(UNIQUE_ID_DISHWASHER_DELAY_NUMBER))
+        eco = _get_switch_state(UNIQUE_ID_DISHWASHER_ECO_SWITCH, self.status.eco_mode)
+        three_in_one = _get_switch_state(
+            UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH, self.status.three_in_one
+        )
+        half_load = _get_switch_state(
+            UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH, self.status.half_load
+        )
+        extra_dry = _get_switch_state(
+            UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH, self.status.extra_dry
+        )
+        open_door = _get_switch_state(
+            UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
+            bool(self.status.door_open_allowed),
+        )
+
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        builder = get_dishwasher_command_builder(interface_type)
+        r15 = self.status.r15
+
+        lang = self.config_entry.data.get(
+            CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+        )
+        selected_prog: DishwasherProgram | None = None
+        if program_option and program_option != DISHWASHER_PROGRAM_PANEL:
+            selected_prog = next(
+                (
+                    p
+                    for p in self._programs
+                    if p.localized_name(lang) == program_option
+                    or p.name == program_option
+                ),
+                None,
+            )
+
+        if selected_prog is not None:
+            program_code = str(selected_prog.cycle_id)
+            position = selected_prog.selector_position
+        elif program_option in DISHWASHER_PROGRAMS:
+            raw_code = DISHWASHER_PROGRAMS[program_option]
+            program_code = raw_code
+            pos_str = raw_code.lstrip("P").rstrip("+-")
+            position = int(pos_str) if pos_str.isdigit() else 1
+        else:
+            program_code = self.status.program
+            pos_str = self.status.program.lstrip("P").rstrip("+-")
+            position = int(pos_str) if pos_str.isdigit() else 1
+
+        params = builder.build_start(
+            program_code=program_code,
+            position=position,
+            delay_minutes=delay_minutes,
+            r15=r15,
+            three_in_one=three_in_one,
+            eco=eco,
+            half_load=half_load,
+            extra_dry=extra_dry,
+            open_door=open_door,
+        )
+        query_string = urlencode(params, quote_via=quote)
+        await self._send_command_and_refresh(query_string)
+
+        if delay_minutes > 0:
+            delay_entity_id = registry.async_get_entity_id(
+                "number",
+                DOMAIN,
+                UNIQUE_ID_DISHWASHER_DELAY_NUMBER.format(self.config_id),
+            )
+            if delay_entity_id is not None:
+                await self.hass.services.async_call(
+                    "number",
+                    "set_value",
+                    {"entity_id": delay_entity_id, "value": 0},
+                    blocking=False,
+                )
+
+
+class CandyDishwasherStopButton(CandyDishwasherButtonBase):
+    _attr_translation_key = "dishwasher_stop_button"
+    _attr_icon = "mdi:stop-circle-outline"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_STOP_BUTTON.format(self.config_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.status.running
+
+    async def async_press(self) -> None:
+        builder = get_dishwasher_command_builder(
+            self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        )
+        await self._send_command_and_refresh(
+            urlencode(builder.build_stop(), quote_via=quote)
+        )
+
+
+class CandyDishwasherPauseButton(CandyDishwasherButtonBase):
+    _attr_translation_key = "dishwasher_pause_button"
+    _attr_icon = "mdi:pause-circle-outline"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_PAUSE_BUTTON.format(self.config_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.status.machine_state == MachineState.RUNNING
+
+    async def async_press(self) -> None:
+        builder = get_dishwasher_command_builder(
+            self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        )
+        await self._send_command_and_refresh(
+            urlencode(builder.build_pause(), quote_via=quote)
+        )
+
+
+class CandyDishwasherResumeButton(CandyDishwasherButtonBase):
+    _attr_translation_key = "dishwasher_resume_button"
+    _attr_icon = "mdi:play-circle-outline"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_RESUME_BUTTON.format(self.config_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.status.machine_state == MachineState.PAUSED
+
+    async def async_press(self) -> None:
+        builder = get_dishwasher_command_builder(
+            self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        )
+        await self._send_command_and_refresh(
+            urlencode(builder.build_resume(), quote_via=quote)
+        )
+
+
+class CandyDishwasherOpenDoorButton(CandyDishwasherButtonBase):
+    _attr_translation_key = "dishwasher_open_door_button"
+    _attr_icon = "mdi:door-open"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON.format(self.config_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.status.machine_state in {
+            MachineState.FINISHED,
+            MachineState.FINISHED1,
+            MachineState.FINISHED2,
+            MachineState.IDLE,
+        }
+
+    async def async_press(self) -> None:
+        builder = get_dishwasher_command_builder(
+            self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        )
+        await self._send_command_and_refresh(
+            urlencode(builder.build_open_door(), quote_via=quote)
+        )
+
+
+class CandyDishwasherCheckUpButton(CandyDishwasherButtonBase):
+    _attr_translation_key = "dishwasher_checkup_button"
+    _attr_icon = "mdi:wrench"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON.format(self.config_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and not self.status.running
+
+    async def async_press(self) -> None:
+        builder = get_dishwasher_command_builder(
+            self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        )
+        await self._send_command_and_refresh(
+            urlencode(builder.build_checkup(), quote_via=quote)
+        )

@@ -11,11 +11,12 @@ from custom_components.candy import CONF_KEY_USE_ENCRYPTION, DOMAIN
 from custom_components.candy.client import Encryption
 from custom_components.candy.client.cloud import CloudApplianceData, SimplyFiCloudError
 from custom_components.candy.client.model import (
-    DishwasherState,
     DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
     MachineState,
+    OvenState,
+    OvenStatus,
     TumbleDryerStatus,
     WashingMachineStatistics,
     WashingMachineStatus,
@@ -34,6 +35,7 @@ from custom_components.candy.const import (
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_DISHWASHER,
     CONF_KEY_IS_TUMBLE_DRYER,
     CONF_KEY_IS_WASHER_DRYER,
     CONF_KEY_IS_WASHING_MACHINE,
@@ -692,16 +694,38 @@ _IDLE_TUMBLE_DRYER = TumbleDryerStatus(
 )
 
 _IDLE_DISHWASHER = DishwasherStatus(
-    machine_state=DishwasherState.IDLE,
-    program="",
+    machine_state=MachineState.IDLE,
+    program_phase=None,
+    program="P0",
     remaining_minutes=0,
-    delayed_start_hours=None,
+    delayed_start_minutes=None,
     door_open=False,
     door_open_allowed=None,
     eco_mode=False,
     remote_control=False,
     salt_empty=False,
     rinse_aid_empty=False,
+    running=False,
+    half_load=False,
+    extra_dry=False,
+    three_in_one=False,
+    error_code=None,
+    buzzer_level=None,
+    water_hardness=None,
+    last_cycle_counter=None,
+    auto_clean_warning=False,
+    checkup_state=None,
+    r15=0,
+)
+
+_IDLE_OVEN = OvenStatus(
+    machine_state=OvenState.IDLE,
+    program=0,
+    selection=0,
+    temp=0.0,
+    temp_reached=False,
+    program_length_minutes=None,
+    remote_control=False,
 )
 
 
@@ -712,7 +736,7 @@ async def test_maintenance_step_skipped_for_non_washing_machine(
     with patch(
         "custom_components.candy.config_flow.CandyClient.status",
         new_callable=AsyncMock,
-        return_value=_IDLE_DISHWASHER,
+        return_value=_IDLE_OVEN,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -724,6 +748,34 @@ async def test_maintenance_step_skipped_for_non_washing_machine(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert CONF_KEY_IS_WASHING_MACHINE not in result["data"]
     assert CONF_KEY_MAINTENANCE_ENABLED not in result["data"]
+
+
+async def test_dishwasher_read_only_skips_maintenance(
+    hass, no_discovery, detect_no_encryption
+):
+    """Dishwasher in Read-Only mode skips maintenance step and creates entry."""
+    with patch(
+        "custom_components.candy.config_flow.CandyClient.status",
+        new_callable=AsyncMock,
+        return_value=_IDLE_DISHWASHER,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "mode"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert CONF_KEY_IS_WASHING_MACHINE not in result["data"]
+    assert CONF_KEY_MAINTENANCE_ENABLED not in result["data"]
+    assert result["data"].get(CONF_KEY_IS_DISHWASHER) is True
 
 
 async def test_tumble_dryer_read_only_skips_maintenance(

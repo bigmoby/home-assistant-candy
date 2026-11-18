@@ -10,6 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from .client import parse_wash_programs
 from .client.dryer_commands import is_dualtech_dryer_interface
 from .client.model import (
+    DishwasherStatus,
     TumbleDryerStatus,
     WashingMachineStatus,
     WashingMachineWashProgram,
@@ -53,7 +54,7 @@ def localized_notification_text(key: str, language: str) -> str:
 def remote_control_enabled(data: object) -> bool:
     """Return True when the appliance accepts remote commands."""
     return (
-        isinstance(data, (WashingMachineStatus, TumbleDryerStatus))
+        isinstance(data, (WashingMachineStatus, TumbleDryerStatus, DishwasherStatus))
         and data.remote_control
     )
 

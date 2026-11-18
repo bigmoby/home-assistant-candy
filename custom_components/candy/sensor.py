@@ -40,7 +40,6 @@ from .client import (
     parse_wash_programs,
 )
 from .client.model import (
-    DishwasherState,
     DishwasherStatus,
     DryerProgramState,
     MachineState,
@@ -92,9 +91,13 @@ from .const import (
     SUGGESTED_AREA_BATHROOM,
     SUGGESTED_AREA_KITCHEN,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_BUZZER,
+    UNIQUE_ID_DISHWASHER_CYCLE_STATUS,
     UNIQUE_ID_DISHWASHER_ERROR,
+    UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES,
     UNIQUE_ID_DISHWASHER_PROGRAM,
     UNIQUE_ID_DISHWASHER_REMAINING_TIME,
+    UNIQUE_ID_DISHWASHER_WATER_HARDNESS,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_OVEN_PROGRAM,
     UNIQUE_ID_OVEN_TEMP,
@@ -295,6 +298,10 @@ async def async_setup_entry(
                 CandyDishwasherProgramSensor(coordinator, config_entry),
                 CandyDishwasherRemainingTimeSensor(coordinator, config_entry),
                 CandyDishwasherErrorSensor(coordinator, config_entry),
+                CandyDishwasherCycleStatusSensor(coordinator, config_entry),
+                CandyDishwasherWaterHardnessSensor(coordinator, config_entry),
+                CandyDishwasherBuzzerSensor(coordinator, config_entry),
+                CandyDishwasherLifetimeCyclesSensor(coordinator, config_entry),
             ]
         )
     elif isinstance(coordinator.data, WineCoolerStatus):
@@ -2205,16 +2212,19 @@ class CandyOvenTempSensor(CandyBaseSensor):
 
 
 # While waiting for a delayed start RemTime is a placeholder, not the cycle time
-_DISHWASHER_NOT_WASHING = [
-    DishwasherState.IDLE,
-    DishwasherState.FINISHED,
-    DishwasherState.DELAYED_START,
-]
+_DISHWASHER_NOT_WASHING = {
+    MachineState.IDLE,
+    MachineState.FINISHED,
+    MachineState.FINISHED1,
+    MachineState.FINISHED2,
+    MachineState.DELAYED_START,
+    MachineState.OFF,
+}
 
 
 class CandyDishwasherSensor(CandyBaseSensor):
-    _attr_translation_key = "dishwasher"
-    _attr_name = "Dishwasher"
+    _attr_has_entity_name = True
+    _attr_name = None
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2261,8 +2271,8 @@ class CandyDishwasherSensor(CandyBaseSensor):
 
 
 class CandyDishwasherProgramSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_program"
-    _attr_name = "Dishwasher program"
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2287,8 +2297,8 @@ class CandyDishwasherProgramSensor(CandyBaseSensor):
 class CandyDishwasherErrorSensor(CandyBaseSensor):
     """Error code reported by the dishwasher (E0 = no error)."""
 
+    _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_error_code"
-    _attr_name = "Dishwasher error code"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def device_name(self) -> str:
@@ -2311,8 +2321,9 @@ class CandyDishwasherErrorSensor(CandyBaseSensor):
 
 
 class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_remaining_time"
-    _attr_name = "Dishwasher remaining time"
+    _attr_icon = "mdi:progress-clock"
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2338,6 +2349,96 @@ class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
     @property
     def device_class(self) -> SensorDeviceClass:
         return SensorDeviceClass.DURATION
+
+
+class CandyDishwasherCycleStatusSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_cycle_status"
+    _attr_icon = "mdi:progress-clock"
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_CYCLE_STATUS.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        status = cast(DishwasherStatus, self.coordinator.data)
+        if status.program_phase is None:
+            return None
+        return str(status.program_phase)
+
+
+class CandyDishwasherWaterHardnessSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_water_hardness"
+    _attr_icon = "mdi:water-opacity"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_WATER_HARDNESS.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        status = cast(DishwasherStatus, self.coordinator.data)
+        return status.water_hardness
+
+
+class CandyDishwasherBuzzerSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_buzzer"
+    _attr_icon = "mdi:volume-high"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_BUZZER.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        status = cast(DishwasherStatus, self.coordinator.data)
+        return status.buzzer_level
+
+
+class CandyDishwasherLifetimeCyclesSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_lifetime_cycles"
+    _attr_icon = "mdi:counter"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        status = cast(DishwasherStatus, self.coordinator.data)
+        return status.last_cycle_counter
 
     @property
     def icon(self) -> str:

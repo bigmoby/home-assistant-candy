@@ -12,6 +12,14 @@ import async_timeout
 import backoff
 
 from .decryption import Encryption, decrypt, find_key
+from .dishwasher_commands import (
+    DishwasherCommandBuilder as DishwasherCommandBuilder,
+    LegacyTouchDishwasherCommandBuilder as LegacyTouchDishwasherCommandBuilder,
+    ModernDishwasherCommandBuilder as ModernDishwasherCommandBuilder,
+    get_dishwasher_command_builder as get_dishwasher_command_builder,
+    is_legacy_dishwasher as is_legacy_dishwasher,
+    is_open_door_supported as is_open_door_supported,
+)
 from .dryer_commands import (
     DryerCommandBuilder as DryerCommandBuilder,
     DualTechDryerCommandBuilder as DualTechDryerCommandBuilder,
@@ -19,6 +27,8 @@ from .dryer_commands import (
     is_dualtech_dryer_interface as is_dualtech_dryer_interface,
 )
 from .model import (
+    DishwasherProgram as DishwasherProgram,
+    DishwasherProgramPhase as DishwasherProgramPhase,
     DishwasherStatus,
     DownloadableProgram as DownloadableProgram,
     OvenStatus,
@@ -52,6 +62,12 @@ def parse_wash_programs(raw: list[dict]) -> list[WashingMachineWashProgram]:
 def parse_dryer_programs(raw: list[dict]) -> list[TumbleDryerProgram]:
     """Parse and filter the raw dryer program list stored in a config entry."""
     programs = [TumbleDryerProgram.from_dict(p) for p in raw]
+    return [p for p in programs if p.position != 0]
+
+
+def parse_dish_programs(raw: list[dict]) -> list[DishwasherProgram]:
+    """Parse and filter the raw dishwasher program list stored in a config entry."""
+    programs = [DishwasherProgram.from_dict(p) for p in raw]
     return [p for p in programs if p.position != 0]
 
 
