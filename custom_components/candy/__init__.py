@@ -64,6 +64,7 @@ from .const import (
     DATA_KEY_CHECKUP_UNSUB,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DATA_KEY_DISHWASHER_ERROR_UNSUB,
     DATA_KEY_DRYER_CHECKUP_UNSUB,
     DATA_KEY_DRYER_ERROR_UNSUB,
     DATA_KEY_DRYER_WARNING_UNSUB,
@@ -78,6 +79,7 @@ from .const import (
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MAINTENANCE_HARDNESS_THRESHOLDS,
     MODE_FULL_CONTROL,
+    NOTIF_ID_DISHWASHER_ERROR,
     NOTIF_ID_DRYER_ERROR,
     NOTIF_ID_DRYER_FILTER,
     NOTIF_ID_DRYER_WATER_TANK,
@@ -587,6 +589,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DRYER_CHECKUP_UNSUB] = (
             unsub_dryer_checkup
         )
+    elif isinstance(coordinator.data, DishwasherStatus):
+        unsub_dishwasher_error = _register_dishwasher_error_listener(
+            hass, config_entry, coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_ERROR_UNSUB] = (
+            unsub_dishwasher_error
+        )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -955,6 +964,12 @@ def _extract_error_code(status: Any) -> int | None:
         return status.error
     if isinstance(status, TumbleDryerStatus):
         return status.error_code
+    if isinstance(status, DishwasherStatus):
+        if status.error_code is not None:
+            raw = str(status.error_code).upper().lstrip("E")
+            if raw.isdigit():
+                return int(raw)
+        return None
     return None
 
 
@@ -966,17 +981,16 @@ def _register_appliance_error_listener(
 ) -> Callable[[], None]:
     """Register a coordinator listener that posts appliance error notifications and dismisses them when cleared."""
     entry_id = config_entry.entry_id
-    notif_id = (
-        NOTIF_ID_DRYER_ERROR.format(entry_id)
-        if appliance_type == "dryer"
-        else NOTIF_ID_WASH_ERROR.format(entry_id)
-    )
+    if appliance_type == "dryer":
+        notif_id = NOTIF_ID_DRYER_ERROR.format(entry_id)
+        unknown_err_msg = "Unknown tumble dryer error code: %s"
+    elif appliance_type == "dishwasher":
+        notif_id = NOTIF_ID_DISHWASHER_ERROR.format(entry_id)
+        unknown_err_msg = "Unknown dishwasher error code: %s"
+    else:
+        notif_id = NOTIF_ID_WASH_ERROR.format(entry_id)
+        unknown_err_msg = "Unknown washing machine error code: %s"
     lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
-    unknown_err_msg = (
-        "Unknown tumble dryer error code: %s"
-        if appliance_type == "dryer"
-        else "Unknown washing machine error code: %s"
-    )
 
     initial_error = _extract_error_code(coordinator.data)
     prev_error: list[int | None] = [initial_error]
@@ -1031,6 +1045,16 @@ def _register_dryer_error_listener(
     coordinator: DataUpdateCoordinator[Any],
 ) -> Callable[[], None]:
     return _register_appliance_error_listener(hass, config_entry, coordinator, "dryer")
+
+
+def _register_dishwasher_error_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+) -> Callable[[], None]:
+    return _register_appliance_error_listener(
+        hass, config_entry, coordinator, "dishwasher"
+    )
 
 
 def _register_dryer_warning_listener(
@@ -1196,6 +1220,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DATA_KEY_STATS_REFRESH_UNSUB,
             DATA_KEY_WASH_ERROR_UNSUB,
             DATA_KEY_DRYER_ERROR_UNSUB,
+            DATA_KEY_DISHWASHER_ERROR_UNSUB,
             DATA_KEY_DRYER_WARNING_UNSUB,
             DATA_KEY_DRYER_CHECKUP_UNSUB,
             DATA_KEY_LIMESCALE_UNSUB,

@@ -161,21 +161,21 @@ async def test_switch_availability_gated_by_program_options(
     # Initial state (panel) -> Half Load available
     assert hass.states.get(half_load_id).state != "unavailable"
 
-    # Select Prelavaggio (which has available_options: 8, where HalfLoad [bit 1] is not supported)
+    # Select Pre-wash (which has available_options: 8, where HalfLoad [bit 1] is not supported)
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": select_id, "option": "Prelavaggio"},
+        {"entity_id": select_id, "option": "Pre-wash - 5 min"},
         blocking=True,
     )
-    # Prelavaggio has options=8 in catalog, so half load (bit 1, value 2) should become unavailable
+    # Pre-wash has options=8 in catalog, so half load (bit 1, value 2) should become unavailable
     assert hass.states.get(half_load_id).state == "unavailable"
 
-    # Select ECO Cotton (which has available_options: 31, allowing half load)
+    # Select Eco 45°C (which has available_options: 31, allowing half load)
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": select_id, "option": "ECO Cotton"},
+        {"entity_id": select_id, "option": "Eco 45°C"},
         blocking=True,
     )
     assert hass.states.get(half_load_id).state != "unavailable"

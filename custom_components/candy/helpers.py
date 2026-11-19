@@ -228,7 +228,14 @@ def get_appliance_error_notification_strings(
     appliance_type: str, error_code: int, language: str
 ) -> tuple[str, str] | None:
     """Return (title, message) for appliance error, or None if unknown code."""
-    prefix = "wash" if appliance_type == "washer" else "dryer"
+    if appliance_type == "washer":
+        prefix = "wash"
+    elif appliance_type == "dryer":
+        prefix = "dryer"
+    elif appliance_type == "dishwasher":
+        prefix = "dishwasher"
+    else:
+        raise ValueError(f"Unsupported appliance_type: {appliance_type}")
     msg_key = f"{prefix}_error_{error_code}_message"
     if msg_key not in _NOTIFICATION_STRINGS:
         return None
@@ -250,3 +257,10 @@ def get_dryer_error_notification_strings(
 ) -> tuple[str, str] | None:
     """Return (title, message) for tumble dryer error, or None if unknown code."""
     return get_appliance_error_notification_strings("dryer", error_code, language)
+
+
+def get_dishwasher_error_notification_strings(
+    error_code: int, language: str
+) -> tuple[str, str] | None:
+    """Return (title, message) for dishwasher error, or None if unknown code."""
+    return get_appliance_error_notification_strings("dishwasher", error_code, language)

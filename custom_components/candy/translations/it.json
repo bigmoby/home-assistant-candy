@@ -134,6 +134,9 @@
       "dishwasher_program": {
         "name": "Programma"
       },
+      "dishwasher_program_description": {
+        "name": "Descrizione programma"
+      },
       "dishwasher_remaining_time": {
         "name": "Tempo rimanente"
       },

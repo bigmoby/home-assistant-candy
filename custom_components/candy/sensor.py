@@ -159,6 +159,7 @@ from .const import (
 from .helpers import (
     cycles_remaining,
     dry_target_label_for_interface,
+    get_dishwasher_error_notification_strings,
     get_dryer_error_notification_strings,
     is_washer_dryer,
     supports_autodose,
@@ -2294,12 +2295,23 @@ class CandyDishwasherProgramSensor(CandyBaseSensor):
         return "mdi:glass-wine"
 
 
-class CandyDishwasherErrorSensor(CandyBaseSensor):
+class CandyDishwasherErrorSensor(CandyBaseSensor, RestoreSensor):
     """Error code reported by the dishwasher (E0 = no error)."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_error_code"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _restored_state: str | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            if isinstance(last.native_value, str):
+                self._restored_state = last.native_value
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_state is not None
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2313,7 +2325,26 @@ class CandyDishwasherErrorSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
-        return cast(DishwasherStatus, self.coordinator.data).error_code
+        if self.coordinator.data is not None:
+            status = cast(DishwasherStatus, self.coordinator.data)
+            return status.error_code if status.error_code is not None else "E0"
+        return self._restored_state
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        val = self.native_value
+        if val is not None and str(val) not in ("0", "E0", "None"):
+            raw = str(val).upper().lstrip("E")
+            if raw.isdigit():
+                code_num = int(raw)
+                if code_num > 0:
+                    lang = self.config_entry.data.get(
+                        CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+                    )
+                    notif = get_dishwasher_error_notification_strings(code_num, lang)
+                    if notif is not None:
+                        return {"description": notif[1].split("\n")[0].strip()}
+        return {}
 
     @property
     def icon(self) -> str:

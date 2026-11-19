@@ -1142,7 +1142,7 @@ async def test_dishwasher_e2e_complete_journey(
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": prog_eid, "option": "ECO Cotton"},
+        {"entity_id": prog_eid, "option": "Eco 45°C"},
         blocking=True,
     )
     # Enable Half Load switch

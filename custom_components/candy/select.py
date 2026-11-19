@@ -37,6 +37,7 @@ from .const import (
     CONF_KEY_PROGRAMS,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
     DISHWASHER_PROGRAMS,
     DOMAIN,
@@ -56,6 +57,7 @@ from .const import (
     PROGRAM_TYPES,
     RAPID_LEVEL_TO_VALUE,
     SOIL_LABELS,
+    UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION,
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
     UNIQUE_ID_TUMBLE_DRY_LEVEL_SELECT,
     UNIQUE_ID_TUMBLE_PROGRAM_SELECT,
@@ -100,9 +102,18 @@ async def async_setup_entry(
     if isinstance(coordinator.data, DishwasherStatus):
         raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
         dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
-        async_add_entities(
-            [CandyDishwasherProgramSelect(coordinator, config_entry, dish_programs)]
+        desc_programs = (
+            dish_programs
+            if dish_programs
+            else parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
         )
+        desc_sensor = CandyDishwasherProgramDescriptionSensor(
+            coordinator, config_entry, desc_programs
+        )
+        prog_select = CandyDishwasherProgramSelect(
+            coordinator, config_entry, dish_programs, desc_sensor
+        )
+        async_add_entities([prog_select, desc_sensor])
         return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
@@ -1446,11 +1457,13 @@ class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
         coordinator: DataUpdateCoordinator,
         config_entry: ConfigEntry,
         programs: list[DishwasherProgram],
+        description_sensor: CandyDishwasherProgramDescriptionSensor | None,
     ) -> None:
         super().__init__(coordinator)
         self.config_entry = config_entry
         self.config_id = config_entry.entry_id
         self._programs = programs
+        self._description_sensor = description_sensor
         lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
         if self._programs:
             self._attr_options = [DISHWASHER_PROGRAM_PANEL] + [
@@ -1487,4 +1500,99 @@ class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         self._selected_option = option
+        if self._description_sensor is not None:
+            self._description_sensor.reset_for_option(option)
+            self._description_sensor.async_write_ha_state()
         self.async_write_ha_state()
+
+
+class CandyDishwasherProgramDescriptionSensor(CoordinatorEntity, SensorEntity):
+    """Read-only sensor showing the description of the selected dishwasher program."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Program description"
+    _attr_translation_key = "dishwasher_program_description"
+    _attr_should_poll = False
+    _description: str | None = None
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        programs: list[DishwasherProgram],
+    ) -> None:
+        super().__init__(coordinator)
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._programs = programs
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION.format(self.config_id)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return dishwasher_device_info(self.config_entry)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._description is not None
+
+    @property
+    def native_value(self) -> str | None:
+        return self._description
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._seed_from_coordinator()
+
+    def _handle_coordinator_update(self) -> None:
+        if self._description is None:
+            self._seed_from_coordinator()
+        super()._handle_coordinator_update()
+
+    def _seed_from_coordinator(self) -> None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return
+        status = cast(DishwasherStatus, self.coordinator.data)
+        lang = self.config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
+        raw_prog = status.program.lstrip("P").rstrip("+-")
+        matched: DishwasherProgram | None = None
+        if raw_prog.isdigit():
+            val = int(raw_prog)
+            matched = next(
+                (p for p in self._programs if val in (p.cycle_id, p.selector_position)),
+                None,
+            )
+        if matched is not None:
+            self._description = self._truncate(matched.localized_description(lang))
+        elif self._programs:
+            self._description = self._truncate(
+                self._programs[0].localized_description(lang)
+            )
+
+    @staticmethod
+    def _truncate(value: str | None) -> str | None:
+        return value[:255] if value is not None else None
+
+    def update_for_program(self, program: DishwasherProgram | None) -> None:
+        if program is None:
+            self._description = None
+            return
+        lang = self.config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
+        self._description = self._truncate(program.localized_description(lang))
+
+    def reset_for_option(self, option: str) -> None:
+        lang = self.config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
+        matched = next(
+            (
+                p
+                for p in self._programs
+                if p.localized_name(lang) == option or p.name == option
+            ),
+            None,
+        )
+        if matched is not None:
+            self._description = self._truncate(matched.localized_description(lang))
+        else:
+            self._seed_from_coordinator()

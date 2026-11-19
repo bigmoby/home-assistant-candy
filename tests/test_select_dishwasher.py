@@ -79,18 +79,18 @@ async def test_select_with_authentic_catalog_programs_english(
     options = state.attributes["options"]
     assert options[0] == DISHWASHER_PROGRAM_PANEL
     assert len(options) == 10  # "panel" + 9 programs
-    assert "ECO Cotton" in options
-    assert "Intensivo" in options
-    assert "Zoom 39" in options
+    assert "Eco 45°C" in options
+    assert "Intensive 75°C" in options
+    assert "ZOOM 39' 60°C" in options
 
     # Select an authentic catalog program
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": select_id, "option": "ECO Cotton"},
+        {"entity_id": select_id, "option": "Eco 45°C"},
         blocking=True,
     )
-    assert hass.states.get(select_id).state == "ECO Cotton"
+    assert hass.states.get(select_id).state == "Eco 45°C"
 
     # Select back to panel
     await hass.services.async_call(
