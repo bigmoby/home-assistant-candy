@@ -1492,6 +1492,8 @@ class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
     def available(self) -> bool:
         if not super().available:
             return False
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return False
         return not self.status.running
 
     @property
@@ -1510,7 +1512,6 @@ class CandyDishwasherProgramDescriptionSensor(CoordinatorEntity, SensorEntity):
     """Read-only sensor showing the description of the selected dishwasher program."""
 
     _attr_has_entity_name = True
-    _attr_name = "Program description"
     _attr_translation_key = "dishwasher_program_description"
     _attr_should_poll = False
     _description: str | None = None

@@ -199,6 +199,8 @@ class CandyDishwasherDelayNumber(CoordinatorEntity, NumberEntity):
     def available(self) -> bool:
         if not super().available:
             return False
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return False
         return not self.status.running
 
     @property

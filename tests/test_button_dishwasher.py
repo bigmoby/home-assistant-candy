@@ -6,6 +6,7 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 import pytest
@@ -590,3 +591,14 @@ def test_state_from_phase(
     assert status.machine_state is machine_state
     assert status.program_phase is program_phase
     assert status.running is running
+
+
+async def test_dishwasher_checkup_button_diagnostic_category(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify check-up button has DIAGNOSTIC entity category."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    registry = er.async_get(hass)
+    btn_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
+
+    assert registry.async_get(btn_id).entity_category == EntityCategory.DIAGNOSTIC

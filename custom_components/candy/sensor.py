@@ -2226,6 +2226,7 @@ _DISHWASHER_NOT_WASHING = {
 class CandyDishwasherSensor(CandyBaseSensor):
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_translation_key = "dishwasher"
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2239,6 +2240,10 @@ class CandyDishwasherSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.hass.data[DOMAIN][self.config_id].get(DATA_KEY_WRITE_PENDING, 0):
+            return "Sending command"
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         return str(status.machine_state)
 
@@ -2248,6 +2253,8 @@ class CandyDishwasherSensor(CandyBaseSensor):
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any]:
+        if self.coordinator.data is None:
+            return {}
         status = cast(DishwasherStatus, self.coordinator.data)
 
         attributes = {
@@ -2287,6 +2294,8 @@ class CandyDishwasherProgramSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         return status.program
 
@@ -2327,8 +2336,9 @@ class CandyDishwasherErrorSensor(CandyBaseSensor, RestoreSensor):
     def native_value(self) -> StateType:
         if self.coordinator.data is not None:
             status = cast(DishwasherStatus, self.coordinator.data)
-            return status.error_code if status.error_code is not None else "E0"
-        return self._restored_state
+            if status.error_code is not None:
+                return status.error_code
+        return self._restored_state if self._restored_state is not None else "E0"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -2368,6 +2378,8 @@ class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         if status.machine_state in _DISHWASHER_NOT_WASHING:
             return 0
@@ -2399,6 +2411,8 @@ class CandyDishwasherCycleStatusSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         if status.program_phase is None:
             return None
@@ -2423,6 +2437,8 @@ class CandyDishwasherWaterHardnessSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         return status.water_hardness
 
@@ -2445,16 +2461,29 @@ class CandyDishwasherBuzzerSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         return status.buzzer_level
 
 
-class CandyDishwasherLifetimeCyclesSensor(CandyBaseSensor):
+class CandyDishwasherLifetimeCyclesSensor(CandyBaseSensor, RestoreSensor):
     _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_lifetime_cycles"
     _attr_icon = "mdi:counter"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _restored_cycles: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_cycles = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_cycles is not None
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2468,12 +2497,11 @@ class CandyDishwasherLifetimeCyclesSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
-        status = cast(DishwasherStatus, self.coordinator.data)
-        return status.last_cycle_counter
-
-    @property
-    def icon(self) -> str:
-        return "mdi:progress-clock"
+        if self.coordinator.data is not None:
+            status = cast(DishwasherStatus, self.coordinator.data)
+            if status.last_cycle_counter is not None:
+                return status.last_cycle_counter
+        return self._restored_cycles
 
 
 class CandyWineCoolerSensor(CandyBaseSensor):

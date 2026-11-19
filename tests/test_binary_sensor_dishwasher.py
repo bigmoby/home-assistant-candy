@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_fixture
@@ -110,3 +111,27 @@ async def test_dishwasher_binary_sensors_alerts(
     assert hass.states.get(door_id).state == "on"
     assert hass.states.get(remote_id).state == "off"
     assert hass.states.get(clean_id).state == "on"
+
+
+async def test_dishwasher_binary_sensors_diagnostic_category(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify diagnostic consumable sensors have DIAGNOSTIC entity category."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    registry = er.async_get(hass)
+
+    salt_id = _entity_id(hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_SALT_EMPTY)
+    rinse_id = _entity_id(
+        hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY
+    )
+    remote_id = _entity_id(
+        hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_REMOTE_CONTROL
+    )
+    clean_id = _entity_id(
+        hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN
+    )
+
+    assert registry.async_get(salt_id).entity_category == EntityCategory.DIAGNOSTIC
+    assert registry.async_get(rinse_id).entity_category == EntityCategory.DIAGNOSTIC
+    assert registry.async_get(remote_id).entity_category == EntityCategory.DIAGNOSTIC
+    assert registry.async_get(clean_id).entity_category == EntityCategory.DIAGNOSTIC

@@ -1,9 +1,14 @@
 """Tests for various sensors."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry, entity_registry
 from pytest_homeassistant_custom_component.common import load_fixture
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+
+from custom_components.candy.const import DATA_KEY_WRITE_PENDING, DOMAIN
+from custom_components.candy.sensor import CandyDishwasherLifetimeCyclesSensor
 
 from .common import init_integration
 
@@ -205,3 +210,43 @@ async def test_dishwasher_hardware_sensors(
     assert hardness.state == "4"
     assert cycles
     assert cycles.state == "150"
+
+
+async def test_dishwasher_main_sensor_write_pending(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify main dishwasher sensor shows 'Sending command' when write is pending."""
+    entry = await init_integration(
+        hass, aioclient_mock, load_fixture("dishwasher/idle.json")
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 1
+    coordinator.async_update_listeners()
+
+    state = hass.states.get("sensor.dishwasher")
+    assert state
+    assert state.state == "Sending command"
+
+
+async def test_dishwasher_lifetime_cycles_restoration(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify lifetime cycles sensor uses restored state when coordinator has None."""
+    entry = await init_integration(
+        hass, aioclient_mock, load_fixture("dishwasher/idle.json")
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+
+    sensor = CandyDishwasherLifetimeCyclesSensor(coordinator, entry)
+    sensor.hass = hass
+    sensor.entity_id = "sensor.dishwasher_completed_cycles"
+
+    # Simulate get_last_sensor_data returning restored 240 cycles
+    last_data = MagicMock()
+    last_data.native_value = 240
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=last_data)  # type: ignore[assignment]
+    await sensor.async_added_to_hass()
+
+    coordinator.data.last_cycle_counter = None
+    assert sensor.native_value == 240
+    assert sensor.available is True

@@ -346,6 +346,7 @@ class _CandyDishwasherBinarySensorBase(CoordinatorEntity, BinarySensorEntity):
 class DishwasherSaltEmptyBinarySensor(_CandyDishwasherBinarySensorBase):
     _attr_translation_key = "dishwasher_salt_empty"
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:shaker-outline"
 
     @property
@@ -353,13 +354,16 @@ class DishwasherSaltEmptyBinarySensor(_CandyDishwasherBinarySensorBase):
         return UNIQUE_ID_DISHWASHER_SALT_EMPTY.format(self.config_id)
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return None
         return self.status.salt_empty
 
 
 class DishwasherRinseAidEmptyBinarySensor(_CandyDishwasherBinarySensorBase):
     _attr_translation_key = "dishwasher_rinse_aid_empty"
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:water-outline"
 
     @property
@@ -367,7 +371,9 @@ class DishwasherRinseAidEmptyBinarySensor(_CandyDishwasherBinarySensorBase):
         return UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY.format(self.config_id)
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return None
         return self.status.rinse_aid_empty
 
 
@@ -380,7 +386,9 @@ class DishwasherDoorBinarySensor(_CandyDishwasherBinarySensorBase):
         return UNIQUE_ID_DISHWASHER_DOOR.format(self.config_id)
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return None
         return self.status.door_open
 
 
@@ -394,7 +402,9 @@ class DishwasherRemoteControlBinarySensor(_CandyDishwasherBinarySensorBase):
         return UNIQUE_ID_DISHWASHER_REMOTE_CONTROL.format(self.config_id)
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return None
         return self.status.remote_control
 
 
@@ -409,5 +419,7 @@ class DishwasherAutoCleanBinarySensor(_CandyDishwasherBinarySensorBase):
         return UNIQUE_ID_DISHWASHER_MAINT_CLEAN.format(self.config_id)
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return None
         return self.status.auto_clean_warning

@@ -1650,6 +1650,7 @@ class CandyDishwasherOpenDoorButton(CandyDishwasherButtonBase):
 
 
 class CandyDishwasherCheckUpButton(CandyDishwasherButtonBase):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_translation_key = "dishwasher_checkup_button"
     _attr_icon = "mdi:wrench"
 

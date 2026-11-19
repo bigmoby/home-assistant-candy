@@ -574,6 +574,8 @@ class _CandyDishwasherSwitchBase(CoordinatorEntity, SwitchEntity):
     def available(self) -> bool:
         if not super().available:
             return False
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return False
         if self.status.running:
             return False
         prog = self._active_program()
@@ -588,6 +590,8 @@ class _CandyDishwasherSwitchBase(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         if self._user_value is not None:
             return self._user_value
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return False
         return self._panel_value()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
