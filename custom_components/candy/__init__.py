@@ -25,7 +25,12 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .client import CandyClient, get_dryer_command_builder, parse_wash_programs
+from .client import (
+    CandyClient,
+    get_dishwasher_command_builder,
+    get_dryer_command_builder,
+    parse_wash_programs,
+)
 from .client.model import (
     CheckUpState,
     DishwasherStatus,
@@ -64,7 +69,9 @@ from .const import (
     DATA_KEY_CHECKUP_UNSUB,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DATA_KEY_DISHWASHER_CHECKUP_UNSUB,
     DATA_KEY_DISHWASHER_ERROR_UNSUB,
+    DATA_KEY_DISHWASHER_WARNING_UNSUB,
     DATA_KEY_DRYER_CHECKUP_UNSUB,
     DATA_KEY_DRYER_ERROR_UNSUB,
     DATA_KEY_DRYER_WARNING_UNSUB,
@@ -80,6 +87,8 @@ from .const import (
     MAINTENANCE_HARDNESS_THRESHOLDS,
     MODE_FULL_CONTROL,
     NOTIF_ID_DISHWASHER_ERROR,
+    NOTIF_ID_DISHWASHER_RINSE,
+    NOTIF_ID_DISHWASHER_SALT,
     NOTIF_ID_DRYER_ERROR,
     NOTIF_ID_DRYER_FILTER,
     NOTIF_ID_DRYER_WATER_TANK,
@@ -596,6 +605,26 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_ERROR_UNSUB] = (
             unsub_dishwasher_error
         )
+        unsub_dishwasher_checkup = _register_dishwasher_checkup_listener(
+            hass, config_entry, coordinator, client
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_CHECKUP_UNSUB] = (
+            unsub_dishwasher_checkup
+        )
+        unsub_dishwasher_warning = _register_dishwasher_warning_listener(
+            hass, config_entry, coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_WARNING_UNSUB] = (
+            unsub_dishwasher_warning
+        )
+        stats_coordinator = hass.data[DOMAIN][config_entry.entry_id].get(
+            DATA_KEY_STATS_COORDINATOR
+        )
+        if stats_coordinator is not None:
+            unsub_maint = _register_dishwasher_maintenance_notifications(
+                hass, config_entry, stats_coordinator
+            )
+            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_MAINT_UNSUB] = unsub_maint
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -649,6 +678,58 @@ def _register_maintenance_notifications(
         if stats is None:
             return
         for last_key, threshold, notif_id, title, message in _MAINTENANCE_ITEMS:
+            last = config_entry.data.get(last_key, 0)
+            if cycles_remaining(stats.total_cycles, last, threshold) == 0:
+                pn_async_create(hass, message, title=title, notification_id=notif_id)
+
+    return stats_coordinator.async_add_listener(_on_stats_update)
+
+
+def _register_dishwasher_maintenance_notifications(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    stats_coordinator: DataUpdateCoordinator[Any],
+) -> Callable[[], None]:
+    entry_id = config_entry.entry_id
+    hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+    limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
+    lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
+
+    maintenance_items = [
+        (
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
+            MAINTENANCE_FULL_CHECKUP_THRESHOLD,
+            NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id),
+            localized_notification_text("dishwasher_full_checkup_result_title", lang),
+            localized_notification_text("full_checkup_due_message", lang),
+        ),
+    ]
+    if config_entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
+        maintenance_items.append(
+            (
+                CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
+                limescale_threshold,
+                NOTIF_ID_MAINT_LIMESCALE.format(entry_id),
+                localized_notification_text("dishwasher_limescale_title", lang),
+                localized_notification_text("dishwasher_limescale_due_message", lang),
+            )
+        )
+    if config_entry.data.get(CONF_KEY_MAINTENANCE_FILTER_ENABLED, True):
+        maintenance_items.append(
+            (
+                CONF_KEY_MAINTENANCE_LAST_FILTER,
+                MAINTENANCE_FILTER_THRESHOLD,
+                NOTIF_ID_MAINT_FILTER.format(entry_id),
+                localized_notification_text("dishwasher_filter_title", lang),
+                localized_notification_text("dishwasher_filter_due_message", lang),
+            )
+        )
+
+    def _on_stats_update() -> None:
+        stats: Any = stats_coordinator.data
+        if stats is None:
+            return
+        for last_key, threshold, notif_id, title, message in maintenance_items:
             last = config_entry.data.get(last_key, 0)
             if cycles_remaining(stats.total_cycles, last, threshold) == 0:
                 pn_async_create(hass, message, title=title, notification_id=notif_id)
@@ -1208,6 +1289,162 @@ def _register_dryer_checkup_listener(
     return coordinator.async_add_listener(_on_status_update)
 
 
+def _register_dishwasher_warning_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+) -> Callable[[], None]:
+    """Register a coordinator listener that manages persistent notifications for dishwasher warnings."""
+    entry_id = config_entry.entry_id
+    salt_notif_id = NOTIF_ID_DISHWASHER_SALT.format(entry_id)
+    rinse_notif_id = NOTIF_ID_DISHWASHER_RINSE.format(entry_id)
+    lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
+
+    initial_status = cast(DishwasherStatus | None, coordinator.data)
+    initial_salt = initial_status.salt_empty if initial_status is not None else False
+    initial_rinse = (
+        initial_status.rinse_aid_empty if initial_status is not None else False
+    )
+
+    prev_salt: list[bool] = [initial_salt]
+    prev_rinse: list[bool] = [initial_rinse]
+
+    if initial_salt:
+        title = localized_notification_text("dishwasher_salt_empty_title", lang)
+        message = localized_notification_text("dishwasher_salt_empty_message", lang)
+        pn_async_create(
+            hass,
+            message,
+            title=title,
+            notification_id=salt_notif_id,
+        )
+
+    if initial_rinse:
+        title = localized_notification_text("dishwasher_rinse_empty_title", lang)
+        message = localized_notification_text("dishwasher_rinse_empty_message", lang)
+        pn_async_create(
+            hass,
+            message,
+            title=title,
+            notification_id=rinse_notif_id,
+        )
+
+    def _on_status_update() -> None:
+        status = cast(DishwasherStatus | None, coordinator.data)
+        if status is None:
+            return
+
+        curr_salt = status.salt_empty
+        prior_salt = prev_salt[0]
+        prev_salt[0] = curr_salt
+
+        if curr_salt and not prior_salt:
+            title = localized_notification_text("dishwasher_salt_empty_title", lang)
+            message = localized_notification_text("dishwasher_salt_empty_message", lang)
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=salt_notif_id,
+            )
+        elif not curr_salt and prior_salt:
+            pn_async_dismiss(hass, salt_notif_id)
+
+        curr_rinse = status.rinse_aid_empty
+        prior_rinse = prev_rinse[0]
+        prev_rinse[0] = curr_rinse
+
+        if curr_rinse and not prior_rinse:
+            title = localized_notification_text("dishwasher_rinse_empty_title", lang)
+            message = localized_notification_text(
+                "dishwasher_rinse_empty_message", lang
+            )
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=rinse_notif_id,
+            )
+        elif not curr_rinse and prior_rinse:
+            pn_async_dismiss(hass, rinse_notif_id)
+
+    return coordinator.async_add_listener(_on_status_update)
+
+
+def _register_dishwasher_checkup_listener(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[Any],
+    client: CandyClient,
+) -> Callable[[], None]:
+    """Register a coordinator listener that handles dishwasher Check-up completion."""
+    initial = cast(DishwasherStatus | None, coordinator.data)
+    prev_state: list[CheckUpState | None] = [
+        initial.checkup_state if initial is not None else None
+    ]
+
+    def _on_status_update() -> None:
+        status = cast(DishwasherStatus | None, coordinator.data)
+        if status is None:
+            return
+        curr_state = status.checkup_state
+        prior_state = prev_state[0]
+        prev_state[0] = curr_state
+
+        has_no_error = (status.error_code in (None, "0", "E0", 0)) and (
+            status.machine_state != MachineState.ERROR
+        )
+
+        if (
+            curr_state == CheckUpState.COMPLETED
+            and prior_state == CheckUpState.RUNNING
+            and has_no_error
+        ):
+            entry_id = config_entry.entry_id
+            lang = config_entry.data.get(
+                CONF_KEY_PROGRAM_LANGUAGE, hass.config.language
+            )
+            title = localized_notification_text(
+                "dishwasher_full_checkup_result_title", lang
+            )
+            message = localized_notification_text(
+                "dishwasher_full_checkup_result_message", lang
+            )
+            pn_async_create(
+                hass,
+                message,
+                title=title,
+                notification_id=NOTIF_ID_FULL_CHECKUP.format(entry_id),
+            )
+            pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
+
+            if (
+                config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
+                and status.remote_control
+            ):
+                interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+                builder = get_dishwasher_command_builder(interface_type)
+                reset_cmd = builder.build_stop()
+
+                async def _send_reset() -> None:
+                    try:
+                        await client.send_command(urlencode(reset_cmd, quote_via=quote))
+                        await asyncio.sleep(5)
+                        await coordinator.async_request_refresh()
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to reset dishwasher check-up state: %s", err
+                        )
+
+                config_entry.async_create_background_task(
+                    hass,
+                    _send_reset(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_send_dishwasher_checkup_reset",
+                )
+
+    return coordinator.async_add_listener(_on_status_update)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -1223,6 +1460,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DATA_KEY_DISHWASHER_ERROR_UNSUB,
             DATA_KEY_DRYER_WARNING_UNSUB,
             DATA_KEY_DRYER_CHECKUP_UNSUB,
+            DATA_KEY_DISHWASHER_CHECKUP_UNSUB,
+            DATA_KEY_DISHWASHER_WARNING_UNSUB,
             DATA_KEY_LIMESCALE_UNSUB,
         ):
             unsub = entry_data.get(key)

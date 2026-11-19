@@ -264,3 +264,51 @@ def get_dishwasher_error_notification_strings(
 ) -> tuple[str, str] | None:
     """Return (title, message) for dishwasher error, or None if unknown code."""
     return get_appliance_error_notification_strings("dishwasher", error_code, language)
+
+
+def get_dishwasher_checkup_result_strings(language: str) -> tuple[str, str]:
+    """Return (title, message) for dishwasher full check-up result notification."""
+    title = localized_notification_text(
+        "dishwasher_full_checkup_result_title", language
+    )
+    message = localized_notification_text(
+        "dishwasher_full_checkup_result_message", language
+    )
+    return title, message
+
+
+def get_dishwasher_maintenance_strings(
+    maint_type: str, language: str
+) -> tuple[str, str]:
+    """Return (title, message) for dishwasher maintenance notifications."""
+    if maint_type == "filter":
+        title = localized_notification_text("dishwasher_filter_title", language)
+        message = localized_notification_text("dishwasher_filter_due_message", language)
+    elif maint_type == "limescale":
+        title = localized_notification_text("dishwasher_limescale_title", language)
+        message = localized_notification_text(
+            "dishwasher_limescale_due_message", language
+        )
+    elif maint_type == "checkup":
+        title = localized_notification_text(
+            "dishwasher_full_checkup_result_title", language
+        )
+        message = localized_notification_text("full_checkup_due_message", language)
+    else:
+        raise ValueError(f"Unsupported dishwasher maintenance type: {maint_type}")
+    return title, message
+
+
+def get_dishwasher_warning_strings(warning_type: str, language: str) -> tuple[str, str]:
+    """Return (title, message) for dishwasher consumable warnings."""
+    if warning_type == "salt":
+        title = localized_notification_text("dishwasher_salt_empty_title", language)
+        message = localized_notification_text("dishwasher_salt_empty_message", language)
+    elif warning_type == "rinse":
+        title = localized_notification_text("dishwasher_rinse_empty_title", language)
+        message = localized_notification_text(
+            "dishwasher_rinse_empty_message", language
+        )
+    else:
+        raise ValueError(f"Unsupported dishwasher warning type: {warning_type}")
+    return title, message

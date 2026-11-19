@@ -919,6 +919,11 @@ class DishwasherProgram:
             "DW_WIFI_PROG_NAME_",
             "DW_PROG_TITLE_",
             "DW_PROG_NAME_",
+            "DW_PROGRAM_NAME_",
+            "DW_WIFI_PROGRAM_DOWNLOAD_",
+            "DW_PROGRAM_DOWNLOAD_",
+            "NFC_DW_PROGRAM_DOWNLOAD_",
+            "NFC_DW_PROGRAM_NAME_",
             "DW_",
         ):
             if raw_name.startswith(prefix):
@@ -953,8 +958,10 @@ class DishwasherProgram:
 
     def localized_name(self, language: str) -> str:
         """Return the program name in the given BCP-47 language code."""
-        translations = _PROGRAM_NAMES.get(f"DW_{self.name}") or _PROGRAM_NAMES.get(
-            self.name, {}
+        translations = (
+            _PROGRAM_NAMES.get(f"DW_{self.name}")
+            or _PROGRAM_NAMES.get(f"DW_DL_{self.name}")
+            or _PROGRAM_NAMES.get(self.name, {})
         )
         return (
             translations.get(language)
@@ -964,9 +971,11 @@ class DishwasherProgram:
 
     def localized_description(self, language: str) -> str | None:
         """Return the program description in the given BCP-47 language code, or None."""
-        translations = _PROGRAM_NAMES.get(
-            f"DW_{self.name}_DESCRIPTION"
-        ) or _PROGRAM_NAMES.get(self.name + "_DESCRIPTION", {})
+        translations = (
+            _PROGRAM_NAMES.get(f"DW_{self.name}_DESCRIPTION")
+            or _PROGRAM_NAMES.get(f"DW_DL_{self.name}_DESCRIPTION")
+            or _PROGRAM_NAMES.get(self.name + "_DESCRIPTION", {})
+        )
         return translations.get(language) or translations.get("en") or None
 
 

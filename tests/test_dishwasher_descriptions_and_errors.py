@@ -20,13 +20,19 @@ from custom_components.candy.const import (
     CONF_KEY_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
     NOTIF_ID_DISHWASHER_ERROR,
+    NOTIF_ID_DISHWASHER_RINSE,
+    NOTIF_ID_DISHWASHER_SALT,
+    NOTIF_ID_FULL_CHECKUP,
     UNIQUE_ID_DISHWASHER_ERROR,
     UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION,
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
 )
 from custom_components.candy.helpers import (
     get_appliance_error_notification_strings,
+    get_dishwasher_checkup_result_strings,
     get_dishwasher_error_notification_strings,
+    get_dishwasher_maintenance_strings,
+    get_dishwasher_warning_strings,
 )
 
 from .common import init_integration
@@ -319,3 +325,227 @@ async def test_persistent_notification_created_and_dismissed_on_error(
         # Notification must be dismissed
         mock_dismiss.assert_called_once_with(hass, notif_id)
         mock_create.assert_not_called()
+
+
+def test_dishwasher_program_localization_legacy_touch() -> None:
+    """Verify Legacy Touch program names and descriptions resolve to authentic strings."""
+    prog = DishwasherProgram.from_dict({"name": "DW_PROG_TITLE_P_1_PLUS"})
+    assert prog.localized_name("en") == "Hygienic 75°C"
+    assert prog.localized_name("it") == "Igienizzante 75°C"
+    desc_en = prog.localized_description("en")
+    assert desc_en is not None
+    assert "sterilising dishes" in desc_en
+    desc_it = prog.localized_description("it")
+    assert desc_it is not None
+    assert "igienizzare" in desc_it
+
+
+def test_dishwasher_program_localization_nfc_and_downloadable() -> None:
+    """Verify NFC Digit, NFC LED, and downloadable programs resolve properly."""
+    prog_digit = DishwasherProgram.from_dict(
+        {"name": "NFC_DW_PROGRAM_NAME_DIGIT_INTENSIVE"}
+    )
+    assert prog_digit.localized_name("en") == "Hygienic 75°C"
+    desc_digit = prog_digit.localized_description("en")
+    assert desc_digit is not None
+    assert "sterilizing dishes" in desc_digit
+
+    prog_led = DishwasherProgram.from_dict(
+        {"name": "NFC_DW_PROGRAM_NAME_LED_INTENSIVE"}
+    )
+    assert prog_led.localized_name("en") == "Intensive 75°C"
+    desc_led = prog_led.localized_description("en")
+    assert desc_led is not None
+    assert "antibacterial cycle" in desc_led
+
+    prog_dl = DishwasherProgram.from_dict(
+        {"name": "NFC_DW_PROGRAM_DOWNLOAD_TURBO_POWER"}
+    )
+    assert prog_dl.localized_name("en") == "TurboPower"
+    desc_dl = prog_dl.localized_description("en")
+    assert desc_dl is not None
+    assert "Deep washing" in desc_dl
+
+    prog_autoclean = DishwasherProgram.from_dict({"name": "DW_PROGRAM_NAME_AUTOCLEAN"})
+    assert prog_autoclean.localized_name("en") == "Auto Clean"
+    desc_ac = prog_autoclean.localized_description("en")
+    assert desc_ac is not None
+    assert "clean the dishwasher" in desc_ac
+
+
+def test_dishwasher_notification_helper_strings() -> None:
+    """Verify dishwasher checkup, maintenance, and warning helper resolvers."""
+    cu_title, cu_msg = get_dishwasher_checkup_result_strings("en")
+    assert "Check-up" in cu_title
+    assert "Door lock" in cu_msg
+    assert "Drain pump" in cu_msg
+
+    cu_title_it, cu_msg_it = get_dishwasher_checkup_result_strings("it")
+    assert "Check-up" in cu_title_it
+    assert "Chiusura porta" in cu_msg_it
+
+    f_title, f_msg = get_dishwasher_maintenance_strings("filter", "en")
+    assert "filter" in f_title.lower()
+    assert "clean the filter" in f_msg.lower()
+
+    l_title, l_msg = get_dishwasher_maintenance_strings("limescale", "en")
+    assert "limescale" in l_title.lower()
+    assert "limescale" in l_msg.lower()
+
+    c_title, c_msg = get_dishwasher_maintenance_strings("checkup", "en")
+    assert "Check-up" in c_title
+
+    with pytest.raises(ValueError, match="Unsupported dishwasher maintenance type"):
+        get_dishwasher_maintenance_strings("invalid", "en")
+
+    s_title, s_msg = get_dishwasher_warning_strings("salt", "en")
+    assert "salt" in s_title.lower()
+    assert "salt" in s_msg.lower()
+
+    r_title, r_msg = get_dishwasher_warning_strings("rinse", "en")
+    assert "rinse" in r_title.lower()
+    assert "rinse" in r_msg.lower()
+
+    with pytest.raises(ValueError, match="Unsupported dishwasher warning type"):
+        get_dishwasher_warning_strings("invalid", "en")
+
+
+async def test_persistent_notification_dishwasher_salt_and_rinse(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify persistent notifications are raised when MissSalt and MissRinse are set, and dismissed when cleared."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_PROGRAM_LANGUAGE: "en"},
+    )
+    salt_notif_id = NOTIF_ID_DISHWASHER_SALT.format(entry.entry_id)
+    rinse_notif_id = NOTIF_ID_DISHWASHER_RINSE.format(entry.entry_id)
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+
+    # Trigger MissSalt == "1"
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_create,
+        patch("custom_components.candy.pn_async_dismiss") as mock_dismiss,
+    ):
+        raw = json.loads(load_fixture(_READY))
+        raw["statusDWash"]["MissSalt"] = "1"
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{entry.data['ip_address']}/http-read.json",
+            json=raw,
+        )
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        mock_create.assert_called_once()
+        _, kwargs = mock_create.call_args
+        assert kwargs["notification_id"] == salt_notif_id
+        assert "Salt" in kwargs["title"]
+        mock_dismiss.assert_not_called()
+
+    # Clear MissSalt == "0"
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_create,
+        patch("custom_components.candy.pn_async_dismiss") as mock_dismiss,
+    ):
+        raw = json.loads(load_fixture(_READY))
+        raw["statusDWash"]["MissSalt"] = "0"
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{entry.data['ip_address']}/http-read.json",
+            json=raw,
+        )
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        mock_dismiss.assert_called_once_with(hass, salt_notif_id)
+        mock_create.assert_not_called()
+
+    # Trigger MissRinse == "1"
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_create,
+        patch("custom_components.candy.pn_async_dismiss") as mock_dismiss,
+    ):
+        raw = json.loads(load_fixture(_READY))
+        raw["statusDWash"]["MissRinse"] = "1"
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{entry.data['ip_address']}/http-read.json",
+            json=raw,
+        )
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        mock_create.assert_called_once()
+        _, kwargs = mock_create.call_args
+        assert kwargs["notification_id"] == rinse_notif_id
+        assert "Rinse" in kwargs["title"]
+        mock_dismiss.assert_not_called()
+
+    # Clear MissRinse == "0"
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_create,
+        patch("custom_components.candy.pn_async_dismiss") as mock_dismiss,
+    ):
+        raw = json.loads(load_fixture(_READY))
+        raw["statusDWash"]["MissRinse"] = "0"
+        aioclient_mock.clear_requests()
+        aioclient_mock.get(
+            f"http://{entry.data['ip_address']}/http-read.json",
+            json=raw,
+        )
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        mock_dismiss.assert_called_once_with(hass, rinse_notif_id)
+        mock_create.assert_not_called()
+
+
+async def test_persistent_notification_dishwasher_checkup_lifecycle(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify checkup completion triggers result notification and sends reset command."""
+    raw_running = json.loads(load_fixture(_READY))
+    raw_running["statusDWash"]["CheckUp"] = "1"
+    raw_running["statusDWash"]["StatoDWash"] = "3"
+    raw_running["statusDWash"]["StatoWiFi"] = "1"
+
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        json.dumps(raw_running),
+        extra_config_data={
+            CONF_KEY_PROGRAM_LANGUAGE: "en",
+            "mode": "full_control",
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    checkup_notif_id = NOTIF_ID_FULL_CHECKUP.format(entry.entry_id)
+
+    raw_completed = json.loads(load_fixture(_READY))
+    raw_completed["statusDWash"]["CheckUp"] = "2"
+    raw_completed["statusDWash"]["CodiceErrore"] = "0"
+    raw_completed["statusDWash"]["StatoDWash"] = "2"
+    raw_completed["statusDWash"]["StatoWiFi"] = "1"
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"http://{entry.data['ip_address']}/http-read.json",
+        json=raw_completed,
+    )
+    aioclient_mock.post(
+        f"http://{entry.data['ip_address']}/http-write.json",
+        status=200,
+    )
+
+    with patch("custom_components.candy.pn_async_create") as mock_create:
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        mock_create.assert_called_once()
+        args, kwargs = mock_create.call_args
+        assert kwargs["notification_id"] == checkup_notif_id
+        assert "Check-up" in kwargs["title"]
+        assert "Door lock" in args[1]

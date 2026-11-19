@@ -1668,3 +1668,14 @@ class CandyDishwasherCheckUpButton(CandyDishwasherButtonBase):
         await self._send_command_and_refresh(
             urlencode(builder.build_checkup(), quote_via=quote)
         )
+        lang = self.config_entry.data.get(
+            CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+        )
+        pn_async_create(
+            self.hass,
+            localized_notification_text("dishwasher_checkup_button_message", lang),
+            title=localized_notification_text(
+                "dishwasher_full_checkup_result_title", lang
+            ),
+            notification_id=NOTIF_ID_FULL_CHECKUP.format(self.config_id),
+        )
