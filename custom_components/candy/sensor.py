@@ -985,14 +985,12 @@ class CandyWashCheckUpResultSensor(CandyBaseSensor, RestoreSensor):
         _code_to_state = {1: "ok", 2: "problem"}
         if self.coordinator.data is not None:
             result = cast(WashingMachineStatus, self.coordinator.data).dis_test_res
-            if result is not None:
-                if result.code != 0:
-                    return _code_to_state.get(result.code)
-                cached = self.config_entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT)
-                if cached in _code_to_state:
-                    return _code_to_state[cached]
-                return "not_run"
-        return self._restored_state
+            if result is not None and result.code != 0:
+                return _code_to_state.get(result.code)
+        cached = self.config_entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT)
+        if cached in _code_to_state:
+            return _code_to_state[cached]
+        return self._restored_state or "not_run"
 
     @property
     def icon(self) -> str:

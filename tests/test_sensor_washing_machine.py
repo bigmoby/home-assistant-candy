@@ -1513,6 +1513,16 @@ async def test_candy_wash_checkup_result_sensor_restoration_and_cached(
     coordinator.data = status
     assert sensor.native_value == "ok"
 
+    # Status has dis_test_res None (e.g. Smart Pro), fallback to cached entry config
+    status.dis_test_res = None
+    assert sensor.native_value == "ok"
+
+    # Status has dis_test_res None and no cached entry config, returns not_run
+    entry_empty = MockConfigEntry(domain=DOMAIN, entry_id="e2", data={})
+    sensor_empty = CandyWashCheckUpResultSensor(coordinator, entry_empty)
+    sensor_empty.hass = hass
+    assert sensor_empty.native_value == "not_run"
+
 
 def test_candy_wash_purchase_date_sensor() -> None:
     """Test CandyWashPurchaseDateSensor properties and None handling."""

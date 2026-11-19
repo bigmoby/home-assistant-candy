@@ -6,11 +6,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import (
+    CONF_KEY_CHECKUP_ENABLED,
+    CONF_KEY_CHECKUP_LAST_DATE,
+    CONF_KEY_CHECKUP_LAST_RESULT,
+    CONF_KEY_CHECKUP_PENDING,
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MODE,
@@ -31,7 +36,11 @@ from custom_components.candy.client.model import (
     WashingMachineStatistics,
     WashingMachineStatus,
 )
-from custom_components.candy.const import MODE_READ_ONLY
+from custom_components.candy.const import (
+    MODE_READ_ONLY,
+    UNIQUE_ID_WASH_CHECKUP_RESULT,
+    UNIQUE_ID_WASH_LAST_CHECKUP,
+)
 
 from .common import TEST_IP
 
@@ -209,6 +218,9 @@ async def test_full_checkup_completion_lifecycle(
 
     # 3. Counter reset to fresh total cycles (51 from _STATS_51_CYCLES)
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 51
+    assert CONF_KEY_CHECKUP_LAST_DATE in entry.data
+    assert entry.data[CONF_KEY_CHECKUP_LAST_RESULT] == 1
+    assert entry.data[CONF_KEY_CHECKUP_PENDING] is False
 
     # 4. Appliance reset command sent and settling delay performed
     mock_send.assert_called_once()
@@ -641,6 +653,80 @@ async def test_full_checkup_completion_dualtech(
     assert "StSt=0" in qs
     assert "PrNm=2" in qs
     assert any(c.args == (5,) for c in mock_sleep.call_args_list)
+
+
+async def test_full_checkup_populates_last_checkup_and_result_sensors(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Full checkup completion updates last check-up date and result sensors even without DisTestRes."""
+    smartpro_running_json = """{
+      "statusLavatrice": {
+        "WiFiStatus": "1", "Err": "0", "MachMd": "2", "PrNm": "2", "PrCode": "65",
+        "PrPh": "0", "SLevel": "3", "Temp": "60", "SpinSp": "14", "DelVal": "0",
+        "RemTime": "180", "FillR": "0", "CheckUpState": "1"
+      }
+    }"""
+    smartpro_completed_json = """{
+      "statusLavatrice": {
+        "WiFiStatus": "1", "Err": "0", "MachMd": "1", "PrNm": "2", "PrCode": "65",
+        "PrPh": "0", "SLevel": "3", "Temp": "60", "SpinSp": "14", "DelVal": "0",
+        "RemTime": "0", "FillR": "0", "CheckUpState": "2"
+      }
+    }"""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        smartpro_running_json,
+        **{
+            CONF_KEY_INTERFACE_TYPE: "SMARTPRO_5DIG_STM_NEL",
+            CONF_KEY_CHECKUP_ENABLED: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    registry = er.async_get(hass)
+    res_entity = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_CHECKUP_RESULT.format(entry.entry_id)
+    )
+    date_entity = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_LAST_CHECKUP.format(entry.entry_id)
+    )
+    assert res_entity is not None
+    assert date_entity is not None
+
+    # Before completion: result is not_run, last check-up is unknown
+    state_res = hass.states.get(res_entity)
+    state_date = hass.states.get(date_entity)
+    assert state_res is not None
+    assert state_res.state == "not_run"
+    assert state_date is not None
+    assert state_date.state == "unknown"
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, smartpro_completed_json, _STATS_51_CYCLES)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # After completion: entry data has timestamp and result
+    assert CONF_KEY_CHECKUP_LAST_DATE in entry.data
+    assert entry.data[CONF_KEY_CHECKUP_LAST_RESULT] == 1
+
+    # Sensors are populated!
+    state_res = hass.states.get(res_entity)
+    state_date = hass.states.get(date_entity)
+    assert state_res is not None
+    assert state_res.state == "ok"
+    assert state_date is not None
+    assert state_date.state not in ("unknown", "unavailable")
 
 
 _TD_RUNNING_CHECKUP_JSON = """{

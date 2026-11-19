@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from .client import CandyClient, get_dryer_command_builder, parse_wash_programs
 from .client.model import (
+    CheckUpResult,
     CheckUpState,
     DishwasherState,
     DishwasherStatus,
@@ -696,6 +697,7 @@ def _register_checkup_listener(
                     new_data[CONF_KEY_CHECKUP_LAST_RESULT] = curr_code
                     new_data[CONF_KEY_CHECKUP_PENDING] = False
                     hass.config_entries.async_update_entry(config_entry, data=new_data)
+                    coordinator.async_update_listeners()
                     return
         elif (
             is_pending
@@ -763,6 +765,17 @@ def _register_full_checkup_listener(
                 notification_id=NOTIF_ID_FULL_CHECKUP.format(entry_id),
             )
             pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
+
+            new_data = dict(config_entry.data)
+            new_data[CONF_KEY_CHECKUP_LAST_DATE] = dt_util.utcnow().timestamp()
+            new_data[CONF_KEY_CHECKUP_LAST_RESULT] = (
+                status.dis_test_res.code
+                if status.dis_test_res is not None and status.dis_test_res.code != 0
+                else CheckUpResult.OK.code
+            )
+            new_data[CONF_KEY_CHECKUP_PENDING] = False
+            hass.config_entries.async_update_entry(config_entry, data=new_data)
+            coordinator.async_update_listeners()
 
             if stats_coordinator is not None:
 
