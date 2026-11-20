@@ -81,6 +81,14 @@ from .common import TEST_IP, init_integration
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
+_STATUS_OFF = """{
+  "statusLavatrice": {
+    "WiFiStatus": "1", "Err": "0", "MachMd": "0", "Pr": "1", "PrPh": "0",
+    "PrCode": "136", "SLevel": "0", "Temp": "40", "SpinSp": "8",
+    "DelVal": "0", "RemTime": "0", "FillR": "0"
+  }
+}"""
+
 _STATUS_IDLE = """{
   "statusLavatrice": {
     "WiFiStatus": "1", "Err": "0", "MachMd": "1", "Pr": "1", "PrPh": "0",
@@ -370,6 +378,49 @@ async def test_seeded_statistics_on_setup(
     )
     assert stats_coordinator is not None
     assert stats_coordinator.data.total_cycles == 50
+
+
+async def test_post_setup_restore_seeds_statistics_when_startup_off(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """When machine is OFF at startup, statistics coordinator is seeded after platforms are added."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-seeded-stats-off",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASHING_MACHINE.format(entry.entry_id),
+        config_entry=entry,
+    )
+    cycles_ent = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASH_TOTAL_CYCLES.format(entry.entry_id),
+        config_entry=entry,
+    )
+    hass.states.async_set(cycles_ent.entity_id, "288")
+
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=_STATUS_OFF)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id].get(
+        DATA_KEY_STATS_COORDINATOR
+    )
+    assert stats_coordinator is not None
+    assert stats_coordinator.data is not None
+    assert stats_coordinator.data.total_cycles == 288
 
 
 # ---------------------------------------------------------------------------

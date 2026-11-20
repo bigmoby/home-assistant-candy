@@ -520,6 +520,41 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                             last_known_statistics.total_cycles,
                         )
                         return last_known_statistics
+
+                    if last_known_statistics is None:
+                        if stats_coordinator.data is not None:
+                            last_known_statistics = stats_coordinator.data
+                        else:
+                            last_known_statistics = _restore_last_known_statistics(
+                                hass, config_entry.entry_id
+                            )
+
+                    max_baseline = max(
+                        config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, 0
+                        ),
+                        config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_LIMESCALE, 0),
+                        config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_FILTER, 0),
+                    )
+
+                    if stats.total_cycles == 0 or (
+                        max_baseline > 0 and stats.total_cycles < max_baseline
+                    ):
+                        if (
+                            last_known_statistics is not None
+                            and last_known_statistics.total_cycles > 0
+                        ):
+                            _LOGGER.warning(
+                                "Ignoring transient total_cycles=%s reading; returning last known value (%s).",
+                                stats.total_cycles,
+                                last_known_statistics.total_cycles,
+                            )
+                            return last_known_statistics
+                        if max_baseline > 0:
+                            raise UpdateFailed(
+                                f"Appliance returned total_cycles={stats.total_cycles}, but stored baselines indicate at least {max_baseline}; "
+                                "ignoring transient reading."
+                            )
                     last_known_statistics = stats
                     return stats
             except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
@@ -633,6 +668,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+
+    if isinstance(coordinator.data, WashingMachineStatus):
+        stats_coord = (
+            hass.data.get(DOMAIN, {})
+            .get(config_entry.entry_id, {})
+            .get(DATA_KEY_STATS_COORDINATOR)
+        )
+        if stats_coord is not None and stats_coord.data is None:
+            restored = _restore_last_known_statistics(hass, config_entry.entry_id)
+            if restored is not None:
+                stats_coord.async_set_updated_data(restored)
 
     return True
 
@@ -856,11 +902,14 @@ def _register_full_checkup_listener(
                     if stats_coordinator is not None:
                         await stats_coordinator.async_request_refresh()
                         total: int | None = None
-                        if stats_coordinator.data is not None:
+                        if (
+                            stats_coordinator.data is not None
+                            and stats_coordinator.data.total_cycles > 0
+                        ):
                             total = stats_coordinator.data.total_cycles
                         else:
                             restored = _restore_last_known_statistics(hass, entry_id)
-                            if restored is not None:
+                            if restored is not None and restored.total_cycles > 0:
                                 total = restored.total_cycles
 
                         current_baseline = config_entry.data.get(
@@ -962,11 +1011,14 @@ def _register_limescale_listener(
                     async def _update_baseline() -> None:
                         await stats_coordinator.async_request_refresh()
                         total: int | None = None
-                        if stats_coordinator.data is not None:
+                        if (
+                            stats_coordinator.data is not None
+                            and stats_coordinator.data.total_cycles > 0
+                        ):
                             total = stats_coordinator.data.total_cycles
                         else:
                             restored = _restore_last_known_statistics(hass, entry_id)
-                            if restored is not None:
+                            if restored is not None and restored.total_cycles > 0:
                                 total = restored.total_cycles
 
                         current_baseline = config_entry.data.get(

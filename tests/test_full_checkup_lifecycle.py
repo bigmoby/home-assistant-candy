@@ -40,12 +40,14 @@ from custom_components.candy.const import (
     MODE_READ_ONLY,
     UNIQUE_ID_WASH_CHECKUP_RESULT,
     UNIQUE_ID_WASH_LAST_CHECKUP,
+    UNIQUE_ID_WASH_TOTAL_CYCLES,
 )
 
 from .common import TEST_IP
 
 _STATS_50_CYCLES = '{"statusCounters": {"Temp0to30": "30", "Temp40": "20"}}'
 _STATS_51_CYCLES = '{"statusCounters": {"Temp0to30": "31", "Temp40": "20"}}'
+_STATS_288_CYCLES = '{"statusCounters": {"Temp0to30": "288"}}'
 
 _RUNNING_CHECKUP_JSON = """{
   "statusLavatrice": {
@@ -123,6 +125,7 @@ async def _setup(
     status_json: str,
     **extra_data,
 ) -> MockConfigEntry:
+    stats_json = str(extra_data.pop("stats_json", _STATS_50_CYCLES))
     entry = _make_entry(**extra_data)
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=status_json)
     aioclient_mock.get(
@@ -131,7 +134,7 @@ async def _setup(
     )
     aioclient_mock.get(
         f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
-        text=_STATS_50_CYCLES,
+        text=stats_json,
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -473,6 +476,52 @@ async def test_full_checkup_completion_ignores_transient_zero(
 
     # Baseline remains 50, not overwritten by transient 0
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 50
+
+
+async def test_full_checkup_completion_recovers_baseline_from_restored_state_when_transient_zero(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """When machine returns transient zero after checkup, baseline updates from restored sensor state."""
+    _STATS_ZERO = (
+        '{"statusCounters": {"Temp0to30": "0", "Temp40": "0", "Temp60to90": "0"}}'
+    )
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _RUNNING_CHECKUP_JSON,
+        stats_json=_STATS_288_CYCLES,
+        **{CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 287},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
+
+    # Precondition: sensor state exists in HA with 288 cycles
+    registry = er.async_get(hass)
+    cycles_ent_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_TOTAL_CYCLES.format(entry.entry_id)
+    )
+    assert cycles_ent_id is not None
+    hass.states.async_set(cycles_ent_id, "288")
+
+    # Simulate that stats_coordinator had no prior data (e.g. startup while off)
+    stats_coordinator.async_set_updated_data(None)
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_ZERO)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # Baseline updated to 288 (recovered from restored state) instead of being stuck at 287
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 288
 
 
 def test_full_checkup_coordinator_data_none(
