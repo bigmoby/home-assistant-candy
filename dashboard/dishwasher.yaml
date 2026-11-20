@@ -300,6 +300,8 @@ cards:
                 entity: switch.<machine_name>_3in1_tablets
                 name: 3-in-1 tabs
                 icon: mdi:pill
+        # Note: Auto-open door switch is only available on models equipped with motorized door release (_OD models).
+        # If your dishwasher model does not have auto-open door, remove or comment out this conditional card.
         - type: conditional
           conditions:
             - condition: state

@@ -40,6 +40,7 @@ from custom_components.candy.client.model import (
 )
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_DISHWASHER,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MODE,
@@ -53,6 +54,7 @@ from custom_components.candy.const import (
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WASH_ERROR_UNSUB,
     MODE_FULL_CONTROL,
+    MODE_READ_ONLY,
     NOTIF_ID_DRYER_FILTER,
     NOTIF_ID_DRYER_WATER_TANK,
     UNIQUE_ID_DISHWASHER,
@@ -1255,3 +1257,35 @@ async def test_dryer_checkup_reset_failure_logs_warning(
         )
         await coordinator.async_refresh()
         await hass.async_block_till_done()
+
+
+async def test_legacy_entry_backfill_missing_keys(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Test legacy config entry without mode or appliance flags is backfilled on setup."""
+    status_dishwasher = """{
+      "statusDWash": {
+        "StatoWiFi": "1", "CodiceErrore": "0", "StatoDWash": "2",
+        "Program": "P1", "RemTime": "0", "StartStop": "0"
+      }
+    }"""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="legacy-dw-entry",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry.add_to_hass(hass)
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        text=status_dishwasher,
+    )
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_READ_ONLY
+    assert updated.data[CONF_KEY_IS_DISHWASHER] is True

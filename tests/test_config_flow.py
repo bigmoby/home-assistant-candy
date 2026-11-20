@@ -2512,3 +2512,153 @@ async def test_config_flow_maintenance_baselines_advance_to_checkup(
         )
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["step_id"] == "checkup"
+
+
+async def test_options_flow_read_only_dishwasher_upgrade(hass, mock_cloud_success):
+    """Options flow for read-only dishwasher offers update_cloud_data to upgrade."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="ro-dw-opts",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_DISHWASHER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "update_cloud_data"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"email": "user@example.com", "password": "pass"},
+    )
+    assert result["step_id"] == "language"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+    assert updated.data[CONF_KEY_IS_DISHWASHER] is True
+
+
+async def test_options_flow_legacy_entry_with_registry_entity(hass, mock_cloud_success):
+    """Legacy entry with missing mode/flags uses entity registry to offer upgrade."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="legacy-dw-opts",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.entry_id}-dishwasher",
+        config_entry=entry,
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "update_cloud_data"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"email": "user@example.com", "password": "pass"},
+    )
+    assert result["step_id"] == "language"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+    assert updated.data[CONF_KEY_IS_DISHWASHER] is True
+
+
+async def test_reconfigure_flow_success(hass, mock_cloud_success):
+    """Reconfigure flow upgrades entry to Full Control and aborts with reconfigure_successful."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="reconf-entry",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_DISHWASHER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={"email": "user@example.com", "password": "pass"},
+    )
+    assert result["step_id"] == "language"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+    assert updated.data[CONF_KEY_IS_DISHWASHER] is True
+
+
+async def test_reconfigure_flow_cloud_error(hass, mock_cloud_error):
+    """Reconfigure flow re-shows form on cloud authentication error."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="reconf-err-entry",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_DISHWASHER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+    )
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={"email": "wrong@example.com", "password": "bad"},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+    assert result["errors"] == {"base": "cloud_auth"}

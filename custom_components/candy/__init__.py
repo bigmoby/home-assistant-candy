@@ -55,6 +55,9 @@ from .const import (
     CONF_KEY_CHECKUP_PENDING,
     CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_DISHWASHER,
+    CONF_KEY_IS_TUMBLE_DRYER,
+    CONF_KEY_IS_WASHING_MACHINE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FILTER,
@@ -86,6 +89,7 @@ from .const import (
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MAINTENANCE_HARDNESS_THRESHOLDS,
     MODE_FULL_CONTROL,
+    MODE_READ_ONLY,
     NOTIF_ID_DISHWASHER_ERROR,
     NOTIF_ID_DISHWASHER_RINSE,
     NOTIF_ID_DISHWASHER_SALT,
@@ -625,6 +629,28 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 hass, config_entry, stats_coordinator
             )
             hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_MAINT_UNSUB] = unsub_maint
+
+    # Backfill missing keys for legacy entries
+    needs_update = False
+    new_data = dict(config_entry.data)
+    if CONF_KEY_MODE not in config_entry.data:
+        new_data[CONF_KEY_MODE] = MODE_READ_ONLY
+        needs_update = True
+    if isinstance(coordinator.data, DishwasherStatus):
+        if not config_entry.data.get(CONF_KEY_IS_DISHWASHER):
+            new_data[CONF_KEY_IS_DISHWASHER] = True
+            needs_update = True
+    elif isinstance(coordinator.data, TumbleDryerStatus):
+        if not config_entry.data.get(CONF_KEY_IS_TUMBLE_DRYER):
+            new_data[CONF_KEY_IS_TUMBLE_DRYER] = True
+            needs_update = True
+    elif isinstance(coordinator.data, WashingMachineStatus):
+        if not config_entry.data.get(CONF_KEY_IS_WASHING_MACHINE):
+            new_data[CONF_KEY_IS_WASHING_MACHINE] = True
+            needs_update = True
+
+    if needs_update:
+        hass.config_entries.async_update_entry(config_entry, data=new_data)
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 

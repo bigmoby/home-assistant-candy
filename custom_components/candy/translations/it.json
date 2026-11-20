@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Il dispositivo è già configurato"
+      "already_configured": "Il dispositivo è già configurato",
+      "reconfigure_successful": "Riconfigurazione completata con successo"
     },
     "error": {
       "unknown": "Errore sconosciuto",
