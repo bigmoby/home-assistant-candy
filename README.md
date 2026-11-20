@@ -17,13 +17,13 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
   - 🧺 Washing Machine — with optional **Full Remote Control** (see below)
   - 🔄 Washer Dryer combo — with optional **Full Remote Control** (see below)
   - 🌫️ Tumble Dryer - with optional **Full Remote Control** (see below)
-  - 🔪 Dishwasher — with remote **Start/Stop** (see [Dishwasher Remote Control](#dishwasher-remote-control))
+  - 🔪 Dishwasher — with remote **Full Remote Control** (see below)
   - 🍳 Oven
   - 🍷 Wine Cooler / Cellar
-- **Full Remote Control:** Complete interactive control panel for **washing machines**, **washer-dryer combos** and **tumble dryers** (see the [compatibility matrix](#compatibility-note) for supported and tested models). Select localized programs, adjust wash & dry parameters (temp, spin speed, soil level, drying mode), start/pause/stop cycles, and track remote status.
+- **Full Remote Control:** Complete interactive control panel for **washing machines**, **washer-dryer combos**, **tumble dryers** and **dishwashers** (see the [compatibility matrix](#compatibility-note) for supported and tested models). Select localized programs, adjust wash & dry parameters (temp, spin speed, soil level, drying mode), start/pause/stop cycles, and track remote status.
 - **Zero-Config Decryption:** Say goodbye to manually extracting encryption keys. This integration boasts a natively built-in *sliding-window/known-plaintext* algorithm that unlocks your device seamlessly in fractions of a second during setup.
 - **Strict HA Compatibility:** Follows the rigorous MyPy styling standards enforced by Home Assistant 2025.
-- Uses the local device API for real-time responsiveness.
+- Uses the **local device API** for real-time responsiveness, even in Full Control mode: the Simply-Fi Cloud is used once only to download detailed information about your appliance.
 - Creates dedicated, native semantic sensors (e.g., remaining time, current status, machine cycle) and exposes granular information cleanly as sensor attributes.
 - **Intelligent Fault Notifications & Error Handling:** Intercepts appliance error codes and shows persistent Home Assistant notifications with authentic vendor troubleshooting steps
 - **Automated Maintenance Notifications:** Show reminders when check-up, descaling, or filter cleaning are due, provides preparation advice on cycle start, and automatically resets baselines upon completion.
@@ -89,15 +89,6 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 | Hoover AXI & Smooth | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT` | No | Implemented from protocol specifications and APK reverse engineering. |
 | Legacy Touch & Built-in | `DishwasherInterfaceTypeFSTouch`, `DishwasherInterfaceTypeBuiltIn`, `DW_NFC_DIGIT_FS` | No | Implemented from protocol specifications (`CandyDishWasherCommand`). |
 
-### Dishwasher Remote Control
-
-Dishwashers can be started and stopped from Home Assistant.
-
-- **Every mode:** the controls are available also in Read-Only mode. No cloud data is needed, and the dishwasher accepts commands only when the remote control button on its panel is enabled.
-- **Entities:** Start and Stop buttons, program to start, Eco and 3in1 switches, start delay, salt, rinse aid, door and remote control sensors, error code.
-- **Program list:** tested only on a Candy `CDIN 1D360PB`. On other models a program could start a different cycle. If you have another model, keep the default `panel` option: it starts the program set on the dishwasher.
-- **After a restart:** the program, options and delay chosen in Home Assistant are not saved. They go back to `panel` and to the settings of the dishwasher.
-
 ---
 
 ## 🛠️ Installation
@@ -112,6 +103,7 @@ Dishwashers can be started and stopped from Home Assistant.
     - **One-Time Cloud Sign-In:** Enter your Simply-Fi credentials once to download your device's program catalog and encryption key. Credentials are discarded immediately and never stored.
     - **Customize:** Choose your preferred display language for program names and descriptions (10 languages available), and optionally configure maintenance thresholds.
 6. The integration will automatically authenticate, decrypt if necessary, and assign the appliance to your dashboard!
+7. If using Full Control, install the relevant dashboard card, (see [`dashboard/`](dashboard/README.md))
 
 ### Method 2: Manual
 1. Copy the `custom_components/candy` folder into your Home Assistant's `custom_components` directory.
