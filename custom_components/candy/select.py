@@ -16,12 +16,14 @@ from homeassistant.helpers.update_coordinator import (
 
 from .client import (
     CandyClient,
+    DishwasherProgram,
     DownloadableProgram,
     TumbleDryerProgram,
     WasherDryerDryTarget,
     WashingMachineStatus,
     WashingMachineWashProgram,
     load_downloadable_programs,
+    parse_dish_programs,
     parse_dryer_programs,
     parse_wash_programs,
     resolve_downloadable_programs,
@@ -35,6 +37,8 @@ from .const import (
     CONF_KEY_PROGRAMS,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DISHWASHER_PROGRAM_PANEL,
+    DISHWASHER_PROGRAMS,
     DOMAIN,
     DRY_LEVEL_FROM_VALUE,
     DRY_LEVEL_HANG,
@@ -52,6 +56,7 @@ from .const import (
     PROGRAM_TYPES,
     RAPID_LEVEL_TO_VALUE,
     SOIL_LABELS,
+    UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
     UNIQUE_ID_TUMBLE_DRY_LEVEL_SELECT,
     UNIQUE_ID_TUMBLE_PROGRAM_SELECT,
     UNIQUE_ID_TUMBLE_RAPID_SELECT,
@@ -69,8 +74,8 @@ from .const import (
     WATER_HARDNESS_OPTIONS,
     WATER_HARDNESS_TO_VALUE,
 )
-from .dishwasher import dishwasher_selects
 from .helpers import (
+    dishwasher_device_info,
     dry_target_label_for_interface,
     dryer_device_info,
     is_dualtech,
@@ -93,7 +98,12 @@ async def async_setup_entry(
     ]
 
     if isinstance(coordinator.data, DishwasherStatus):
-        async_add_entities(dishwasher_selects(coordinator, config_entry))
+        raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
+        dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
+        prog_select = CandyDishwasherProgramSelect(
+            coordinator, config_entry, dish_programs
+        )
+        async_add_entities([prog_select])
         return
 
     if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
@@ -1425,3 +1435,59 @@ class CandyWashWaterHardnessSelect(CoordinatorEntity, SelectEntity):
         level = WATER_HARDNESS_TO_VALUE[option]
         await self._client.set_water_hardness(level)
         await self.coordinator.async_request_refresh()
+
+
+class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_program_select"
+    _attr_icon = "mdi:format-list-numbered"
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        programs: list[DishwasherProgram],
+    ) -> None:
+        super().__init__(coordinator)
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._programs = programs
+        lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
+        if self._programs:
+            self._attr_options = [DISHWASHER_PROGRAM_PANEL] + [
+                p.localized_name(lang) for p in self._programs
+            ]
+        else:
+            self._attr_options = [
+                DISHWASHER_PROGRAM_PANEL,
+                *DISHWASHER_PROGRAMS.keys(),
+            ]
+        self._selected_option: str = DISHWASHER_PROGRAM_PANEL
+
+    @property
+    def status(self) -> DishwasherStatus:
+        return cast(DishwasherStatus, self.coordinator.data)
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_PROGRAM_SELECT.format(self.config_id)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return dishwasher_device_info(self.config_entry)
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return False
+        return not self.status.running
+
+    @property
+    def current_option(self) -> str:
+        return self._selected_option
+
+    async def async_select_option(self, option: str) -> None:
+        self._selected_option = option
+        self.async_write_ha_state()

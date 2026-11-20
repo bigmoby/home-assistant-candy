@@ -20,7 +20,6 @@ from custom_components.candy import DOMAIN
 from custom_components.candy.client.model import (
     CheckUpResult,
     CheckUpState,
-    DishwasherState,
     DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
@@ -314,7 +313,7 @@ def test_dishwasher_parser_resilience() -> None:
     """Dishwasher parser must handle variations in OpzProg and non-numeric fields."""
     payload = copy.deepcopy(BASE_DISHWASHER_JSON)
     status_base = DishwasherStatus.from_json(payload)
-    assert status_base.machine_state == DishwasherState.IDLE
+    assert status_base.machine_state == MachineState.IDLE
     assert status_base.program == "P1"
 
     payload["OpzProg"] = "p"

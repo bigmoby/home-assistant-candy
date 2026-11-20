@@ -63,7 +63,12 @@ async def fetch_appliance_data(
     tokens = await _authenticate(session, email, password)
     appliances = await _fetch_appliances(session, tokens)
     downloadable_programs = await _fetch_downloadable_programs(session, tokens)
-    return _match_appliance(appliances, device_ip, downloadable_programs)
+    dw_downloadable_programs = await _fetch_dishwasher_downloadable_programs(
+        session, tokens
+    )
+    return _match_appliance(
+        appliances, device_ip, downloadable_programs, dw_downloadable_programs
+    )
 
 
 async def _authenticate(
@@ -180,10 +185,43 @@ async def _fetch_downloadable_programs(
     return programs
 
 
+async def _fetch_dishwasher_downloadable_programs(
+    session: aiohttp.ClientSession,
+    tokens: dict,
+) -> list[dict]:
+    """Fetch downloadable dishwasher recipes catalog from Simply-Fi if available."""
+    headers = {
+        "id-token": tokens["id_token"],
+        "cognito-token": tokens["cognito_token"],
+        "Authorization": f"Bearer {tokens['id_token']}",
+        "Salesforce-Auth": "1",
+        "User-Agent": _HON_USER_AGENT,
+    }
+    try:
+        async with session.get(
+            f"{_SIMPLY_FI_BASE}/api/v1/dw_nfc_download_programs.json",
+            headers=headers,
+        ) as resp:
+            if resp.status != 200:
+                return []
+            data = await resp.json()
+            raw = (
+                data
+                if isinstance(data, list)
+                else data.get("dw_nfc_download_programs", [])
+            )
+            return [
+                e.get("dw_nfc_download_program", e) for e in raw if isinstance(e, dict)
+            ]
+    except Exception:
+        return []
+
+
 def _match_appliance(
     appliances: list[dict],
     device_ip: str,
     downloadable_programs: list[dict],
+    dw_downloadable_programs: list[dict],
 ) -> CloudApplianceData:
     """Find the appliance that matches device_ip via current_status_parameters.
 
@@ -222,6 +260,11 @@ def _match_appliance(
             "Appliance data missing programs — cannot proceed with Full Control setup"
         )
 
+    app_type = matched.get("appliance_type") or matched.get("applianceTypeName", "")
+    dl_progs = (
+        dw_downloadable_programs if app_type == "dishwasher" else downloadable_programs
+    )
+
     return CloudApplianceData(
         mac_address=matched.get("mac_address", ""),
         encryption_key=encryption_key,
@@ -230,7 +273,7 @@ def _match_appliance(
         purchase_date=matched.get("purchase_date", ""),
         programs=programs,
         interface_type=matched.get("interface_type", ""),
-        downloadable_programs=downloadable_programs,
+        downloadable_programs=dl_progs,
         brand=matched.get("brand", ""),
-        appliance_type=matched.get("appliance_type", ""),
+        appliance_type=app_type,
     )

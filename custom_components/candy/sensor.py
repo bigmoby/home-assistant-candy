@@ -40,7 +40,7 @@ from .client import (
     parse_wash_programs,
 )
 from .client.model import (
-    DishwasherState,
+    DishwasherStatistics,
     DishwasherStatus,
     DryerProgramState,
     MachineState,
@@ -78,6 +78,7 @@ from .const import (
     DEVICE_NAME_OVEN,
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WINE_COOLER,
+    DISHWASHER_PROGRAM_PANEL,
     DOMAIN,
     DRY_LEVEL_FROM_VALUE,
     DRY_LEVEL_OPTIONS,
@@ -92,9 +93,19 @@ from .const import (
     SUGGESTED_AREA_BATHROOM,
     SUGGESTED_AREA_KITCHEN,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_BUZZER,
+    UNIQUE_ID_DISHWASHER_CYCLE_STATUS,
     UNIQUE_ID_DISHWASHER_ERROR,
+    UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES,
+    UNIQUE_ID_DISHWASHER_MAINT_FILTER,
+    UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP,
+    UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE,
     UNIQUE_ID_DISHWASHER_PROGRAM,
+    UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION,
+    UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
     UNIQUE_ID_DISHWASHER_REMAINING_TIME,
+    UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
+    UNIQUE_ID_DISHWASHER_WATER_HARDNESS,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_OVEN_PROGRAM,
     UNIQUE_ID_OVEN_TEMP,
@@ -156,8 +167,11 @@ from .const import (
 from .helpers import (
     cycles_remaining,
     dry_target_label_for_interface,
+    get_dishwasher_error_notification_strings,
     get_dryer_error_notification_strings,
     is_washer_dryer,
+    resolve_dishwasher_program_description,
+    resolve_dishwasher_program_name,
     supports_autodose,
     wash_device_name,
 )
@@ -289,14 +303,41 @@ async def async_setup_entry(
             ]
         )
     elif isinstance(coordinator.data, DishwasherStatus):
-        async_add_entities(
-            [
-                CandyDishwasherSensor(coordinator, config_entry),
-                CandyDishwasherProgramSensor(coordinator, config_entry),
-                CandyDishwasherRemainingTimeSensor(coordinator, config_entry),
-                CandyDishwasherErrorSensor(coordinator, config_entry),
-            ]
-        )
+        dw_entities: list[CandyBaseSensor] = [
+            CandyDishwasherSensor(coordinator, config_entry),
+            CandyDishwasherProgramSensor(coordinator, config_entry),
+            CandyDishwasherProgramDescriptionSensor(coordinator, config_entry),
+            CandyDishwasherRemainingTimeSensor(coordinator, config_entry),
+            CandyDishwasherErrorSensor(coordinator, config_entry),
+            CandyDishwasherCycleStatusSensor(coordinator, config_entry),
+            CandyDishwasherWaterHardnessSensor(coordinator, config_entry),
+            CandyDishwasherBuzzerSensor(coordinator, config_entry),
+            CandyDishwasherLifetimeCyclesSensor(coordinator, config_entry),
+        ]
+        stats_coordinator = hass.data[DOMAIN][config_id].get(DATA_KEY_STATS_COORDINATOR)
+        if stats_coordinator is not None:
+            dw_entities.append(
+                CandyDishwasherTotalCyclesSensor(stats_coordinator, config_entry)
+            )
+            if config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED):
+                dw_entities.append(
+                    CandyDishwasherMaintFullCheckupSensor(
+                        stats_coordinator, config_entry
+                    )
+                )
+                if config_entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
+                    dw_entities.append(
+                        CandyDishwasherMaintLimescaleSensor(
+                            stats_coordinator, config_entry, coordinator
+                        )
+                    )
+                if config_entry.data.get(CONF_KEY_MAINTENANCE_FILTER_ENABLED, True):
+                    dw_entities.append(
+                        CandyDishwasherMaintFilterSensor(
+                            stats_coordinator, config_entry
+                        )
+                    )
+        async_add_entities(dw_entities)
     elif isinstance(coordinator.data, WineCoolerStatus):
         wc_status = coordinator.data
         entities = [
@@ -2205,16 +2246,20 @@ class CandyOvenTempSensor(CandyBaseSensor):
 
 
 # While waiting for a delayed start RemTime is a placeholder, not the cycle time
-_DISHWASHER_NOT_WASHING = [
-    DishwasherState.IDLE,
-    DishwasherState.FINISHED,
-    DishwasherState.DELAYED_START,
-]
+_DISHWASHER_NOT_WASHING = {
+    MachineState.IDLE,
+    MachineState.FINISHED,
+    MachineState.FINISHED1,
+    MachineState.FINISHED2,
+    MachineState.DELAYED_START,
+    MachineState.OFF,
+}
 
 
 class CandyDishwasherSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_name = None
     _attr_translation_key = "dishwasher"
-    _attr_name = "Dishwasher"
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2228,6 +2273,10 @@ class CandyDishwasherSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.hass.data[DOMAIN][self.config_id].get(DATA_KEY_WRITE_PENDING, 0):
+            return "Sending command"
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         return str(status.machine_state)
 
@@ -2237,6 +2286,8 @@ class CandyDishwasherSensor(CandyBaseSensor):
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any]:
+        if self.coordinator.data is None:
+            return {}
         status = cast(DishwasherStatus, self.coordinator.data)
 
         attributes = {
@@ -2254,6 +2305,9 @@ class CandyDishwasherSensor(CandyBaseSensor):
         if status.door_open_allowed is not None:
             attributes["door_open_allowed"] = status.door_open_allowed
 
+        if status.delayed_start_minutes is not None:
+            attributes["delayed_start_minutes"] = status.delayed_start_minutes
+
         if status.delayed_start_hours is not None:
             attributes["delayed_start_hours"] = status.delayed_start_hours
 
@@ -2261,8 +2315,8 @@ class CandyDishwasherSensor(CandyBaseSensor):
 
 
 class CandyDishwasherProgramSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_program"
-    _attr_name = "Dishwasher program"
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2276,20 +2330,121 @@ class CandyDishwasherProgramSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
-        return status.program
+        lang = self.config_entry.data.get(
+            CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+        )
+        return resolve_dishwasher_program_name(status.program, lang)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        status = cast(DishwasherStatus, self.coordinator.data)
+        lang = self.config_entry.data.get(
+            CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+        )
+        desc = resolve_dishwasher_program_description(status.program, lang)
+        attrs: dict[str, Any] = {
+            "raw_program": status.program,
+        }
+        if desc is not None:
+            attrs["description"] = desc
+        return attrs
 
     @property
     def icon(self) -> str:
         return "mdi:glass-wine"
 
 
-class CandyDishwasherErrorSensor(CandyBaseSensor):
+class CandyDishwasherProgramDescriptionSensor(CandyBaseSensor):
+    """Read-only sensor showing description of selected or running dishwasher program."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_program_description"
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION.format(self.config_id)
+
+    @property
+    def native_value(self) -> str | None:
+        if self.coordinator.data is None:
+            return None
+        status = cast(DishwasherStatus, self.coordinator.data)
+        lang = self.config_entry.data.get(
+            CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+        )
+        if status.running:
+            return resolve_dishwasher_program_description(status.program, lang)
+
+        registry = er.async_get(self.hass)
+        select_uid = UNIQUE_ID_DISHWASHER_PROGRAM_SELECT.format(self.config_id)
+        select_eid = registry.async_get_entity_id("select", DOMAIN, select_uid)
+        selected_option: str | None = None
+        if select_eid is not None:
+            select_state = self.hass.states.get(select_eid)
+            if select_state is not None and select_state.state not in (
+                "unknown",
+                "unavailable",
+                DISHWASHER_PROGRAM_PANEL,
+            ):
+                selected_option = select_state.state
+
+        if selected_option is not None:
+            desc = resolve_dishwasher_program_description(selected_option, lang)
+            if desc is not None:
+                return desc
+
+        return resolve_dishwasher_program_description(status.program, lang)
+
+    @property
+    def icon(self) -> str:
+        return "mdi:information-outline"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        registry = er.async_get(self.hass)
+        target_uid = UNIQUE_ID_DISHWASHER_PROGRAM_SELECT.format(self.config_id)
+
+        @callback
+        def _on_state_changed(event: Any) -> None:
+            entity_id: str = event.data.get("entity_id", "")
+            if not entity_id.startswith("select."):
+                return
+            entry = registry.async_get(entity_id)
+            if entry is not None and entry.config_entry_id == self.config_id:
+                if entry.unique_id == target_uid:
+                    self.async_write_ha_state()
+
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_STATE_CHANGED, _on_state_changed)
+        )
+
+
+class CandyDishwasherErrorSensor(CandyBaseSensor, RestoreSensor):
     """Error code reported by the dishwasher (E0 = no error)."""
 
+    _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_error_code"
-    _attr_name = "Dishwasher error code"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _restored_state: str | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            if isinstance(last.native_value, str):
+                self._restored_state = last.native_value
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_state is not None
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2303,7 +2458,27 @@ class CandyDishwasherErrorSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
-        return cast(DishwasherStatus, self.coordinator.data).error_code
+        if self.coordinator.data is not None:
+            status = cast(DishwasherStatus, self.coordinator.data)
+            if status.error_code is not None:
+                return status.error_code
+        return self._restored_state if self._restored_state is not None else "E0"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        val = self.native_value
+        if val is not None and str(val) not in ("0", "E0", "None"):
+            raw = str(val).upper().lstrip("E")
+            if raw.isdigit():
+                code_num = int(raw)
+                if code_num > 0:
+                    lang = self.config_entry.data.get(
+                        CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
+                    )
+                    notif = get_dishwasher_error_notification_strings(code_num, lang)
+                    if notif is not None:
+                        return {"description": notif[1].split("\n")[0].strip()}
+        return {}
 
     @property
     def icon(self) -> str:
@@ -2311,8 +2486,9 @@ class CandyDishwasherErrorSensor(CandyBaseSensor):
 
 
 class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_remaining_time"
-    _attr_name = "Dishwasher remaining time"
+    _attr_icon = "mdi:progress-clock"
 
     def device_name(self) -> str:
         return DEVICE_NAME_DISHWASHER
@@ -2326,6 +2502,8 @@ class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
 
     @property
     def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
         status = cast(DishwasherStatus, self.coordinator.data)
         if status.machine_state in _DISHWASHER_NOT_WASHING:
             return 0
@@ -2339,9 +2517,315 @@ class CandyDishwasherRemainingTimeSensor(CandyBaseSensor):
     def device_class(self) -> SensorDeviceClass:
         return SensorDeviceClass.DURATION
 
+
+class CandyDishwasherCycleStatusSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_cycle_status"
+    _attr_icon = "mdi:progress-clock"
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_CYCLE_STATUS.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
+        status = cast(DishwasherStatus, self.coordinator.data)
+        if status.program_phase is None:
+            return None
+        return str(status.program_phase)
+
+
+class CandyDishwasherWaterHardnessSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_water_hardness"
+    _attr_icon = "mdi:water-opacity"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_WATER_HARDNESS.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
+        status = cast(DishwasherStatus, self.coordinator.data)
+        return status.water_hardness
+
+
+class CandyDishwasherBuzzerSensor(CandyBaseSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_buzzer"
+    _attr_icon = "mdi:volume-high"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_BUZZER.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is None:
+            return None
+        status = cast(DishwasherStatus, self.coordinator.data)
+        return status.buzzer_level
+
+
+class CandyDishwasherLifetimeCyclesSensor(CandyBaseSensor, RestoreSensor):
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_lifetime_cycles"
+    _attr_icon = "mdi:counter"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _restored_cycles: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_cycles = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_cycles is not None
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is not None:
+            status = cast(DishwasherStatus, self.coordinator.data)
+            if status.last_cycle_counter is not None:
+                return status.last_cycle_counter
+        return self._restored_cycles
+
+
+class CandyDishwasherTotalCyclesSensor(CandyBaseSensor, RestoreSensor):
+    """Cumulative total cycles completed by the dishwasher."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_total_cycles"
+    _attr_name = "Dishwasher total cycles"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _restored_cycles: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_cycles = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_cycles is not None
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def entity_category(self) -> EntityCategory:
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is not None:
+            return cast(DishwasherStatistics, self.coordinator.data).total_cycles
+        return self._restored_cycles
+
     @property
     def icon(self) -> str:
-        return "mdi:progress-clock"
+        return "mdi:counter"
+
+
+class CandyDishwasherMaintFullCheckupSensor(CandyBaseSensor, RestoreSensor):
+    """Cycles remaining until the next diagnostic check-up is recommended."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_maint_full_checkup"
+    _attr_name = "Full Check-up maintenance remaining cycles"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _restored_value: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_value = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_value is not None
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def entity_category(self) -> EntityCategory:
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is not None:
+            total = cast(DishwasherStatistics, self.coordinator.data).total_cycles
+            last = self.config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, 0)
+            return cycles_remaining(total, last, MAINTENANCE_FULL_CHECKUP_THRESHOLD)
+        return self._restored_value
+
+    @property
+    def icon(self) -> str:
+        return "mdi:dishwasher-alert"
+
+
+class CandyDishwasherMaintLimescaleSensor(CandyBaseSensor, RestoreSensor):
+    """Cycles remaining until the next descale is due."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_maint_limescale"
+    _attr_name = "Limescale maintenance remaining cycles"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _restored_value: int | None = None
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        device_coordinator: DataUpdateCoordinator,
+    ) -> None:
+        super().__init__(coordinator, config_entry)
+        self._device_coordinator = device_coordinator
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_value = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_value is not None
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def entity_category(self) -> EntityCategory:
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is not None:
+            total = cast(DishwasherStatistics, self.coordinator.data).total_cycles
+            last = self.config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_LIMESCALE, 0)
+            status = self._device_coordinator.data
+            hardness = getattr(status, "water_hardness", None)
+            if (
+                hardness is None
+                or hardness < 0
+                or hardness >= len(MAINTENANCE_HARDNESS_THRESHOLDS)
+            ):
+                hardness = self.config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+            threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
+            return cycles_remaining(total, last, threshold)
+        return self._restored_value
+
+    @property
+    def icon(self) -> str:
+        return "mdi:water-alert"
+
+
+class CandyDishwasherMaintFilterSensor(CandyBaseSensor, RestoreSensor):
+    """Cycles remaining until the next filter clean is due."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "dishwasher_maint_filter"
+    _attr_name = "Filter maintenance remaining cycles"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _restored_value: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_value = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_value is not None
+
+    def device_name(self) -> str:
+        return DEVICE_NAME_DISHWASHER
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_KITCHEN
+
+    @property
+    def entity_category(self) -> EntityCategory:
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_MAINT_FILTER.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is not None:
+            total = cast(DishwasherStatistics, self.coordinator.data).total_cycles
+            last = self.config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_FILTER, 0)
+            return cycles_remaining(total, last, MAINTENANCE_FILTER_THRESHOLD)
+        return self._restored_value
+
+    @property
+    def icon(self) -> str:
+        return "mdi:filter-check"
 
 
 class CandyWineCoolerSensor(CandyBaseSensor):

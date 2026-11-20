@@ -1,0 +1,201 @@
+# --------------------------------------------------------------------------------------------------
+# Home Assistant Dashboard Card: Dishwasher Maintenance & Care
+# --------------------------------------------------------------------------------------------------
+# Requirements:
+#   - piitaya/lovelace-mushroom (custom:mushroom-template-card, custom:mushroom-chips-card)
+#
+# Instructions:
+#   Copy the contents of this file into a Manual Card on your dashboard.
+#   Replace every occurrence of `<machine_name>` with your device's entity ID prefix
+#   (e.g. `dishwasher` or `my_dishwasher`).
+#
+# Note:
+#   This companion card monitors dishwasher consumables (salt and rinse aid containers),
+#   auto-clean maintenance alerts, hardware cycle totals, water hardness, and provides
+#   one-tap triggering for electronic diagnostic self-tests.
+# --------------------------------------------------------------------------------------------------
+type: vertical-stack
+cards:
+  # ------------------------------------------------------------------------------------------------
+  # 1. Maintenance Status Header Banner
+  # ------------------------------------------------------------------------------------------------
+  - type: custom:mushroom-template-card
+    primary: Dishwasher Maintenance & Diagnostics
+    secondary: >-
+      {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
+      {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
+      {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set err = states('sensor.<machine_name>_error_code') %}
+      {% set issues = [] %}
+      {% if salt %}{% set issues = issues + ['Refill Salt'] %}{% endif %}
+      {% if rinse %}{% set issues = issues + ['Refill Rinse Aid'] %}{% endif %}
+      {% if clean %}{% set issues = issues + ['Tub Clean Due'] %}{% endif %}
+      {% if err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}{% set issues = issues + ['Fault ' ~ err] %}{% endif %}
+      {% if issues | length > 0 %}
+        Action needed: {{ issues | join(' · ') }}
+      {% else %}
+        All systems healthy · Consumables OK
+      {% endif %}
+    icon: mdi:shield-check
+    badge_icon: >-
+      {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
+      {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
+      {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set err = states('sensor.<machine_name>_error_code') %}
+      {% if salt or rinse or clean or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+        mdi:alert-circle
+      {% else %}
+        mdi:check-circle
+      {% endif %}
+    badge_color: >-
+      {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
+      {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
+      {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set err = states('sensor.<machine_name>_error_code') %}
+      {% if salt or rinse or clean or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+        amber
+      {% else %}
+        green
+      {% endif %}
+    color: >-
+      {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
+      {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
+      {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set err = states('sensor.<machine_name>_error_code') %}
+      {% if salt or rinse or clean or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+        amber
+      {% else %}
+        green
+      {% endif %}
+    entity: sensor.<machine_name>
+    tap_action:
+      action: more-info
+
+  # ------------------------------------------------------------------------------------------------
+  # 2. Consumables & Care Status
+  # ------------------------------------------------------------------------------------------------
+  - type: custom:mushroom-template-card
+    primary: Special Salt Reservoir
+    secondary: >-
+      {% if is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
+        Container empty · Refill dishwasher salt to prevent limescale buildup
+      {% else %}
+        Level adequate · Ion exchanger active
+      {% endif %}
+    icon: mdi:shaker-outline
+    icon_color: >-
+      {% if is_state('binary_sensor.<machine_name>_salt_empty', 'on') %} red {% else %} green {% endif %}
+    entity: binary_sensor.<machine_name>_salt_empty
+    tap_action:
+      action: more-info
+
+  - type: custom:mushroom-template-card
+    primary: Rinse Aid Reservoir
+    secondary: >-
+      {% if is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
+        Container empty · Refill rinse aid for spotless drying
+      {% else %}
+        Level adequate · Drying performance optimal
+      {% endif %}
+    icon: mdi:cup-water
+    icon_color: >-
+      {% if is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %} red {% else %} green {% endif %}
+    entity: binary_sensor.<machine_name>_rinse_aid_empty
+    tap_action:
+      action: more-info
+
+  - type: custom:mushroom-template-card
+    primary: Tub Maintenance Clean
+    secondary: >-
+      {% if is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+        Maintenance clean cycle recommended · Run Auto-Clean or empty high-temp wash
+      {% else %}
+        Tub interior clean · No descaling required
+      {% endif %}
+    icon: mdi:dishwasher-alert
+    icon_color: >-
+      {% if is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %} orange {% else %} green {% endif %}
+    entity: binary_sensor.<machine_name>_maintenance_clean_warning
+    tap_action:
+      action: more-info
+
+  # ------------------------------------------------------------------------------------------------
+  # 3. Usage Statistics & Hardware Settings
+  # ------------------------------------------------------------------------------------------------
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: template
+        icon: mdi:counter
+        content: >-
+          {% set v = states('sensor.<machine_name>_completed_cycles') | int(-1) %}
+          {% if v >= 0 %}{{ v }} completed cycles{% else %}Cycles: —{% endif %}
+        icon_color: blue
+        tap_action:
+          action: more-info
+          entity: sensor.<machine_name>_completed_cycles
+      - type: template
+        icon: mdi:water-opacity
+        content: >-
+          {% set h = states('sensor.<machine_name>_water_hardness') %}
+          {% if h not in ['unknown', 'unavailable', ''] %}Hardness: Level {{ h }}{% else %}Hardness: —{% endif %}
+        icon_color: teal
+        tap_action:
+          action: more-info
+          entity: sensor.<machine_name>_water_hardness
+      - type: template
+        icon: mdi:volume-high
+        content: >-
+          {% set b = states('sensor.<machine_name>_buzzer_volume') %}
+          {% if b not in ['unknown', 'unavailable', ''] %}Buzzer: Level {{ b }}{% else %}Buzzer: —{% endif %}
+        icon_color: grey
+        tap_action:
+          action: more-info
+          entity: sensor.<machine_name>_buzzer_volume
+
+  # ------------------------------------------------------------------------------------------------
+  # 4. Electronic Diagnostic Self Check-Up
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: button.<machine_name>_check_up
+        state_not: unavailable
+    card:
+      type: vertical-stack
+      cards:
+        - type: custom:mushroom-template-card
+          primary: Electronic Self-Test
+          secondary: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% if 'checkup' in state or 'diagnostic' in state %}
+              Self-test currently running... Please wait.
+            {% elif state in ['idle', 'ready'] %}
+              Tap below to execute component self-check (inlet valves, heaters, wash & drain pumps).
+            {% else %}
+              Dishwasher must be in Ready mode with door shut to run test.
+            {% endif %}
+          icon: mdi:stethoscope
+          icon_color: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% if 'checkup' in state %} blue {% else %} teal {% endif %}
+          entity: button.<machine_name>_check_up
+          tap_action:
+            action: more-info
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Idle
+                - idle
+          card:
+            type: custom:mushroom-template-card
+            primary: Start Diagnostic Check-Up
+            icon: mdi:play-circle-outline
+            icon_color: blue
+            layout: horizontal
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_check_up

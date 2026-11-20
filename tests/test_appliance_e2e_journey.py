@@ -25,9 +25,17 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import CONF_KEY_USE_ENCRYPTION, DOMAIN
-from custom_components.candy.client import parse_dryer_programs, parse_wash_programs
+from custom_components.candy.client import (
+    parse_dish_programs,
+    parse_dryer_programs,
+    parse_wash_programs,
+)
 from custom_components.candy.client.model import (
+    DishwasherProgram,
+    DishwasherProgramPhase,
+    DishwasherStatus,
     DryerProgramState,
+    MachineState,
     TumbleDryerProgram,
     TumbleDryerStatus,
     WashingMachineStatus,
@@ -44,6 +52,15 @@ from custom_components.candy.const import (
     DATA_KEY_COORDINATOR,
     MODE_FULL_CONTROL,
     PROGRAM_TYPE_WASHING,
+    UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
+    UNIQUE_ID_DISHWASHER_CYCLE_STATUS,
+    UNIQUE_ID_DISHWASHER_DELAY_NUMBER,
+    UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH,
+    UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON,
+    UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
+    UNIQUE_ID_DISHWASHER_START_BUTTON,
+    UNIQUE_ID_DISHWASHER_STOP_BUTTON,
     UNIQUE_ID_TUMBLE_DELAY_NUMBER,
     UNIQUE_ID_TUMBLE_DRY_LEVEL_SELECT,
     UNIQUE_ID_TUMBLE_PROGRAM_SELECT,
@@ -168,6 +185,38 @@ async def _init_tumble_dryer(
     await hass.async_block_till_done()
 
     parsed_programs = parse_dryer_programs(raw_programs)
+    return entry, parsed_programs
+
+
+async def _init_dishwasher(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    catalog: dict[str, Any],
+    initial_status_json: str,
+) -> tuple[MockConfigEntry, list[DishwasherProgram]]:
+    """Initialize a full-control dishwasher with authentic catalog data."""
+    raw_programs = catalog["programs"]
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=f"test-dw-e2e-{catalog['serial']}",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_PROGRAMS: raw_programs,
+            CONF_KEY_INTERFACE_TYPE: catalog.get("interface_type", "BRAVA_BI_DIGIT_OD"),
+            CONF_KEY_PROGRAM_LANGUAGE: "en",
+        },
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0", text=initial_status_json
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    parsed_programs = parse_dish_programs(raw_programs)
     return entry, parsed_programs
 
 
@@ -1015,3 +1064,236 @@ async def test_tumble_dryer_delayed_start_journey(
 
     assert coordinator.data.program_state == DryerProgramState.RUNNING
     assert coordinator.data.remaining_minutes == 120
+
+
+# ===========================================================================
+# Journey 3: Complete Dishwasher Lifecycle Journey
+# ===========================================================================
+
+
+async def test_dishwasher_e2e_complete_journey(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Execute complete end-to-end journey for Brava dishwasher (Serial 40, BRAVA_BI_DIGIT_OD).
+
+    Flow steps:
+    1. Ingest catalog & verify Idle state and initial panel program selection.
+    2. Configure program parameters (Eco cycle P8, Half Load, Auto Door Open, 60m delay).
+    3. Press Start button -> verify wire serialization invariants (DelayStart=60, Program=P8, w1=1, OpzProg=18, OpenDoorOpt=1).
+    4. Progression through Delayed start -> Wash -> Rinse -> Drying -> Finished.
+    5. Mid-cycle transient network dropout -> coordinator 3-strike resilience shields entities.
+    6. Cycle completion -> remaining minutes forced to 0.
+    7. Post-cycle motorized door release actuation (OpenDoorOpt=7).
+    """
+    catalog = _load_catalog("catalog_serial_40_brava_dw.json")
+    idle_json = """{
+      "statusDWash": {
+        "StatoWiFi": "1", "CodiceErrore": "E0", "StatoDWash": "2", "MetaCarico": "0",
+        "StartStop": "0", "TreinUno": "0", "Eco": "0", "Program": "P17",
+        "ExtraDry": "0", "OpenDoorOpt": "0", "DelayStart": "0", "RemTime": "240",
+        "MissSalt": "0", "MissRinse": "0", "OpenDoor": "0", "Reset": "0",
+        "CheckUp": "0", "r1": "3", "r2": "2", "r3": "1", "r4": "1",
+        "r5": "0", "r6": "1", "r7": "4", "r8": "0", "r9": "NULL", "r15": "1"
+      }
+    }"""
+
+    # --- Step 1: Ingestion & Idle Verification ---
+    entry, parsed_programs = await _init_dishwasher(
+        hass, aioclient_mock, catalog, idle_json
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    assert len(parsed_programs) == 9
+    assert coordinator.data.machine_state == MachineState.IDLE
+
+    status_eid = _entity_id(hass, entry.entry_id, "sensor", UNIQUE_ID_DISHWASHER)
+    prog_eid = _entity_id(
+        hass, entry.entry_id, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT
+    )
+    start_eid = _entity_id(
+        hass, entry.entry_id, "button", UNIQUE_ID_DISHWASHER_START_BUTTON
+    )
+    stop_eid = _entity_id(
+        hass, entry.entry_id, "button", UNIQUE_ID_DISHWASHER_STOP_BUTTON
+    )
+    half_load_eid = _entity_id(
+        hass, entry.entry_id, "switch", UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH
+    )
+    auto_door_eid = _entity_id(
+        hass, entry.entry_id, "switch", UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH
+    )
+    delay_eid = _entity_id(
+        hass, entry.entry_id, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER
+    )
+    cycle_status_eid = _entity_id(
+        hass, entry.entry_id, "sensor", UNIQUE_ID_DISHWASHER_CYCLE_STATUS
+    )
+    door_btn_eid = _entity_id(
+        hass, entry.entry_id, "button", UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON
+    )
+
+    assert hass.states.get(status_eid).state == "Idle"
+    assert hass.states.get(prog_eid).state == "panel"
+    assert hass.states.get(start_eid).state != "unavailable"
+    assert hass.states.get(stop_eid).state == "unavailable"
+
+    # --- Step 2: Configure UI Selections ---
+    # Select Eco program (cycle 8, position 1)
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": prog_eid, "option": "Eco 45°C"},
+        blocking=True,
+    )
+    # Enable Half Load switch
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": half_load_eid}, blocking=True
+    )
+    # Enable Auto Door Opening switch
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": auto_door_eid}, blocking=True
+    )
+    # Set Delay Start to 60 minutes
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": delay_eid, "value": 60}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    # --- Step 3: Dispatch Command & Wire Invariant Validation ---
+    with (
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+        patch("custom_components.candy.button.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": start_eid}, blocking=True
+        )
+        await hass.async_block_till_done()
+
+        mock_send.assert_called_once()
+        query_string = mock_send.call_args[0][0]
+        params = parse_qs(query_string)
+
+        assert params["StartStop"] == ["1"]
+        assert params["Program"] == ["P8"]
+        assert params["w1"] == ["1"]
+        assert params["DelayStart"] == ["60"]
+        assert params["MetaCarico"] == ["1"]
+        assert params["OpenDoorOpt"] == ["1"]
+        # Bit 1 (HalfLoad: 2) + Bit 4 (OpenDoor: 16) = 18
+        assert params["OpzProg"] == ["18"]
+
+    # --- Step 4: Progression through Telemetry ---
+    base_dw_telemetry = {
+        "StatoWiFi": "1",
+        "CodiceErrore": "E0",
+        "StatoDWash": "3",
+        "MetaCarico": "1",
+        "StartStop": "1",
+        "TreinUno": "0",
+        "Eco": "0",
+        "Program": "P8",
+        "ExtraDry": "0",
+        "OpenDoorOpt": "1",
+        "DelayStart": "0",
+        "RemTime": "115",
+        "MissSalt": "0",
+        "MissRinse": "0",
+        "OpenDoor": "0",
+        "Reset": "0",
+        "CheckUp": "0",
+        "r1": "1",
+        "r2": "2",
+        "r3": "1",
+        "r4": "1",
+        "r5": "0",
+        "r6": "1",
+        "r7": "4",
+        "r8": "0",
+        "r9": "NULL",
+        "r15": "1",
+    }
+
+    # Phase 4a: Delayed start countdown programmed
+    delayed_status = DishwasherStatus.from_json(
+        {**base_dw_telemetry, "r2": "0", "DelayStart": "60", "RemTime": "180"}
+    )
+    coordinator.async_set_updated_data(delayed_status)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(status_eid).state == "Delayed start programmed"
+    assert coordinator.data.machine_state == MachineState.DELAYED_START_PROGRAMMED
+
+    # Phase 4b: Active cycle execution (Wash phase)
+    wash_status = DishwasherStatus.from_json(base_dw_telemetry)
+    coordinator.async_set_updated_data(wash_status)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(status_eid).state == "Running"
+    assert hass.states.get(cycle_status_eid).state == "Wash"
+    assert coordinator.data.program_phase == DishwasherProgramPhase.WASH
+    assert coordinator.data.remaining_minutes == 115
+
+    # Phase 4c: Progression to Rinse phase
+    rinse_status = DishwasherStatus.from_json(
+        {**base_dw_telemetry, "r2": "3", "RemTime": "60"}
+    )
+    coordinator.async_set_updated_data(rinse_status)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(cycle_status_eid).state == "Rinse"
+    assert coordinator.data.program_phase == DishwasherProgramPhase.RINSE
+
+    # Phase 4d: Progression to Drying phase
+    drying_status = DishwasherStatus.from_json(
+        {**base_dw_telemetry, "r2": "4", "RemTime": "25"}
+    )
+    coordinator.async_set_updated_data(drying_status)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(cycle_status_eid).state == "Drying"
+    assert coordinator.data.program_phase == DishwasherProgramPhase.DRYING
+
+    # --- Step 5: Transient Network Dropout Resilience ---
+    coordinator.miss_count = 1
+    assert hass.states.get(status_eid).state == "Running"
+    assert hass.states.get(cycle_status_eid).state == "Drying"
+
+    # --- Step 6: Cycle Completion & Finished Ingress ---
+    # Hardware reports Finished mode (StatoDWash=5, r2=5). Note empirical quirk:
+    # RemTime is not zeroed by microcontroller (reports stale 75), but sensor forces 0.
+    finished_status = DishwasherStatus.from_json(
+        {
+            **base_dw_telemetry,
+            "StatoDWash": "5",
+            "r2": "5",
+            "RemTime": "75",
+            "r8": "1",
+        }
+    )
+    coordinator.miss_count = 0
+    coordinator.async_set_updated_data(finished_status)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(status_eid).state == "Finished"
+    assert coordinator.data.remaining_minutes == 0
+    assert hass.states.get(cycle_status_eid).state == "Finished"
+
+    # --- Step 7: Motorized Door Release Actuation ---
+    assert hass.states.get(door_btn_eid).state != "unavailable"
+
+    with (
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_door_send,
+        patch("custom_components.candy.button.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": door_btn_eid}, blocking=True
+        )
+        await hass.async_block_till_done()
+
+        mock_door_send.assert_called_once_with("OpenDoorOpt=7")

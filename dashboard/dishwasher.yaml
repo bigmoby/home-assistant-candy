@@ -1,0 +1,549 @@
+# --------------------------------------------------------------------------------------------------
+# Home Assistant Dashboard Card: Candy / Hoover Dishwasher (Full Control)
+# --------------------------------------------------------------------------------------------------
+# Requirements:
+#   - piitaya/lovelace-mushroom (custom:mushroom-template-card, custom:mushroom-chips-card)
+#
+# Instructions:
+#   Copy the contents of this file into a Manual Card on your dashboard.
+#   Replace every occurrence of `<machine_name>` with your device's entity ID prefix
+#   (e.g. `dishwasher` or `my_dishwasher`).
+#
+# Note:
+#   For Dishwasher maintenance and diagnostics (salt/rinse aid status, auto-clean, self check-up),
+#   use companion card `dishwasher-maintenance.yaml`.
+# --------------------------------------------------------------------------------------------------
+type: vertical-stack
+cards:
+  # ------------------------------------------------------------------------------------------------
+  # 1. Main Appliance Status Banner
+  # ------------------------------------------------------------------------------------------------
+  - type: custom:mushroom-template-card
+    primary: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} Running
+      {% elif state == 'paused' %} Paused
+      {% elif state == 'finished' %} Cycle finished
+      {% elif 'delayed' in state %} Delayed start
+      {% elif 'checkup' in state or 'diagnostic' in state %} Check-up running
+      {% elif 'sending' in state %} Sending command...
+      {% elif state in ['idle', 'stopped'] %} Ready
+      {% elif state == 'error' %} Error
+      {% else %} Off {% endif %}
+    secondary: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% set raw_phase = states('sensor.<machine_name>_cycle_status') %}
+      {% set prog = states('sensor.<machine_name>_program') %}
+      {% set del = states('number.<machine_name>_delay') | int(0) %}
+      {% if state == 'running' %}
+        {% if raw_phase in ['stopped', 'idle', 'unknown', 'unavailable', 'running', ''] %}
+          Washing...
+        {% else %}
+          {{ raw_phase }}
+        {% endif %}
+      {% elif 'delayed' in state %}
+        {% if del > 0 %}
+          Starts in {{ del // 60 }}h {{ del % 60 }}min ({{ (as_timestamp(now()) + (del * 60)) | timestamp_custom('%H:%M', default='--:--') }})
+        {% else %}
+          Delayed start active
+        {% endif %}
+      {% elif state == 'finished' %}
+        Unload dishwasher · Clean dishes ready
+      {% elif state in ['idle', 'stopped'] and prog not in ['unknown', 'unavailable', ''] %}
+        {{ prog }}
+      {% elif state == 'error' %}
+        {% set err = states('sensor.<machine_name>_error_code') %}
+        {% if err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+          Fault code: {{ err }}
+        {% else %}
+          Appliance error detected
+        {% endif %}
+      {% else %}
+        —
+      {% endif %}
+    icon: mdi:dishwasher
+    badge_icon: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% set phase = states('sensor.<machine_name>_cycle_status') | lower %}
+      {% if state == 'running' %}
+        {% if 'dry' in phase %} mdi:weather-dust
+        {% elif 'rinse' in phase %} mdi:water-sync
+        {% else %} mdi:play-circle {% endif %}
+      {% elif state == 'paused' %} mdi:pause-circle
+      {% elif state == 'finished' %} mdi:check-circle
+      {% elif state == 'error' %} mdi:alert-circle
+      {% elif 'delayed' in state %} mdi:timer-outline
+      {% elif 'sending' in state %} mdi:loading
+      {% else %} '' {% endif %}
+    badge_color: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
+    color: >-
+      {% set state = states('sensor.<machine_name>') | lower %}
+      {% if state == 'running' %} blue
+      {% elif state == 'paused' %} orange
+      {% elif state == 'finished' %} green
+      {% elif state == 'error' %} red
+      {% elif 'delayed' in state %} purple
+      {% else %} grey {% endif %}
+    entity: sensor.<machine_name>
+    tap_action:
+      action: more-info
+
+  # ------------------------------------------------------------------------------------------------
+  # 2. Live Telemetry & Active Option Chips
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - Idle
+          - idle
+    card:
+      type: custom:mushroom-chips-card
+      chips:
+        - type: template
+          icon: mdi:dishwasher
+          content: Prog. {{ states('sensor.<machine_name>_program') }}
+          icon_color: blue
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_program
+        - type: template
+          icon: mdi:water-sync
+          content: "{{ states('sensor.<machine_name>_cycle_status') }}"
+          icon_color: teal
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_cycle_status
+        - type: template
+          icon: mdi:progress-clock
+          content: >-
+            {% set m = states('sensor.<machine_name>_remaining_time') | int(0) %}
+            {% if m > 0 %}{{ m }} min{% else %}—{% endif %}
+          icon_color: >-
+            {% set state = states('sensor.<machine_name>') | lower %}
+            {% if state == 'paused' %} orange {% else %} blue {% endif %}
+          tap_action:
+            action: more-info
+            entity: sensor.<machine_name>_remaining_time
+        - type: template
+          icon: mdi:tune-variant
+          content: >-
+            {% set parts = [] %}
+            {% if is_state('switch.<machine_name>_eco_option', 'on') %}{% set parts = parts + ['Eco'] %}{% endif %}
+            {% if is_state('switch.<machine_name>_half_load', 'on') %}{% set parts = parts + ['Half Load'] %}{% endif %}
+            {% if is_state('switch.<machine_name>_extra_dry', 'on') %}{% set parts = parts + ['Extra Dry'] %}{% endif %}
+            {% if is_state('switch.<machine_name>_3in1_tablets', 'on') %}{% set parts = parts + ['3-in-1'] %}{% endif %}
+            {% if is_state('switch.<machine_name>_auto_open_door', 'on') %}{% set parts = parts + ['Auto Door'] %}{% endif %}
+            {% if parts | length > 0 %}{{ parts | join(' · ') }}{% else %}Standard{% endif %}
+          icon_color: indigo
+          tap_action:
+            action: none
+
+  # ------------------------------------------------------------------------------------------------
+  # 3. Consumable & Interlock Warning Chips
+  # ------------------------------------------------------------------------------------------------
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.<machine_name>_salt_empty
+            state: "on"
+        chip:
+          type: template
+          icon: mdi:shaker-outline
+          content: Salt empty
+          icon_color: amber
+          tap_action:
+            action: more-info
+            entity: binary_sensor.<machine_name>_salt_empty
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.<machine_name>_rinse_aid_empty
+            state: "on"
+        chip:
+          type: template
+          icon: mdi:cup-water
+          content: Rinse aid empty
+          icon_color: amber
+          tap_action:
+            action: more-info
+            entity: binary_sensor.<machine_name>_rinse_aid_empty
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.<machine_name>_door
+            state: "on"
+        chip:
+          type: template
+          icon: mdi:door-open
+          content: Door open
+          icon_color: red
+          tap_action:
+            action: more-info
+            entity: binary_sensor.<machine_name>_door
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.<machine_name>_remote_control
+            state: "off"
+          - condition: state
+            entity: sensor.<machine_name>
+            state_not:
+              - "Off"
+              - "off"
+        chip:
+          type: template
+          icon: mdi:remote-off
+          content: Local manual mode
+          icon_color: grey
+          tap_action:
+            action: more-info
+            entity: binary_sensor.<machine_name>_remote_control
+
+  # ------------------------------------------------------------------------------------------------
+  # 4. Cycle Configuration (Program Selection & Wash Options)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: select.<machine_name>_program
+        state_not: unavailable
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+    card:
+      type: vertical-stack
+      cards:
+        - type: tile
+          entity: select.<machine_name>_program
+          name: Program
+          icon: mdi:dishwasher
+          vertical: false
+          features:
+            - type: select-options
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>_program_description
+              state_not: unavailable
+            - condition: state
+              entity: sensor.<machine_name>_program_description
+              state_not: unknown
+          card:
+            type: custom:mushroom-template-card
+            primary: Program details
+            secondary: "{{ states('sensor.<machine_name>_program_description') }}"
+            multiline_secondary: true
+            icon: mdi:information-outline
+            icon_color: blue
+            entity: sensor.<machine_name>_program_description
+            tap_action:
+              action: more-info
+        - type: horizontal-stack
+          cards:
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: switch.<machine_name>_eco_option
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: switch.<machine_name>_eco_option
+                name: Eco
+                icon: mdi:leaf
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: switch.<machine_name>_half_load
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: switch.<machine_name>_half_load
+                name: Half load
+                icon: mdi:fraction-one-half
+        - type: horizontal-stack
+          cards:
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: switch.<machine_name>_extra_dry
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: switch.<machine_name>_extra_dry
+                name: Extra dry
+                icon: mdi:weather-dust
+            - type: conditional
+              conditions:
+                - condition: state
+                  entity: switch.<machine_name>_3in1_tablets
+                  state_not: unavailable
+              card:
+                type: tile
+                entity: switch.<machine_name>_3in1_tablets
+                name: 3-in-1 tabs
+                icon: mdi:pill
+        # Note: Auto-open door switch is only available on models equipped with motorized door release (_OD models).
+        # We match explicit 'on' / 'off' states so models without auto-open door cleanly hide this card instead of showing "Entity not found".
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: switch.<machine_name>_auto_open_door
+              state:
+                - "on"
+                - "off"
+          card:
+            type: tile
+            entity: switch.<machine_name>_auto_open_door
+            name: Auto open door
+            icon: mdi:door-open
+        - type: tile
+          entity: number.<machine_name>_delay
+          name: Start delay
+          icon: mdi:timer-outline
+          hide_state: false
+          vertical: false
+          features:
+            - style: buttons
+              type: numeric-input
+          features_position: bottom
+
+  # ------------------------------------------------------------------------------------------------
+  # 5. Timing Forecasts (Scheduled Start / Completion)
+  # ------------------------------------------------------------------------------------------------
+  - type: horizontal-stack
+    cards:
+      - type: conditional
+        conditions:
+          - condition: numeric_state
+            entity: number.<machine_name>_delay
+            above: 0
+        card:
+          type: custom:mushroom-template-card
+          entity: number.<machine_name>_delay
+          primary: Starts
+          secondary: >-
+            {% set del = states('number.<machine_name>_delay') | int(0) %}
+            {{ (as_timestamp(now()) + (del * 60)) | timestamp_custom('%H:%M', default='--:--') }}
+          icon: mdi:clock-start
+          icon_color: purple
+          tap_action:
+            action: more-info
+      - type: conditional
+        conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: sensor.<machine_name>
+                state: running
+              - condition: state
+                entity: sensor.<machine_name>
+                state: Running
+              - condition: state
+                entity: sensor.<machine_name>
+                state: paused
+              - condition: state
+                entity: sensor.<machine_name>
+                state: Paused
+        card:
+          type: custom:mushroom-template-card
+          entity: sensor.<machine_name>
+          primary: Finishes
+          secondary: >-
+            {% set rem = states('sensor.<machine_name>_remaining_time') | int(0) %}
+            {% if rem > 0 %}
+              {{ (as_timestamp(now()) + (rem * 60)) | timestamp_custom('%H:%M', default='--:--') }}
+            {% else %}
+              Finishing...
+            {% endif %}
+          icon: mdi:clock-end
+          icon_color: green
+          tap_action:
+            action: more-info
+
+  # ------------------------------------------------------------------------------------------------
+  # 6. Cycle Controls (Start, Pause, Resume, Stop, Open Door)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: binary_sensor.<machine_name>_remote_control
+        state: "on"
+    card:
+      type: horizontal-stack
+      cards:
+        # Start button (shown when idle / stopped / delay active)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - Running
+                - running
+                - Paused
+                - paused
+                - Finished
+                - finished
+                - "Off"
+                - "off"
+                - Sending command
+                - sending command
+                - sending_command
+          card:
+            type: custom:mushroom-template-card
+            primary: Start
+            icon: mdi:play-circle-outline
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_start
+            layout: vertical
+            color: green
+        # Pause button (shown while actively running)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Running
+                - running
+            - condition: state
+              entity: button.<machine_name>_pause
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Pause
+            icon: mdi:pause-circle-outline
+            icon_color: orange
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_pause
+        # Resume button (shown when cycle is paused)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state:
+                - Paused
+                - paused
+            - condition: state
+              entity: button.<machine_name>_resume
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Resume
+            icon: mdi:play-circle-outline
+            icon_color: green
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_resume
+        # Stop button (shown when running, paused, or delayed)
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.<machine_name>
+              state_not:
+                - Idle
+                - idle
+                - Finished
+                - finished
+                - "Off"
+                - "off"
+                - Sending command
+                - sending command
+                - sending_command
+          card:
+            type: custom:mushroom-template-card
+            primary: Stop
+            icon: mdi:stop-circle-outline
+            icon_color: red
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_stop
+        # Motorized door release button (shown for _OD models when available).
+        # If your dishwasher model does not have motorized door release, remove or comment out this conditional card.
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: button.<machine_name>_open_door
+              state_not: unavailable
+          card:
+            type: custom:mushroom-template-card
+            primary: Open door
+            icon: mdi:door-open
+            icon_color: blue
+            layout: vertical
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.<machine_name>_open_door
+
+  # ------------------------------------------------------------------------------------------------
+  # 7. Interlock Guidance (Manual Dial & Door Warnings)
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: binary_sensor.<machine_name>_remote_control
+        state: "off"
+      - condition: state
+        entity: sensor.<machine_name>
+        state_not:
+          - "Off"
+          - "off"
+    card:
+      type: custom:mushroom-template-card
+      primary: Remote control inactive
+      secondary: Turn physical dial to Remote / Wi-Fi to operate from Home Assistant
+      icon: mdi:dial-outline
+      icon_color: grey
+      tap_action:
+        action: more-info
+        entity: binary_sensor.<machine_name>_remote_control
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: binary_sensor.<machine_name>_door
+        state: "on"
+      - condition: state
+        entity: sensor.<machine_name>
+        state:
+          - Idle
+          - idle
+    card:
+      type: custom:mushroom-template-card
+      primary: Dishwasher door open
+      secondary: Close door firmly before starting cycle
+      icon: mdi:door-open
+      icon_color: orange
+      tap_action:
+        action: more-info
+        entity: binary_sensor.<machine_name>_door

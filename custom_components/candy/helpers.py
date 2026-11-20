@@ -7,9 +7,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 
-from .client import parse_wash_programs
+from .client import is_legacy_dishwasher, parse_wash_programs
 from .client.dryer_commands import is_dualtech_dryer_interface
 from .client.model import (
+    _PROGRAM_NAMES,
+    DishwasherStatus,
     TumbleDryerStatus,
     WashingMachineStatus,
     WashingMachineWashProgram,
@@ -27,6 +29,8 @@ from .const import (
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WASHER_DRYER,
     DEVICE_NAME_WASHING_MACHINE,
+    DISHWASHER_PROGRAM_NAME_KEYS,
+    DISHWASHER_TELEMETRY_TO_KEYS,
     DOMAIN,
     DRY_TARGET_TO_VALUE,
     DUALTECH_DRY_TARGET_TO_VALUE,
@@ -53,7 +57,7 @@ def localized_notification_text(key: str, language: str) -> str:
 def remote_control_enabled(data: object) -> bool:
     """Return True when the appliance accepts remote commands."""
     return (
-        isinstance(data, (WashingMachineStatus, TumbleDryerStatus))
+        isinstance(data, (WashingMachineStatus, TumbleDryerStatus, DishwasherStatus))
         and data.remote_control
     )
 
@@ -68,6 +72,14 @@ def is_dualtech(interface_type: str | None) -> bool:
 def is_dualtech_dryer(interface_type: str | None) -> bool:
     """Return True if the interface_type belongs to a DualTech tumble dryer."""
     return is_dualtech_dryer_interface(interface_type)
+
+
+def is_modern_dishwasher(interface_type: str | None) -> bool:
+    """Return True if the interface_type belongs to Family 2 (Brava) or Family 3 (AXI)."""
+    if not interface_type or is_legacy_dishwasher(interface_type):
+        return False
+    up = interface_type.upper()
+    return any(term in up for term in ("BRAVA", "DW_WIFI", "AXI", "SMOOTH"))
 
 
 def dry_target_value_for_interface(target_name: str, interface_type: str | None) -> int:
@@ -227,7 +239,14 @@ def get_appliance_error_notification_strings(
     appliance_type: str, error_code: int, language: str
 ) -> tuple[str, str] | None:
     """Return (title, message) for appliance error, or None if unknown code."""
-    prefix = "wash" if appliance_type == "washer" else "dryer"
+    if appliance_type == "washer":
+        prefix = "wash"
+    elif appliance_type == "dryer":
+        prefix = "dryer"
+    elif appliance_type == "dishwasher":
+        prefix = "dishwasher"
+    else:
+        raise ValueError(f"Unsupported appliance_type: {appliance_type}")
     msg_key = f"{prefix}_error_{error_code}_message"
     if msg_key not in _NOTIFICATION_STRINGS:
         return None
@@ -249,3 +268,141 @@ def get_dryer_error_notification_strings(
 ) -> tuple[str, str] | None:
     """Return (title, message) for tumble dryer error, or None if unknown code."""
     return get_appliance_error_notification_strings("dryer", error_code, language)
+
+
+def get_dishwasher_error_notification_strings(
+    error_code: int, language: str
+) -> tuple[str, str] | None:
+    """Return (title, message) for dishwasher error, or None if unknown code."""
+    return get_appliance_error_notification_strings("dishwasher", error_code, language)
+
+
+def get_dishwasher_checkup_result_strings(language: str) -> tuple[str, str]:
+    """Return (title, message) for dishwasher full check-up result notification."""
+    title = localized_notification_text(
+        "dishwasher_full_checkup_result_title", language
+    )
+    message = localized_notification_text(
+        "dishwasher_full_checkup_result_message", language
+    )
+    return title, message
+
+
+def get_dishwasher_maintenance_strings(
+    maint_type: str, language: str
+) -> tuple[str, str]:
+    """Return (title, message) for dishwasher maintenance notifications."""
+    if maint_type == "filter":
+        title = localized_notification_text("dishwasher_filter_title", language)
+        message = localized_notification_text("dishwasher_filter_due_message", language)
+    elif maint_type == "limescale":
+        title = localized_notification_text("dishwasher_limescale_title", language)
+        message = localized_notification_text(
+            "dishwasher_limescale_due_message", language
+        )
+    elif maint_type == "checkup":
+        title = localized_notification_text(
+            "dishwasher_full_checkup_result_title", language
+        )
+        message = localized_notification_text("full_checkup_due_message", language)
+    else:
+        raise ValueError(f"Unsupported dishwasher maintenance type: {maint_type}")
+    return title, message
+
+
+def get_dishwasher_warning_strings(warning_type: str, language: str) -> tuple[str, str]:
+    """Return (title, message) for dishwasher consumable warnings."""
+    if warning_type == "salt":
+        title = localized_notification_text("dishwasher_salt_empty_title", language)
+        message = localized_notification_text("dishwasher_salt_empty_message", language)
+    elif warning_type == "rinse":
+        title = localized_notification_text("dishwasher_rinse_empty_title", language)
+        message = localized_notification_text(
+            "dishwasher_rinse_empty_message", language
+        )
+    else:
+        raise ValueError(f"Unsupported dishwasher warning type: {warning_type}")
+    return title, message
+
+
+def resolve_dishwasher_program_name(
+    program_identifier: str,
+    language: str,
+) -> str:
+    """Resolve localized friendly program name for select key or hardware register."""
+    if not program_identifier:
+        return ""
+    # 1. Match select option key (e.g. eco_45)
+    name_key = DISHWASHER_PROGRAM_NAME_KEYS.get(program_identifier)
+    if name_key is not None:
+        trans = _PROGRAM_NAMES.get(name_key, {})
+        resolved = _lookup_translation(trans, language)
+        if resolved:
+            return resolved
+
+    # 2. Match hardware telemetry register (e.g. P8, P2, P1+)
+    telemetry_match = DISHWASHER_TELEMETRY_TO_KEYS.get(program_identifier)
+    if telemetry_match is not None:
+        trans = _PROGRAM_NAMES.get(telemetry_match[0], {})
+        resolved = _lookup_translation(trans, language)
+        if resolved:
+            return resolved
+
+    # 3. Fallback to raw program identifier
+    return program_identifier
+
+
+def resolve_dishwasher_program_description(
+    program_identifier: str,
+    language: str,
+) -> str | None:
+    """Resolve localized multi-line description for select key or hardware register."""
+    if not program_identifier:
+        return None
+    # 1. Match select option key (e.g. eco_45)
+    name_key = DISHWASHER_PROGRAM_NAME_KEYS.get(program_identifier)
+    if name_key is not None:
+        desc_key = f"{name_key}_DESCRIPTION"
+        trans = _PROGRAM_NAMES.get(desc_key, {})
+        return _lookup_translation(trans, language)
+
+    # 2. Match hardware telemetry register (e.g. P8, P2, P1+)
+    telemetry_match = DISHWASHER_TELEMETRY_TO_KEYS.get(program_identifier)
+    if telemetry_match is not None:
+        trans = _PROGRAM_NAMES.get(telemetry_match[1], {})
+        return _lookup_translation(trans, language)
+
+    # 3. Direct description key or candidate keys
+    for candidate_key in (
+        f"{program_identifier}_DESCRIPTION",
+        f"DW_{program_identifier}_DESCRIPTION",
+    ):
+        trans = _PROGRAM_NAMES.get(candidate_key, {})
+        resolved = _lookup_translation(trans, language)
+        if resolved:
+            return resolved
+
+    # 4. Search _PROGRAM_NAMES for program whose localized name matches program_identifier
+    for k, v in _PROGRAM_NAMES.items():
+        if not k.endswith("_DESCRIPTION") and isinstance(v, dict):
+            if any(name == program_identifier for name in v.values()):
+                desc_trans = _PROGRAM_NAMES.get(f"{k}_DESCRIPTION", {})
+                resolved = _lookup_translation(desc_trans, language)
+                if resolved:
+                    return resolved
+
+    return None
+
+
+def _lookup_translation(
+    translations: dict[str, str],
+    language: str,
+) -> str | None:
+    if not translations:
+        return None
+    lang_lower = language.lower()
+    if lang_lower in translations:
+        return translations[lang_lower]
+    if "en" in translations:
+        return translations["en"]
+    return next(iter(translations.values()), None)

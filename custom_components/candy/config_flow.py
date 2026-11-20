@@ -25,11 +25,12 @@ from .client import (
     CandyClient,
     detect_encryption,
     discover_devices,
+    is_legacy_dishwasher,
     parse_wash_programs,
 )
 from .client.cloud import SimplyFiCloudError, fetch_appliance_data
 from .client.decryption import Encryption
-from .client.model import TumbleDryerStatus, WashingMachineStatus
+from .client.model import DishwasherStatus, TumbleDryerStatus, WashingMachineStatus
 from .const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_MONTHLY,
@@ -42,6 +43,7 @@ from .const import (
     CONF_KEY_DEVICE_MODEL,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_DISHWASHER,
     CONF_KEY_IS_TUMBLE_DRYER,
     CONF_KEY_IS_WASHER_DRYER,
     CONF_KEY_IS_WASHING_MACHINE,
@@ -59,7 +61,9 @@ from .const import (
     CONF_KEY_SERIAL_NUMBER,
     CONF_KEY_USE_ENCRYPTION,
     CONF_KEY_WATER_HARDNESS,
+    DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DOMAIN,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
@@ -68,9 +72,15 @@ from .const import (
     MODE_FULL_CONTROL,
     MODE_READ_ONLY,
     PROGRAM_LANGUAGES,
+    UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_MAINT_FILTER,
+    UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP,
+    UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE,
+    UNIQUE_ID_TUMBLE_DRYER,
     UNIQUE_ID_WASH_MAINT_FILTER,
     UNIQUE_ID_WASH_MAINT_FULL_CHECKUP,
     UNIQUE_ID_WASH_MAINT_LIMESCALE,
+    UNIQUE_ID_WASHING_MACHINE,
 )
 from .helpers import (
     cycles_remaining,
@@ -248,29 +258,98 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self) -> None:
         self._pending_data: dict[str, Any] = {}
 
+    def _is_washing_machine(self) -> bool:
+        if CONF_KEY_IS_WASHING_MACHINE in self.config_entry.data:
+            return bool(self.config_entry.data[CONF_KEY_IS_WASHING_MACHINE])
+        registry = er.async_get(self.hass)
+        if (
+            registry.async_get_entity_id(
+                "sensor",
+                DOMAIN,
+                UNIQUE_ID_WASHING_MACHINE.format(self.config_entry.entry_id),
+            )
+            is not None
+        ):
+            return True
+        coord = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self.config_entry.entry_id, {})
+            .get(DATA_KEY_COORDINATOR)
+        )
+        return coord is not None and isinstance(coord.data, WashingMachineStatus)
+
+    def _is_tumble_dryer(self) -> bool:
+        if CONF_KEY_IS_TUMBLE_DRYER in self.config_entry.data:
+            return bool(self.config_entry.data[CONF_KEY_IS_TUMBLE_DRYER])
+        registry = er.async_get(self.hass)
+        if (
+            registry.async_get_entity_id(
+                "sensor",
+                DOMAIN,
+                UNIQUE_ID_TUMBLE_DRYER.format(self.config_entry.entry_id),
+            )
+            is not None
+        ):
+            return True
+        coord = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self.config_entry.entry_id, {})
+            .get(DATA_KEY_COORDINATOR)
+        )
+        return coord is not None and isinstance(coord.data, TumbleDryerStatus)
+
+    def _is_dishwasher(self) -> bool:
+        if CONF_KEY_IS_DISHWASHER in self.config_entry.data:
+            return bool(self.config_entry.data[CONF_KEY_IS_DISHWASHER])
+        registry = er.async_get(self.hass)
+        if (
+            registry.async_get_entity_id(
+                "sensor",
+                DOMAIN,
+                UNIQUE_ID_DISHWASHER.format(self.config_entry.entry_id),
+            )
+            is not None
+        ):
+            return True
+        coord = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self.config_entry.entry_id, {})
+            .get(DATA_KEY_COORDINATOR)
+        )
+        return coord is not None and isinstance(coord.data, DishwasherStatus)
+
+    def _is_controllable(self) -> bool:
+        return (
+            self._is_washing_machine()
+            or self._is_tumble_dryer()
+            or self._is_dishwasher()
+        )
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Branch based on current mode."""
-        mode = self.config_entry.data.get(CONF_KEY_MODE)
-        is_washing_machine = self.config_entry.data.get(
-            CONF_KEY_IS_WASHING_MACHINE, False
-        )
+        mode = self.config_entry.data.get(CONF_KEY_MODE, MODE_READ_ONLY)
+        is_washing_machine = self._is_washing_machine()
+        is_dryer = self._is_tumble_dryer()
+        is_dishwasher = self._is_dishwasher()
+
+        if user_input is not None:
+            if user_input["next_step"] == "switch_to_read_only":
+                return await self.async_step_switch_to_read_only()
+            if user_input["next_step"] == "maintenance_settings":
+                return await self.async_step_maintenance()
+            if user_input["next_step"] == "checkup_settings":
+                return await self.async_step_checkup()
+            return await self.async_step_update_cloud_data()
 
         if mode == MODE_FULL_CONTROL:
-            if user_input is not None:
-                if user_input["next_step"] == "switch_to_read_only":
-                    return await self.async_step_switch_to_read_only()
-                if user_input["next_step"] == "maintenance_settings":
-                    return await self.async_step_maintenance()
-                if user_input["next_step"] == "checkup_settings":
-                    return await self.async_step_checkup()
-                return await self.async_step_update_cloud_data()
             options = ["update_cloud_data", "switch_to_read_only"]
-            if is_washing_machine:
-                options.append("maintenance_settings")
             interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-            is_dryer = self.config_entry.data.get(CONF_KEY_IS_TUMBLE_DRYER, False)
+            if is_washing_machine or (
+                is_dishwasher and not is_legacy_dishwasher(interface_type)
+            ):
+                options.append("maintenance_settings")
             if supports_scheduled_checkup(interface_type, is_dryer):
                 options.append("checkup_settings")
             return self.async_show_form(
@@ -289,6 +368,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             )
 
         if not is_washing_machine:
+            if is_dryer or is_dishwasher:
+                return await self.async_step_update_cloud_data()
             return self.async_create_entry(data={})
 
         return await self.async_step_maintenance()
@@ -443,15 +524,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     total_cycles, last_ft, MAINTENANCE_FILTER_THRESHOLD
                 )
             else:
-                current_sc = _current_remaining_cycles(
-                    self.hass, entry_id, UNIQUE_ID_WASH_MAINT_FULL_CHECKUP
-                )
-                current_ls = _current_remaining_cycles(
-                    self.hass, entry_id, UNIQUE_ID_WASH_MAINT_LIMESCALE
-                )
-                current_ft = _current_remaining_cycles(
-                    self.hass, entry_id, UNIQUE_ID_WASH_MAINT_FILTER
-                )
+                if self._is_dishwasher():
+                    uid_sc = UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP
+                    uid_ls = UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE
+                    uid_ft = UNIQUE_ID_DISHWASHER_MAINT_FILTER
+                else:
+                    uid_sc = UNIQUE_ID_WASH_MAINT_FULL_CHECKUP
+                    uid_ls = UNIQUE_ID_WASH_MAINT_LIMESCALE
+                    uid_ft = UNIQUE_ID_WASH_MAINT_FILTER
+                current_sc = _current_remaining_cycles(self.hass, entry_id, uid_sc)
+                current_ls = _current_remaining_cycles(self.hass, entry_id, uid_ls)
+                current_ft = _current_remaining_cycles(self.hass, entry_id, uid_ft)
                 sc_default = (
                     current_sc
                     if current_sc is not None
@@ -626,6 +709,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         new_data = dict(self.config_entry.data)
         new_data[CONF_KEY_MODE] = MODE_FULL_CONTROL
+        if self._is_washing_machine():
+            new_data[CONF_KEY_IS_WASHING_MACHINE] = True
+        if self._is_tumble_dryer():
+            new_data[CONF_KEY_IS_TUMBLE_DRYER] = True
+        if self._is_dishwasher():
+            new_data[CONF_KEY_IS_DISHWASHER] = True
+            if not appliance.programs:
+                new_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
         if (
             CONF_KEY_USE_ENCRYPTION not in self.config_entry.data
             and appliance.encryption_key
@@ -730,11 +821,57 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._discovered: dict[str, str] = {}  # ip -> device type label
         self._ip_address: str = ""
         self._config_data: dict[str, Any] = {}  # accumulated config entry data
+        self._is_reconfigure: bool = False
         self._is_washing_machine: bool = False
         self._is_tumble_dryer: bool = False
+        self._is_dishwasher: bool = False
         self._total_cycles: int = (
             0  # fetched once after device probe; used for baselines
         )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle entry reconfiguration to upgrade to Full Control or refresh cloud data."""
+        entry = self._get_reconfigure_entry()
+        self._is_reconfigure = True
+        self._ip_address = entry.data[CONF_IP_ADDRESS]
+        self._config_data = dict(entry.data)
+
+        self._is_washing_machine = entry.data.get(CONF_KEY_IS_WASHING_MACHINE, False)
+        self._is_tumble_dryer = entry.data.get(CONF_KEY_IS_TUMBLE_DRYER, False)
+        self._is_dishwasher = entry.data.get(CONF_KEY_IS_DISHWASHER, False)
+
+        if not (
+            self._is_washing_machine or self._is_tumble_dryer or self._is_dishwasher
+        ):
+            registry = er.async_get(self.hass)
+            self._is_washing_machine = (
+                registry.async_get_entity_id(
+                    "sensor", DOMAIN, UNIQUE_ID_WASHING_MACHINE.format(entry.entry_id)
+                )
+                is not None
+            )
+            self._is_tumble_dryer = (
+                registry.async_get_entity_id(
+                    "sensor", DOMAIN, UNIQUE_ID_TUMBLE_DRYER.format(entry.entry_id)
+                )
+                is not None
+            )
+            self._is_dishwasher = (
+                registry.async_get_entity_id(
+                    "sensor", DOMAIN, UNIQUE_ID_DISHWASHER.format(entry.entry_id)
+                )
+                is not None
+            )
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=CLOUD_SCHEMA,
+            )
+
+        return await self.async_step_cloud(user_input)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -834,6 +971,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 status = await client.status()
             self._is_washing_machine = isinstance(status, WashingMachineStatus)
             self._is_tumble_dryer = isinstance(status, TumbleDryerStatus)
+            self._is_dishwasher = isinstance(status, DishwasherStatus)
             if self._is_washing_machine:
                 try:
                     async with async_timeout.timeout(20):
@@ -848,11 +986,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             _LOGGER.debug("Device type probe failed, assuming non-controllable machine")
             self._is_washing_machine = False
             self._is_tumble_dryer = False
+            self._is_dishwasher = False
 
         if self._is_washing_machine:
             self._config_data[CONF_KEY_IS_WASHING_MACHINE] = True
         if self._is_tumble_dryer:
             self._config_data[CONF_KEY_IS_TUMBLE_DRYER] = True
+        if self._is_dishwasher:
+            self._config_data[CONF_KEY_IS_DISHWASHER] = True
 
         return await self.async_step_mode()
 
@@ -860,7 +1001,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Ask the user whether they want Read-Only or Full Control mode."""
-        if not (self._is_washing_machine or self._is_tumble_dryer):
+        if not (
+            self._is_washing_machine or self._is_tumble_dryer or self._is_dishwasher
+        ):
             self._config_data[CONF_KEY_MODE] = MODE_READ_ONLY
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
@@ -878,6 +1021,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         # Read-only washing machine: ask whether appliance is a washer-dryer
         if self._is_washing_machine:
             return await self.async_step_washer_dryer()
+
+        if self._is_dishwasher:
+            self._config_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if not is_legacy_dishwasher(interface_type):
+                return await self.async_step_maintenance()
+            return self.async_create_entry(
+                title=CONF_INTEGRATION_TITLE, data=self._config_data
+            )
 
         return self.async_create_entry(
             title=CONF_INTEGRATION_TITLE, data=self._config_data
@@ -910,8 +1062,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Collect Simply-Fi credentials and fetch appliance data from cloud."""
+        step_id = "reconfigure" if self._is_reconfigure else "cloud"
         if user_input is None:
-            return self.async_show_form(step_id="cloud", data_schema=CLOUD_SCHEMA)
+            return self.async_show_form(step_id=step_id, data_schema=CLOUD_SCHEMA)
 
         errors: dict[str, str] = {}
         try:
@@ -926,14 +1079,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             _LOGGER.warning("Simply-Fi cloud fetch failed: %s", err)
             errors["base"] = "cloud_auth"
             return self.async_show_form(
-                step_id="cloud", data_schema=CLOUD_SCHEMA, errors=errors
+                step_id=step_id, data_schema=CLOUD_SCHEMA, errors=errors
             )
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected error during Simply-Fi cloud fetch")
             errors["base"] = "cloud_auth"
             return self.async_show_form(
-                step_id="cloud", data_schema=CLOUD_SCHEMA, errors=errors
+                step_id=step_id, data_schema=CLOUD_SCHEMA, errors=errors
             )
+
+        if self._is_reconfigure:
+            self._config_data[CONF_KEY_MODE] = MODE_FULL_CONTROL
+            if self._is_washing_machine:
+                self._config_data[CONF_KEY_IS_WASHING_MACHINE] = True
+            if self._is_tumble_dryer:
+                self._config_data[CONF_KEY_IS_TUMBLE_DRYER] = True
+            if self._is_dishwasher:
+                self._config_data[CONF_KEY_IS_DISHWASHER] = True
 
         # Credentials are NOT stored — only the fetched appliance data
         # Device transport (encryption mode and local key) is detected and verified
@@ -974,6 +1136,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     self._config_data[CONF_KEY_IS_WASHER_DRYER] = True
             except (KeyError, TypeError, ValueError):
                 pass
+        if self._is_dishwasher and not appliance.programs:
+            self._config_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
         if self._is_tumble_dryer:
             if not is_dualtech_dryer(appliance.interface_type):
                 _LOGGER.warning(
@@ -1003,6 +1167,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._config_data[CONF_KEY_PROGRAM_LANGUAGE] = user_input[
             CONF_KEY_PROGRAM_LANGUAGE
         ]
+        if self._is_reconfigure:
+            return self.async_update_reload_and_abort(
+                self._get_reconfigure_entry(),
+                data=self._config_data,
+            )
+        if self._is_dishwasher:
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if not is_legacy_dishwasher(interface_type):
+                return await self.async_step_maintenance()
+            return self.async_create_entry(
+                title=CONF_INTEGRATION_TITLE, data=self._config_data
+            )
         if self._is_tumble_dryer:
             interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
             if self._config_data.get(

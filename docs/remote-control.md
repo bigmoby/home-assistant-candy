@@ -14,9 +14,11 @@ This guide explains how to use **Full Control mode** in Home Assistant to monito
   - [Washing Machines](#washing-machines)
   - [Washer-Dryer Combos](#washer-dryer-combos)
   - [Tumble Dryers](#tumble-dryers)
+  - [Dishwashers](#dishwashers)
 - [Maintenance & Care](#maintenance--care)
   - [Washing Machines & Washer-Dryers](#washing-machines--washer-dryers)
   - [Tumble Dryers](#tumble-dryers-1)
+  - [Dishwashers](#dishwashers-1)
 - [Troubleshooting & Fault Alerts](#troubleshooting--fault-alerts)
 - [Dashboards & Automations](#dashboards--automations)
   - [Ready-Made Dashboards](#ready-made-dashboards)
@@ -99,6 +101,14 @@ Washer-dryers combine standard washing controls with dedicated drying management
 - **Anti-Crease Tumbling:** After drying completes, the dryer gently tumbles intermittently to prevent creases until unloaded. You can stop this at any time by pressing **Cancel Anti-Crease**.
 - **Door Safety:** Cycles cannot be started while the door is open.
 
+### Dishwashers
+
+- **Wash Programs:** Select from your machine's full range of localized cycles (e.g. *Eco 45°C*, *Intensive 75°C*, *Universal 60°C*, *Auto Daily*, *Zoom 39'*, *Rapid 24'*, *Prewash*).
+- **Wash Options:** Toggle tailored wash stages including **Eco**, **Half Load**, **Extra Dry**, and **3-in-1** tablet detergent mode.
+- **Motorized Door Opening:** On supported models equipped with motorized latches, enable automatic door opening during drying or tap **Open Door** to release the door immediately from Home Assistant.
+- **Delay Start:** Program start delays in minutes or hours to run dishes during cheaper off-peak electricity hours.
+- **Door Safety & Interlocks:** Cycles are safely locked out whenever the door is open or the physical knob is turned away from the Wi-Fi position.
+
 ---
 
 ## Maintenance & Care
@@ -121,6 +131,15 @@ Dryers use real-time hardware alerts rather than software cycle counters:
 - **Water Tank Alert:** Alerts you when the condensate collection drawer is full and needs emptying.
 - **Clear Warnings:** After cleaning the filter or emptying the tank, tap **Reset Warnings** to clear the machine's warning indicator.
 - **Electronic Self Check-up:** Tap the **Self Check-up** button to run an automated hardware diagnostic test on the dryer's internal components.
+
+### Dishwashers
+
+Dishwashers combine real-time consumable monitoring with periodic tub care and diagnostics:
+
+- **Special Salt Reservoir:** Warns you as soon as the ion-exchange water softener salt is depleted, preventing mineral deposits and water spots on glassware.
+- **Rinse Aid Reservoir:** Warns you when rinse aid needs refilling to maintain optimal drying and sheet-off performance.
+- **Tub Maintenance Clean:** Alerts you when an auto-clean maintenance cycle is recommended to clear grease and food residue.
+- **Electronic Self Check-up:** Tap the **Check-up** button to run an automated hardware diagnostic test verifying inlet valves, heating elements, and wash/drain circulation pumps.
 
 ---
 
@@ -148,7 +167,9 @@ Pre-configured Lovelace dashboard cards using [Mushroom Cards](https://github.co
 - **[Washing Machine Card](../dashboard/washing-machine.yaml):** Operational control panel for standard washing machines (program selection, spin/temp adjustments, start/pause/stop buttons, and time estimates).
 - **[Washer-Dryer Card](../dashboard/washer-dryer.yaml):** All-in-one panel featuring wash-and-dry mode selection, drying settings, and live status icons.
 - **[Tumble Dryer Card](../dashboard/tumble-dryer.yaml):** Complete dryer panel with dry level selectors, timed drying controls, filter and water alerts, and anti-crease management.
+- **[Dishwasher Card](../dashboard/dishwasher.yaml):** Operational control panel for dishwashers with program selection, wash options (Eco, Half Load, Extra Dry, 3-in-1, Auto Open Door), delay start, progress telemetry, and start/pause/resume/stop/open door controls.
 - **[Maintenance Card](../dashboard/maintenance.yaml):** Companion card strictly for **washing machines** and **washer-dryers** (tracks cycle-based countdowns for Full Check-up, Limescale cleaning, and Filter care). Not needed for tumble dryers, which already include live hardware alerts directly on their card.
+- **[Dishwasher Maintenance Card](../dashboard/dishwasher-maintenance.yaml):** Dedicated companion card for **dishwashers** (monitors salt and rinse aid reservoir levels, tub maintenance clean warning, lifetime completed cycles, water hardness, and provides electronic diagnostic self-tests).
 
 #### Requirements & Setup
 

@@ -1,5 +1,7 @@
 """Constants for the Candy integration."""
 
+from typing import Any
+
 DOMAIN = "candy"
 PLATFORMS = ["sensor", "binary_sensor", "select", "number", "button", "switch", "light"]
 
@@ -14,8 +16,14 @@ DATA_KEY_STATS_REFRESH_UNSUB = "stats_refresh_unsub"
 DATA_KEY_LIMESCALE_UNSUB = "limescale_unsub"
 DATA_KEY_WASH_ERROR_UNSUB = "wash_error_unsub"
 DATA_KEY_DRYER_ERROR_UNSUB = "dryer_error_unsub"
+DATA_KEY_DISHWASHER_ERROR_UNSUB = "dishwasher_error_unsub"
 DATA_KEY_DRYER_WARNING_UNSUB = "dryer_warning_unsub"
 DATA_KEY_DRYER_CHECKUP_UNSUB = "dryer_checkup_unsub"
+DATA_KEY_DISHWASHER_CHECKUP_UNSUB = "dishwasher_checkup_unsub"
+DATA_KEY_DISHWASHER_WARNING_UNSUB = "dishwasher_warning_unsub"
+DATA_KEY_DISHWASHER_STATS_REFRESH_UNSUB = "dishwasher_stats_refresh_unsub"
+DATA_KEY_DISHWASHER_MAINT_UNSUB = "dishwasher_maint_unsub"
+DATA_KEY_DISHWASHER_STATS_COORDINATOR = "dishwasher_stats_coordinator"
 
 CONF_INTEGRATION_TITLE = "Candy"
 CONF_KEY_USE_ENCRYPTION = "use_encryption"
@@ -228,6 +236,7 @@ DRY_TARGET_DURATIONS: dict[str, int] = {
 CONF_KEY_IS_WASHING_MACHINE = "is_washing_machine"
 CONF_KEY_IS_WASHER_DRYER = "is_washer_dryer"
 CONF_KEY_IS_TUMBLE_DRYER = "is_tumble_dryer"
+CONF_KEY_IS_DISHWASHER = "is_dishwasher"
 CONF_KEY_INTERFACE_TYPE = "interface_type"
 
 CONF_KEY_MAINTENANCE_ENABLED = "maintenance_enabled"
@@ -278,6 +287,9 @@ UNIQUE_ID_WASH_LIMESCALE_BUTTON = "{0}-wash_limescale_button"
 NOTIF_ID_LIMESCALE = "candy_{0}_limescale"
 NOTIF_ID_WASH_ERROR = "candy_{0}_wash_error"
 NOTIF_ID_DRYER_ERROR = "candy_{0}_dryer_error"
+NOTIF_ID_DISHWASHER_ERROR = "candy_{0}_dishwasher_error"
+NOTIF_ID_DISHWASHER_SALT = "candy_{0}_dishwasher_salt"
+NOTIF_ID_DISHWASHER_RINSE = "candy_{0}_dishwasher_rinse"
 NOTIF_ID_DRYER_FILTER = "candy_{0}_dryer_filter"
 NOTIF_ID_DRYER_WATER_TANK = "candy_{0}_dryer_water_tank"
 
@@ -413,20 +425,40 @@ UNIQUE_ID_OVEN_PROGRAM = "{0}-oven_program"
 UNIQUE_ID_OVEN_TEMP = "{0}-oven-temp"
 UNIQUE_ID_DISHWASHER = "{0}-dishwasher"
 UNIQUE_ID_DISHWASHER_PROGRAM = "{0}-dishwasher_program"
+UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION = "{0}-dishwasher_program_description"
 UNIQUE_ID_DISHWASHER_REMAINING_TIME = "{0}-dishwasher_remaining_time"
+UNIQUE_ID_DISHWASHER_CYCLE_STATUS = "{0}-dishwasher_cycle_status"
 UNIQUE_ID_DISHWASHER_START_BUTTON = "{0}-dishwasher_start_button"
 UNIQUE_ID_DISHWASHER_STOP_BUTTON = "{0}-dishwasher_stop_button"
+UNIQUE_ID_DISHWASHER_PAUSE_BUTTON = "{0}-dishwasher_pause_button"
+UNIQUE_ID_DISHWASHER_RESUME_BUTTON = "{0}-dishwasher_resume_button"
+UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON = "{0}-dishwasher_open_door_button"
+UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON = "{0}-dishwasher_checkup_button"
 UNIQUE_ID_DISHWASHER_PROGRAM_SELECT = "{0}-dishwasher_program_select"
 UNIQUE_ID_DISHWASHER_ECO_SWITCH = "{0}-dishwasher_eco_switch"
 UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH = "{0}-dishwasher_three_in_one_switch"
+UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH = "{0}-dishwasher_half_load_switch"
+UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH = "{0}-dishwasher_extra_dry_switch"
+UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH = "{0}-dishwasher_auto_door_switch"
 UNIQUE_ID_DISHWASHER_DELAY_NUMBER = "{0}-dishwasher_delay_number"
 UNIQUE_ID_DISHWASHER_SALT_EMPTY = "{0}-dishwasher_salt_empty"
 UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY = "{0}-dishwasher_rinse_aid_empty"
 UNIQUE_ID_DISHWASHER_DOOR = "{0}-dishwasher_door"
 UNIQUE_ID_DISHWASHER_REMOTE_CONTROL = "{0}-dishwasher_remote_control"
 UNIQUE_ID_DISHWASHER_ERROR = "{0}-dishwasher_error"
-
-DATA_KEY_DISHWASHER_START_OPTIONS = "dishwasher_start_options"
+UNIQUE_ID_DISHWASHER_WATER_HARDNESS = "{0}-dishwasher_water_hardness"
+UNIQUE_ID_DISHWASHER_BUZZER = "{0}-dishwasher_buzzer"
+UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES = "{0}-dishwasher_lifetime_cycles"
+UNIQUE_ID_DISHWASHER_MAINT_CLEAN = "{0}-dishwasher_maint_clean"
+UNIQUE_ID_DISHWASHER_TOTAL_CYCLES = "{0}-dishwasher_total_cycles"
+UNIQUE_ID_DISHWASHER_MAINT_FILTER = "{0}-dishwasher_maint_filter"
+UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE = "{0}-dishwasher_maint_limescale"
+UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP = "{0}-dishwasher_maint_full_checkup"
+UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON = "{0}-dishwasher_maint_filter_reset"
+UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE_BUTTON = "{0}-dishwasher_maint_limescale_reset"
+UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON = (
+    "{0}-dishwasher_maint_full_checkup_reset"
+)
 
 # Select option that keeps the program chosen on the machine panel
 DISHWASHER_PROGRAM_PANEL = "panel"
@@ -443,6 +475,129 @@ DISHWASHER_PROGRAMS: dict[str, str] = {
     "zoom_39": "P19",
     "rapid_24": "P20",
     "prewash": "P12",
+}
+
+DEFAULT_DISHWASHER_PROGRAMS: list[dict[str, Any]] = [
+    {
+        "position": 1,
+        "name": "DW_WIFI_PROG_NAME_ECO",
+        "cycle_name": 8,
+        "selector_position": 1,
+        "duration_timing": 180,
+        "temp": 55,
+        "available_options": 31,
+    },
+    {
+        "position": 2,
+        "name": "DW_WIFI_PROG_NAME_INTENSIVO",
+        "cycle_name": 2,
+        "selector_position": 2,
+        "duration_timing": 130,
+        "temp": 75,
+        "available_options": 31,
+    },
+    {
+        "position": 3,
+        "name": "DW_WIFI_PROG_NAME_NOTTE",
+        "cycle_name": 17,
+        "selector_position": 3,
+        "duration_timing": 240,
+        "temp": 55,
+        "available_options": 31,
+    },
+    {
+        "position": 4,
+        "name": "DW_WIFI_PROG_NAME_UNIVERSALE",
+        "cycle_name": 5,
+        "selector_position": 4,
+        "duration_timing": 120,
+        "temp": 60,
+        "available_options": 31,
+    },
+    {
+        "position": 5,
+        "name": "DW_WIFI_PROG_NAME_AUTO_GIORNALIERO_NO_TORBI",
+        "cycle_name": 16,
+        "selector_position": 5,
+        "duration_timing": 95,
+        "temp": 60,
+        "available_options": 31,
+    },
+    {
+        "position": 6,
+        "name": "DW_WIFI_PROG_NAME_DELICATO",
+        "cycle_name": 9,
+        "selector_position": 6,
+        "duration_timing": 85,
+        "temp": 45,
+        "available_options": 31,
+    },
+    {
+        "position": 7,
+        "name": "DW_WIFI_PROG_NAME_ZOOM_39",
+        "cycle_name": 19,
+        "selector_position": 7,
+        "duration_timing": 39,
+        "temp": 60,
+        "available_options": 31,
+    },
+    {
+        "position": 8,
+        "name": "DW_WIFI_PROG_NAME_RAPIDO_24",
+        "cycle_name": 20,
+        "selector_position": 8,
+        "duration_timing": 24,
+        "temp": 50,
+        "available_options": 31,
+    },
+    {
+        "position": 9,
+        "name": "DW_WIFI_PROG_NAME_PRELAVAGGIO",
+        "cycle_name": 12,
+        "selector_position": 9,
+        "duration_timing": 5,
+        "temp": 0,
+        "available_options": 31,
+    },
+]
+
+# Maps select options to authentic Simply-Fi APK program resource keys (DW_*)
+DISHWASHER_PROGRAM_NAME_KEYS: dict[str, str] = {
+    "eco_45": "DW_ECO",
+    "intensive_75": "DW_INTENSIVO",
+    "night_55": "DW_NOTTE",
+    "universal_60": "DW_UNIVERSALE",
+    "auto": "DW_AUTO_GIORNALIERO",
+    "glass_45": "DW_CRISTALLI",
+    "zoom_39": "DW_ZOOM_39",
+    "rapid_24": "DW_RAPIDO_24",
+    "prewash": "DW_PRELAVAGGIO",
+}
+
+# Maps hardware telemetry registers (e.g. P8, P2, P1+) to (APK_name_key, APK_desc_key)
+DISHWASHER_TELEMETRY_TO_KEYS: dict[str, tuple[str, str]] = {
+    "P1": ("DW_P_1", "DW_P_1_DESCRIPTION"),
+    "P1+": ("DW_P_1_PLUS", "DW_P_1_PLUS_DESCRIPTION"),
+    "P1-": ("DW_P_1_MINUS", "DW_P_1_MINUS_DESCRIPTION"),
+    "P2": ("DW_INTENSIVO", "DW_INTENSIVO_DESCRIPTION"),
+    "P2+": ("DW_P_2_PLUS", "DW_P_2_PLUS_DESCRIPTION"),
+    "P2-": ("DW_P_2_MINUS", "DW_P_2_MINUS_DESCRIPTION"),
+    "P3": ("DW_P_3", "DW_P_3_DESCRIPTION"),
+    "P3+": ("DW_P_3_PLUS", "DW_P_3_PLUS_DESCRIPTION"),
+    "P3-": ("DW_P_3_MINUS", "DW_P_3_MINUS_DESCRIPTION"),
+    "P4": ("DW_P_4", "DW_P_4_DESCRIPTION"),
+    "P4+": ("DW_P_4_PLUS", "DW_P_4_PLUS_DESCRIPTION"),
+    "P4-": ("DW_P_4_MINUS", "DW_P_4_MINUS_DESCRIPTION"),
+    "P5": ("DW_UNIVERSALE", "DW_UNIVERSALE_DESCRIPTION"),
+    "P8": ("DW_ECO", "DW_ECO_DESCRIPTION"),
+    "P9": ("DW_CRISTALLI", "DW_CRISTALLI_DESCRIPTION"),
+    "P12": ("DW_PRELAVAGGIO", "DW_PRELAVAGGIO_DESCRIPTION"),
+    "P16": ("DW_AUTO_GIORNALIERO", "DW_AUTO_GIORNALIERO_DESCRIPTION"),
+    "P17": ("DW_NOTTE", "DW_NOTTE_DESCRIPTION"),
+    "P19": ("DW_ZOOM_39", "DW_ZOOM_39_DESCRIPTION"),
+    "P20": ("DW_RAPIDO_24", "DW_RAPIDO_24_DESCRIPTION"),
+    "11": ("DW_AUTOCLEAN", "DW_AUTOCLEAN_DESCRIPTION"),
+    "Checkup": ("DW_AUTOCLEAN", "DW_AUTOCLEAN_DESCRIPTION"),
 }
 
 UNIQUE_ID_WINE_COOLER = "{0}-wine_cooler"

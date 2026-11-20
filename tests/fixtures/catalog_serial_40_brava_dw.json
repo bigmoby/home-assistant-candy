@@ -1,0 +1,944 @@
+{
+  "serial": 40,
+  "model": "CDIN 4D530PB",
+  "type": "dishwasher",
+  "interface_type": "BRAVA_BI_DIGIT_OD",
+  "programs": [
+    {
+      "serial": 421,
+      "position": 1,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_ECO_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_ECO",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144346",
+      "updated_at": "20190326144346",
+      "program_id": "5296cb6b-0033-4297-9bd3-c638dd728592",
+      "parameters": [
+        {
+          "serial": 7931,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7932,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7933,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7934,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7935,
+          "validation": "31",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7936,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7937,
+          "validation": "1",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7938,
+          "validation": "8",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7939,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7940,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7941,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7942,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7943,
+          "validation": "-77%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7944,
+          "validation": "55",
+          "name": "temp",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7945,
+          "validation": "180",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 422,
+      "position": 2,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_INTENSIVO_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_INTENSIVO",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144346",
+      "updated_at": "20190326144346",
+      "program_id": "07fb5dec-0511-4c12-b5fb-d4bb567182ed",
+      "parameters": [
+        {
+          "serial": 7946,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7947,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7948,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7949,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7950,
+          "validation": "2",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7951,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7952,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7953,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7954,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7955,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7956,
+          "validation": "130",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7957,
+          "validation": "-55%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7958,
+          "validation": "31",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7959,
+          "validation": "73",
+          "name": "temp",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7960,
+          "validation": "2",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 423,
+      "position": 3,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_NOTTE_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_NOTTE",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "3e5bf15a-8146-4d18-b137-da0a1f520d51",
+      "parameters": [
+        {
+          "serial": 7961,
+          "validation": "28",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7962,
+          "validation": "55",
+          "name": "temp",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7963,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7964,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7965,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7966,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7967,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7968,
+          "validation": "17",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7969,
+          "validation": "3",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7970,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7971,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7972,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7973,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7974,
+          "validation": "240",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7975,
+          "validation": "-70%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 424,
+      "position": 4,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_UNIVERSALE_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_UNIVERSALE",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "6e3f612f-e2c0-48f4-8079-db5f5322cd02",
+      "parameters": [
+        {
+          "serial": 7976,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7977,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7978,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7979,
+          "validation": "31",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7980,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7981,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7982,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7983,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7984,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7985,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7986,
+          "validation": "-68%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7987,
+          "validation": "4",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7988,
+          "validation": "5",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7989,
+          "validation": "120",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7990,
+          "validation": "57",
+          "name": "temp",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 425,
+      "position": 5,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_AUTO_GIORNALIERO_NO_TORBI_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_AUTO_GIORNALIERO_NO_TORBI",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "a3fa40c8-9410-42a6-9cb5-e2e1e10725bf",
+      "parameters": [
+        {
+          "serial": 7991,
+          "validation": "-68%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7992,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7993,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7994,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7995,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7996,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7997,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7998,
+          "validation": "31",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 7999,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8000,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8001,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8002,
+          "validation": "16",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8003,
+          "validation": "5",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8004,
+          "validation": "95",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8005,
+          "validation": "60",
+          "name": "temp",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 426,
+      "position": 6,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_DELICATO_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_DELICATO",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "1ed3c802-ca31-4523-bbae-f4ae69de1bb3",
+      "parameters": [
+        {
+          "serial": 8006,
+          "validation": "48",
+          "name": "temp",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8007,
+          "validation": "-66%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8008,
+          "validation": "85",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8009,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8010,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8011,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8012,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8013,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8014,
+          "validation": "9",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8015,
+          "validation": "6",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8016,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8017,
+          "validation": "31",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8018,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8019,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8020,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 427,
+      "position": 7,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_ZOOM_39_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_ZOOM_39",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "d20036f7-a26f-4cfe-9efb-63691ee363be",
+      "parameters": [
+        {
+          "serial": 8021,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8022,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8023,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8024,
+          "validation": "28",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8025,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8026,
+          "validation": "7",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8027,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8028,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8029,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8030,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8031,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8032,
+          "validation": "39",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8033,
+          "validation": "-72%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8034,
+          "validation": "57",
+          "name": "temp",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8035,
+          "validation": "19",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 428,
+      "position": 8,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_RAPIDO_24_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_RAPIDO_24",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "37ebdfd0-af29-49f9-aa07-1430635185b6",
+      "parameters": [
+        {
+          "serial": 8036,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8037,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8038,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8039,
+          "validation": "8",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8040,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8041,
+          "validation": "8",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8042,
+          "validation": "20",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8043,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8044,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8045,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8046,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8047,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8048,
+          "validation": "24",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8049,
+          "validation": "-83%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8050,
+          "validation": "50",
+          "name": "temp",
+          "datatype": "mixed"
+        }
+      ]
+    },
+    {
+      "serial": 429,
+      "position": 9,
+      "icon": "",
+      "description": "DW_WIFI_PROG_NAME_PRELAVAGGIO_DESCRIPTION",
+      "name": "DW_WIFI_PROG_NAME_PRELAVAGGIO",
+      "lastStartedAt": null,
+      "lastStartedParams": null,
+      "created_at": "20190326144347",
+      "updated_at": "20190326144347",
+      "program_id": "44d0dd9d-dbe8-405d-b7c6-efa1430e2331",
+      "parameters": [
+        {
+          "serial": 8051,
+          "validation": "0",
+          "name": "temp",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8052,
+          "validation": "-90%",
+          "name": "load_delta_dw_vs_hand_wash",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8053,
+          "validation": "5",
+          "name": "duration_timing",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8054,
+          "validation": "",
+          "name": "open_door",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8055,
+          "validation": "",
+          "name": "halfload_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8056,
+          "validation": "",
+          "name": "extradry_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8057,
+          "validation": "",
+          "name": "eco_opt",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8058,
+          "validation": "",
+          "name": "tab",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8059,
+          "validation": "12",
+          "name": "cycle_name",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8060,
+          "validation": "9",
+          "name": "selector_position",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8061,
+          "validation": "",
+          "name": "default_soil_level",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8062,
+          "validation": "8",
+          "name": "available_options",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8063,
+          "validation": "",
+          "name": "energy_default",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8064,
+          "validation": "",
+          "name": "energy_max",
+          "datatype": "mixed"
+        },
+        {
+          "serial": 8065,
+          "validation": "",
+          "name": "energy_min",
+          "datatype": "mixed"
+        }
+      ]
+    }
+  ]
+}
