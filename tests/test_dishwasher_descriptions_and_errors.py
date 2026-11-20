@@ -214,6 +214,7 @@ async def test_program_description_sensor_with_catalog(
         hass,
         aioclient_mock,
         load_fixture(_READY),
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
         extra_config_data={
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
@@ -222,7 +223,7 @@ async def test_program_description_sensor_with_catalog(
     )
     select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
     desc_id = _entity_id(
-        hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION
+        hass, entry, "sensor", UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION
     )
 
     state = hass.states.get(desc_id)

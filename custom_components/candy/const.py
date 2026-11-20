@@ -563,6 +563,45 @@ DEFAULT_DISHWASHER_PROGRAMS: list[dict[str, Any]] = [
     },
 ]
 
+# Maps select options to authentic Simply-Fi APK program resource keys (DW_*)
+DISHWASHER_PROGRAM_NAME_KEYS: dict[str, str] = {
+    "eco_45": "DW_ECO",
+    "intensive_75": "DW_INTENSIVO",
+    "night_55": "DW_NOTTE",
+    "universal_60": "DW_UNIVERSALE",
+    "auto": "DW_AUTO_GIORNALIERO",
+    "glass_45": "DW_CRISTALLI",
+    "zoom_39": "DW_ZOOM_39",
+    "rapid_24": "DW_RAPIDO_24",
+    "prewash": "DW_PRELAVAGGIO",
+}
+
+# Maps hardware telemetry registers (e.g. P8, P2, P1+) to (APK_name_key, APK_desc_key)
+DISHWASHER_TELEMETRY_TO_KEYS: dict[str, tuple[str, str]] = {
+    "P1": ("DW_P_1", "DW_P_1_DESCRIPTION"),
+    "P1+": ("DW_P_1_PLUS", "DW_P_1_PLUS_DESCRIPTION"),
+    "P1-": ("DW_P_1_MINUS", "DW_P_1_MINUS_DESCRIPTION"),
+    "P2": ("DW_INTENSIVO", "DW_INTENSIVO_DESCRIPTION"),
+    "P2+": ("DW_P_2_PLUS", "DW_P_2_PLUS_DESCRIPTION"),
+    "P2-": ("DW_P_2_MINUS", "DW_P_2_MINUS_DESCRIPTION"),
+    "P3": ("DW_P_3", "DW_P_3_DESCRIPTION"),
+    "P3+": ("DW_P_3_PLUS", "DW_P_3_PLUS_DESCRIPTION"),
+    "P3-": ("DW_P_3_MINUS", "DW_P_3_MINUS_DESCRIPTION"),
+    "P4": ("DW_P_4", "DW_P_4_DESCRIPTION"),
+    "P4+": ("DW_P_4_PLUS", "DW_P_4_PLUS_DESCRIPTION"),
+    "P4-": ("DW_P_4_MINUS", "DW_P_4_MINUS_DESCRIPTION"),
+    "P5": ("DW_UNIVERSALE", "DW_UNIVERSALE_DESCRIPTION"),
+    "P8": ("DW_ECO", "DW_ECO_DESCRIPTION"),
+    "P9": ("DW_CRISTALLI", "DW_CRISTALLI_DESCRIPTION"),
+    "P12": ("DW_PRELAVAGGIO", "DW_PRELAVAGGIO_DESCRIPTION"),
+    "P16": ("DW_AUTO_GIORNALIERO", "DW_AUTO_GIORNALIERO_DESCRIPTION"),
+    "P17": ("DW_NOTTE", "DW_NOTTE_DESCRIPTION"),
+    "P19": ("DW_ZOOM_39", "DW_ZOOM_39_DESCRIPTION"),
+    "P20": ("DW_RAPIDO_24", "DW_RAPIDO_24_DESCRIPTION"),
+    "11": ("DW_AUTOCLEAN", "DW_AUTOCLEAN_DESCRIPTION"),
+    "Checkup": ("DW_AUTOCLEAN", "DW_AUTOCLEAN_DESCRIPTION"),
+}
+
 UNIQUE_ID_WINE_COOLER = "{0}-wine_cooler"
 UNIQUE_ID_WINE_COOLER_PROGRAM = "{0}-wine_cooler_program"
 UNIQUE_ID_WINE_COOLER_TEMP = "{0}-wine_cooler_temp"

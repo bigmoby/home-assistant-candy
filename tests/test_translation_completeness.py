@@ -14,6 +14,14 @@ from custom_components.candy.client.model import (
     TumbleDryerProgram,
     WashingMachineWashProgram,
 )
+from custom_components.candy.const import (
+    DISHWASHER_PROGRAMS,
+    DISHWASHER_TELEMETRY_TO_KEYS,
+)
+from custom_components.candy.dishwasher import (
+    resolve_dishwasher_program_description,
+    resolve_dishwasher_program_name,
+)
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "all_appliance_program_names.json"
 
@@ -139,3 +147,32 @@ def test_nfc_washer_specific_program_mappings() -> None:
         assert prog.localized_name("en") == expected_en
         assert prog.localized_name("it") == expected_it
         assert prog.localized_description("en") is not None
+
+
+def test_dishwasher_program_resolution_completeness() -> None:
+    """Validate that 100% of dishwasher programs and telemetry registers resolve to localized names and descriptions."""
+    for opt_key in DISHWASHER_PROGRAMS:
+        en_name = resolve_dishwasher_program_name(opt_key, "en")
+        it_name = resolve_dishwasher_program_name(opt_key, "it")
+        en_desc = resolve_dishwasher_program_description(opt_key, "en")
+        it_desc = resolve_dishwasher_program_description(opt_key, "it")
+
+        assert en_name and en_name != opt_key, f"Failed resolving EN name for {opt_key}"
+        assert it_name and it_name != opt_key, f"Failed resolving IT name for {opt_key}"
+        assert en_desc, f"Failed resolving EN description for {opt_key}"
+        assert it_desc, f"Failed resolving IT description for {opt_key}"
+
+    for telem_key in DISHWASHER_TELEMETRY_TO_KEYS:
+        en_name = resolve_dishwasher_program_name(telem_key, "en")
+        it_name = resolve_dishwasher_program_name(telem_key, "it")
+        en_desc = resolve_dishwasher_program_description(telem_key, "en")
+        it_desc = resolve_dishwasher_program_description(telem_key, "it")
+
+        assert en_name and en_name != telem_key, (
+            f"Failed resolving EN name for {telem_key}"
+        )
+        assert it_name and it_name != telem_key, (
+            f"Failed resolving IT name for {telem_key}"
+        )
+        assert en_desc, f"Failed resolving EN description for {telem_key}"
+        assert it_desc, f"Failed resolving IT description for {telem_key}"

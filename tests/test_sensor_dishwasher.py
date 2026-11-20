@@ -38,16 +38,60 @@ async def test_main_sensor_idle(
 async def test_program_sensor_idle(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    await init_integration(hass, aioclient_mock, load_fixture("dishwasher/idle.json"))
+    await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture("dishwasher/idle.json"),
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+    )
 
     state = hass.states.get("sensor.dishwasher_program")
 
     assert state
-    assert state.state == "P1+"
-    assert state.attributes == {
-        "friendly_name": "Dishwasher Program",
-        "icon": "mdi:glass-wine",
-    }
+    assert state.state == "Hygienic 75°C"
+    assert state.attributes["raw_program"] == "P1+"
+    assert "antibacterial" in state.attributes["description"].lower()
+    assert state.attributes["friendly_name"] == "Dishwasher Program"
+    assert state.attributes["icon"] == "mdi:glass-wine"
+
+    desc_state = hass.states.get("sensor.dishwasher_program_description")
+    assert desc_state
+    assert "antibacterial" in desc_state.state.lower()
+    assert desc_state.attributes["friendly_name"] == "Dishwasher Program description"
+    assert desc_state.attributes["icon"] == "mdi:information-outline"
+
+
+async def test_program_description_updates_on_select(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture("dishwasher/idle.json"),
+        statistics_response='{"statusCounters": {"Program1": "10"}}',
+    )
+    desc_sensor = hass.states.get("sensor.dishwasher_program_description")
+    assert desc_sensor
+    assert "antibacterial" in desc_sensor.state.lower()
+
+    # Find the select entity and change it to rapid_24
+    select_entity_id = None
+    for state_obj in hass.states.async_all("select"):
+        if "program" in state_obj.entity_id:
+            select_entity_id = state_obj.entity_id
+            break
+    assert select_entity_id is not None
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select_entity_id, "option": "rapid_24"},
+        blocking=True,
+    )
+
+    desc_sensor = hass.states.get("sensor.dishwasher_program_description")
+    assert desc_sensor
+    assert "super fast" in desc_sensor.state.lower()
 
 
 async def test_main_sensor_wash(

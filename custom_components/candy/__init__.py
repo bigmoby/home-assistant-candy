@@ -575,13 +575,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 unsub_checkup
             )
 
-        if stats_coordinator is not None:
-            unsub_stats_refresh = _register_stats_refresh_listener(
-                hass, config_entry, coordinator, stats_coordinator
-            )
-            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
-                unsub_stats_refresh
-            )
+        unsub_stats_refresh = _register_stats_refresh_listener(
+            hass, config_entry, coordinator, stats_coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
+            unsub_stats_refresh
+        )
 
         unsub_full_checkup = _register_full_checkup_listener(
             hass, config_entry, coordinator, stats_coordinator, client
@@ -646,7 +645,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
             async def update_dw_statistics() -> DishwasherStatistics:
                 nonlocal last_known_dw_stats
-                if not coordinator.last_update_success:
+                if (
+                    getattr(coordinator.data, "machine_state", None) == MachineState.OFF
+                    or not coordinator.last_update_success
+                ):
                     if last_known_dw_stats is not None:
                         return last_known_dw_stats
                     raise UpdateFailed("Dishwasher is offline; statistics unavailable.")
@@ -686,7 +688,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             )
             if last_known_dw_stats is not None:
                 dw_stats_coordinator.async_set_updated_data(last_known_dw_stats)
-            elif not coordinator.last_update_success:
+            elif (
+                getattr(coordinator.data, "machine_state", None) == MachineState.OFF
+                or not coordinator.last_update_success
+            ):
                 pass
             else:
                 await dw_stats_coordinator.async_refresh()
@@ -704,24 +709,24 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                     dw_stats_coordinator
                 )
 
-            if (
-                config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED)
-                and dw_stats_coordinator is not None
-            ):
-                unsub_dw_maint = _register_maintenance_notifications(
-                    hass, config_entry, dw_stats_coordinator, coordinator
-                )
-                hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_MAINT_UNSUB] = (
-                    unsub_dw_maint
-                )
+        if (
+            config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED)
+            and dw_stats_coordinator is not None
+        ):
+            unsub_dw_maint = _register_maintenance_notifications(
+                hass, config_entry, dw_stats_coordinator, coordinator
+            )
+            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_MAINT_UNSUB] = (
+                unsub_dw_maint
+            )
 
-            if dw_stats_coordinator is not None:
-                unsub_dw_refresh = _register_stats_refresh_listener(
-                    hass, config_entry, coordinator, dw_stats_coordinator
-                )
-                hass.data[DOMAIN][config_entry.entry_id][
-                    DATA_KEY_STATS_REFRESH_UNSUB
-                ] = unsub_dw_refresh
+        if dw_stats_coordinator is not None:
+            unsub_dw_refresh = _register_stats_refresh_listener(
+                hass, config_entry, coordinator, dw_stats_coordinator
+            )
+            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
+                unsub_dw_refresh
+            )
 
         unsub_dishwasher_checkup = _register_dishwasher_checkup_listener(
             hass, config_entry, coordinator, client, dw_stats_coordinator
