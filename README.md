@@ -103,7 +103,7 @@ Untested or unlisted appliances families may not behave correctly. If such cases
     - **One-Time Cloud Sign-In:** Enter your Simply-Fi credentials once to download your device's program catalog and encryption key. Credentials are discarded immediately and never stored.
     - **Customize:** Choose your preferred display language for program names and descriptions (10 languages available), and optionally configure maintenance thresholds.
 6. The integration will automatically authenticate, decrypt if necessary, and assign the appliance to your dashboard!
-7. If using Full Control, install the relevant dashboard card, (see [`dashboard/`](dashboard/README.md))
+7. If using Full Control, install the relevant dashboard card, (see [`dashboards`](dashboard/README.md))
 
 ### Method 2: Manual
 1. Copy the `custom_components/candy` folder into your Home Assistant's `custom_components` directory.
