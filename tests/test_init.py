@@ -9,6 +9,8 @@ import aiohttp
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.update_coordinator import UpdateFailed
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
@@ -18,6 +20,7 @@ from custom_components.candy import (
     SCAN_INTERVAL_ACTIVE,
     SCAN_INTERVAL_RESTING,
     _make_off_status,
+    _offline_wine_cooler,
     _register_checkup_listener,
     _register_dryer_checkup_listener,
     _register_dryer_error_listener,
@@ -408,12 +411,20 @@ async def test_post_setup_restore_seeds_statistics_when_startup_off(
         UNIQUE_ID_WASH_TOTAL_CYCLES.format(entry.entry_id),
         config_entry=entry,
     )
-    hass.states.async_set(cycles_ent.entity_id, "288")
 
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=_STATUS_OFF)
 
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    orig_forward = hass.config_entries.async_forward_entry_setups
+
+    async def _mock_forward(*args, **kwargs):
+        hass.states.async_set(cycles_ent.entity_id, "288")
+        return await orig_forward(*args, **kwargs)
+
+    with patch.object(
+        hass.config_entries, "async_forward_entry_setups", side_effect=_mock_forward
+    ):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
 
     stats_coordinator = hass.data[DOMAIN][entry.entry_id].get(
         DATA_KEY_STATS_COORDINATOR
@@ -1214,6 +1225,8 @@ def test_make_off_status_wine_cooler():
     )
     off_status = _make_off_status(wc_status)
     assert off_status.machine_state == WineCoolerState.OFF
+    offline = _offline_wine_cooler()
+    assert offline.machine_state == WineCoolerState.OFF
 
 
 async def test_coordinator_off_state_consecutive_timeout(
@@ -1599,3 +1612,169 @@ async def test_async_unload_entry_failure(hass: HomeAssistant):
     ):
         res = await async_unload_entry(hass, entry)
         assert res is False
+
+
+async def test_migrate_unique_ids_limestone_button(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Verify entity registry migrates wash_limestone_button to wash_limescale_button."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    old_unique_id = f"{entry.entry_id}-wash_limestone_button"
+    new_unique_id = f"{entry.entry_id}-wash_limescale_button"
+    ent = registry.async_get_or_create(
+        "button",
+        DOMAIN,
+        old_unique_id,
+        config_entry=entry,
+    )
+    assert ent.unique_id == old_unique_id
+
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=_STATUS_OFF)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    migrated_ent = registry.async_get(ent.entity_id)
+    assert migrated_ent is not None
+    assert migrated_ent.unique_id == new_unique_id
+
+
+async def test_update_statistics_transient_reading_with_baseline(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Verify update_statistics handles transient low readings against stored baselines."""
+    # Case 1: last_known_statistics is None initially, but stats_coordinator.data has 100 cycles.
+    # Reading returns 50 cycles < baseline 80. Returns cached 100 cycles with warning.
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 80,
+        },
+    )
+    entry.add_to_hass(hass)
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=_STATUS_OFF)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    main_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    main_coordinator.data.machine_state = MachineState.RUNNING
+
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
+    stats_coordinator.async_set_updated_data(
+        WashingMachineStatistics(
+            total_cycles=100,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        )
+    )
+
+    with patch(
+        "custom_components.candy.client.CandyClient.statistics_with_retry",
+        AsyncMock(
+            return_value=WashingMachineStatistics(
+                total_cycles=50,
+                total_drying_cycles=0,
+                drying_cotton_cycles=0,
+                drying_synthetic_cycles=0,
+            )
+        ),
+    ):
+        await stats_coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    assert stats_coordinator.data.total_cycles == 100
+    assert stats_coordinator.last_update_success is True
+
+    # Machine OFF with cached statistics returns cached value immediately (lines 504-505)
+    main_coordinator.data.machine_state = MachineState.OFF
+    await stats_coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert stats_coordinator.data.total_cycles == 100
+
+    # Case 2: stats_coordinator.data is None, last_known is None, reading 50 < baseline 80.
+    # Raises UpdateFailed and marks update failed.
+    entry2 = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 80,
+        },
+    )
+    entry2.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry2.entry_id)
+    await hass.async_block_till_done()
+
+    main_coordinator2 = hass.data[DOMAIN][entry2.entry_id][DATA_KEY_COORDINATOR]
+    main_coordinator2.data.machine_state = MachineState.RUNNING
+
+    stats_coordinator2 = hass.data[DOMAIN][entry2.entry_id][DATA_KEY_STATS_COORDINATOR]
+    assert stats_coordinator2.data is None
+
+    with (
+        patch(
+            "custom_components.candy.client.CandyClient.statistics_with_retry",
+            AsyncMock(
+                return_value=WashingMachineStatistics(
+                    total_cycles=50,
+                    total_drying_cycles=0,
+                    drying_cotton_cycles=0,
+                    drying_synthetic_cycles=0,
+                )
+            ),
+        ),
+        pytest.raises(UpdateFailed, match="ignoring transient reading"),
+    ):
+        await stats_coordinator2._async_update_data()
+
+    # Case 3: stats.total_cycles == 0, max_baseline == 0, last_known is None.
+    # Lines 540-558 accepts 0 cycles without baseline error.
+    entry3 = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry3.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry3.entry_id)
+    await hass.async_block_till_done()
+
+    main_coordinator3 = hass.data[DOMAIN][entry3.entry_id][DATA_KEY_COORDINATOR]
+    main_coordinator3.data.machine_state = MachineState.RUNNING
+
+    stats_coordinator3 = hass.data[DOMAIN][entry3.entry_id][DATA_KEY_STATS_COORDINATOR]
+    assert stats_coordinator3.data is None
+
+    with patch(
+        "custom_components.candy.client.CandyClient.statistics_with_retry",
+        AsyncMock(
+            return_value=WashingMachineStatistics(
+                total_cycles=0,
+                total_drying_cycles=0,
+                drying_cotton_cycles=0,
+                drying_synthetic_cycles=0,
+            )
+        ),
+    ):
+        await stats_coordinator3.async_request_refresh()
+        await hass.async_block_till_done()
+
+    assert stats_coordinator3.data.total_cycles == 0
+    assert stats_coordinator3.last_update_success is True
