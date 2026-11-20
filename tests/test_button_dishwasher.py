@@ -365,7 +365,7 @@ async def test_start_with_chosen_settings(
 
     assert await _press_start(hass, entry) == (
         "DelayStart=90&ExtraDry=0&TreinUno=0&Eco=1&Program=P20"
-        "&MetaCarico=0&OpzProg=4&w1=20&StartStop=1"
+        "&MetaCarico=0&OpzProg=4&w1=8&StartStop=1"
     )
     assert hass.states.get(select).state == "rapid_24"
 
@@ -725,3 +725,21 @@ def test_checkup_reset_command_builder() -> None:
     builder = ModernDishwasherCommandBuilder(open_door_supported=True)
     assert builder.build_checkup() == {"StartCheckUp": 1}
     assert builder.build_checkup_reset() == {"Write": 1, "StartStop": 0, "Program": 11}
+
+
+async def test_start_with_fallback_program_resolves_selector_position(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Selecting a fallback program option (night_55) resolves w1=3 from DEFAULT_DISHWASHER_PROGRAMS, not w1=17."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select_id, "option": "night_55"},
+        blocking=True,
+    )
+    qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+    assert "Program=P17" in qs
+    assert "w1=3" in qs
+    assert "w1=17" not in qs

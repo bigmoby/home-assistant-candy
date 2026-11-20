@@ -62,6 +62,7 @@ from .const import (
     DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WRITE_PENDING,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
     DISHWASHER_PROGRAMS,
     DOMAIN,
@@ -164,7 +165,11 @@ async def async_setup_entry(
     # key, and the machine itself gates commands with its remote control switch.
     if isinstance(coordinator.data, DishwasherStatus):
         raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
-        dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
+        dish_programs = (
+            parse_dish_programs(raw_programs)
+            if raw_programs
+            else parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
+        )
         interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
 
         dish_buttons: list[ButtonEntity] = [
@@ -1522,6 +1527,10 @@ class CandyDishwasherStartButton(CandyDishwasherButtonBase):
                     for p in self._programs
                     if p.localized_name(lang) == program_option
                     or p.name == program_option
+                    or (
+                        program_option in DISHWASHER_PROGRAMS
+                        and f"P{p.cycle_id}" == DISHWASHER_PROGRAMS[program_option]
+                    )
                 ),
                 None,
             )

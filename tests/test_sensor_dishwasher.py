@@ -109,6 +109,7 @@ async def test_main_sensor_drying_optional_params(
     assert state.state == "Running"
     assert state.attributes["program"] == "P2"
     assert state.attributes["remaining_minutes"] == 58
+    assert state.attributes["delayed_start_minutes"] == 240
     assert state.attributes["delayed_start_hours"] == 4
     assert state.attributes["eco_mode"] is True
     assert state.attributes["door_open"] is False

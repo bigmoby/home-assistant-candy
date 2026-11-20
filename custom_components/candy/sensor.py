@@ -2272,6 +2272,9 @@ class CandyDishwasherSensor(CandyBaseSensor):
         if status.door_open_allowed is not None:
             attributes["door_open_allowed"] = status.door_open_allowed
 
+        if status.delayed_start_minutes is not None:
+            attributes["delayed_start_minutes"] = status.delayed_start_minutes
+
         if status.delayed_start_hours is not None:
             attributes["delayed_start_hours"] = status.delayed_start_hours
 

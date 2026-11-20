@@ -32,7 +32,9 @@ from .const import (
     CONF_KEY_PROGRAMS,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
+    DISHWASHER_PROGRAMS,
     DOMAIN,
     MODE_FULL_CONTROL,
     UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
@@ -68,7 +70,11 @@ async def async_setup_entry(
 
     if isinstance(coordinator.data, DishwasherStatus):
         raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
-        dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
+        dish_programs = (
+            parse_dish_programs(raw_programs)
+            if raw_programs
+            else parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
+        )
         interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
 
         switches: list[SwitchEntity] = [
@@ -565,6 +571,10 @@ class _CandyDishwasherSwitchBase(CoordinatorEntity, SwitchEntity):
                         for p in self._programs
                         if p.localized_name(lang) == state.state
                         or p.name == state.state
+                        or (
+                            state.state in DISHWASHER_PROGRAMS
+                            and f"P{p.cycle_id}" == DISHWASHER_PROGRAMS[state.state]
+                        )
                     ),
                     None,
                 )

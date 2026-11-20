@@ -622,14 +622,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_WARNING_UNSUB] = (
             unsub_dishwasher_warning
         )
-        stats_coordinator = hass.data[DOMAIN][config_entry.entry_id].get(
-            DATA_KEY_STATS_COORDINATOR
-        )
-        if stats_coordinator is not None:
-            unsub_maint = _register_dishwasher_maintenance_notifications(
-                hass, config_entry, stats_coordinator
-            )
-            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_MAINT_UNSUB] = unsub_maint
 
     # Backfill missing keys for legacy entries
     needs_update = False
@@ -705,58 +697,6 @@ def _register_maintenance_notifications(
         if stats is None:
             return
         for last_key, threshold, notif_id, title, message in _MAINTENANCE_ITEMS:
-            last = config_entry.data.get(last_key, 0)
-            if cycles_remaining(stats.total_cycles, last, threshold) == 0:
-                pn_async_create(hass, message, title=title, notification_id=notif_id)
-
-    return stats_coordinator.async_add_listener(_on_stats_update)
-
-
-def _register_dishwasher_maintenance_notifications(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    stats_coordinator: DataUpdateCoordinator[Any],
-) -> Callable[[], None]:
-    entry_id = config_entry.entry_id
-    hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
-    limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
-    lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
-
-    maintenance_items = [
-        (
-            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
-            MAINTENANCE_FULL_CHECKUP_THRESHOLD,
-            NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id),
-            localized_notification_text("dishwasher_full_checkup_result_title", lang),
-            localized_notification_text("full_checkup_due_message", lang),
-        ),
-    ]
-    if config_entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
-        maintenance_items.append(
-            (
-                CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
-                limescale_threshold,
-                NOTIF_ID_MAINT_LIMESCALE.format(entry_id),
-                localized_notification_text("dishwasher_limescale_title", lang),
-                localized_notification_text("dishwasher_limescale_due_message", lang),
-            )
-        )
-    if config_entry.data.get(CONF_KEY_MAINTENANCE_FILTER_ENABLED, True):
-        maintenance_items.append(
-            (
-                CONF_KEY_MAINTENANCE_LAST_FILTER,
-                MAINTENANCE_FILTER_THRESHOLD,
-                NOTIF_ID_MAINT_FILTER.format(entry_id),
-                localized_notification_text("dishwasher_filter_title", lang),
-                localized_notification_text("dishwasher_filter_due_message", lang),
-            )
-        )
-
-    def _on_stats_update() -> None:
-        stats: Any = stats_coordinator.data
-        if stats is None:
-            return
-        for last_key, threshold, notif_id, title, message in maintenance_items:
             last = config_entry.data.get(last_key, 0)
             if cycles_remaining(stats.total_cycles, last, threshold) == 0:
                 pn_async_create(hass, message, title=title, notification_id=notif_id)
@@ -1445,10 +1385,7 @@ def _register_dishwasher_checkup_listener(
             )
             pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
 
-            if (
-                config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
-                and status.remote_control
-            ):
+            if status.remote_control:
                 interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
                 builder = get_dishwasher_command_builder(interface_type)
                 reset_cmd = builder.build_checkup_reset()

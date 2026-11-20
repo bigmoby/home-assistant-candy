@@ -518,7 +518,6 @@ async def test_persistent_notification_dishwasher_checkup_lifecycle(
         json.dumps(raw_running),
         extra_config_data={
             CONF_KEY_PROGRAM_LANGUAGE: "en",
-            "mode": "full_control",
         },
     )
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
