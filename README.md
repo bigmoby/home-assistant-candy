@@ -85,8 +85,8 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 
 | Series / Platform | Interface / Family | Tested | Notes |
 |---|---|---|---|
-| Candy Brava / Nautilus | `DW_WIFI_*` | Yes | Reference hardware (`CDIN 1D360PB`, verified with `CDPN 4D620PX`). The program list is tested only on this model. |
-| Hoover AXI & Smooth | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT` | No | Implemented from protocol specifications and APK reverse engineering. |
+| Candy Brava / Hoover H-DISH 300 & 500 | `DW_WIFI_*` | Yes | Reference hardware (`CDIN 1D360PB`, verified with `CDPN 4D620PX` and `HDIN 2L360PB`). |
+| Hoover AXI / H-DISH 700 | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT` | No | Implemented from protocol specifications and APK reverse engineering. |
 | Legacy Touch & Built-in | `DishwasherInterfaceTypeFSTouch`, `DishwasherInterfaceTypeBuiltIn`, `DW_NFC_DIGIT_FS` | No | Implemented from protocol specifications (`CandyDishWasherCommand`). |
 
 ---
@@ -94,7 +94,7 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 ## 🛠️ Installation
 
 ### Method 1: HACS (Recommended)
-1. Install [HACS](https://hacs.xyz/).
+1. Install [HACS](https://hacs.xyz/). Not required since Home Assistant 2026.11, where it has been ren
 2. Go to the HACS integrations page, search for `Candy Simply-Fi` and download it.
 3. Restart Home Assistant.
 4. Go to **Settings > Devices & Services**, click **Add integration** and search for `Candy`.
