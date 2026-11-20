@@ -122,7 +122,12 @@ def _statistics_probe():
     with patch(
         "custom_components.candy.config_flow.CandyClient.statistics_with_retry",
         new_callable=AsyncMock,
-        return_value=WashingMachineStatistics(total_cycles=388),
+        return_value=WashingMachineStatistics(
+            total_cycles=388,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        ),
     ):
         yield
 
@@ -2075,7 +2080,12 @@ async def test_options_flow_maintenance_baselines_with_stats_data_and_checkup(ha
 
     # Provide stats coordinator data with total_cycles > 0 (line 426)
     mock_stats_coord = MagicMock()
-    mock_stats_coord.data = WashingMachineStatistics(total_cycles=150)
+    mock_stats_coord.data = WashingMachineStatistics(
+        total_cycles=150,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
     hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})[
         DATA_KEY_STATS_COORDINATOR
     ] = mock_stats_coord

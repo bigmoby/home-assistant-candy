@@ -616,7 +616,12 @@ async def test_full_checkup_completion_restores_from_storage_when_stats_none(
     stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
     stats_coordinator.async_set_updated_data(None)
 
-    restored_stats = WashingMachineStatistics(total_cycles=388)
+    restored_stats = WashingMachineStatistics(
+        total_cycles=388,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
 
     with (
         patch("custom_components.candy.pn_async_create"),

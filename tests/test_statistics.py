@@ -260,6 +260,40 @@ def test_total_cycles_survives_program_counter_wraparound():
     assert stats.total_cycles == 395
 
 
+def test_washer_dryer_drying_counters_from_json():
+    """Test that Drying counters (DryCotton* and DrySynt*) are parsed into drying cycle counts."""
+    payload = {
+        "Temp0to30": "100",
+        "Temp40": "50",
+        "Temp60to90": "20",
+        "DryCotton60": "1",
+        "DryCotton90": "2",
+        "DrySynt30": "3",
+        "DrySynt60": "4",
+        "DrySynt90": "5",
+        "DrySynt120": "6",
+    }
+    stats = WashingMachineStatistics.from_json(payload)
+    assert stats.total_cycles == 170
+    assert stats.drying_cotton_cycles == 3
+    assert stats.drying_synthetic_cycles == 18
+    assert stats.total_drying_cycles == 21
+
+
+def test_washer_dryer_missing_or_invalid_drying_counters():
+    """Missing or invalid drying counters gracefully parse as zero."""
+    payload = {
+        "Temp0to30": "10",
+        "DryCotton60": "invalid",
+        "DrySynt30": "-5",
+    }
+    stats = WashingMachineStatistics.from_json(payload)
+    assert stats.total_cycles == 10
+    assert stats.drying_cotton_cycles == 0
+    assert stats.drying_synthetic_cycles == 0
+    assert stats.total_drying_cycles == 0
+
+
 async def test_smartpro_statistics_integration_setup(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
