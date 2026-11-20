@@ -345,6 +345,7 @@ def _offline_dishwasher() -> DishwasherStatus:
         auto_clean_warning=False,
         checkup_state=None,
         r15=0,
+        selector_position=None,
     )
 
 
@@ -1450,7 +1451,7 @@ def _register_dishwasher_checkup_listener(
             ):
                 interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
                 builder = get_dishwasher_command_builder(interface_type)
-                reset_cmd = builder.build_stop()
+                reset_cmd = builder.build_checkup_reset()
 
                 async def _send_reset() -> None:
                     try:

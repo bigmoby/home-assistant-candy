@@ -373,6 +373,7 @@ class DishwasherStatus:
     auto_clean_warning: bool
     checkup_state: CheckUpState | None
     r15: int
+    selector_position: int | None
 
     @property
     def delayed_start_hours(self) -> int | None:
@@ -478,6 +479,13 @@ class DishwasherStatus:
             except (ValueError, TypeError):
                 checkup_state = None
 
+        selector_position: int | None = None
+        if "r1" in json:
+            try:
+                selector_position = int(json["r1"])
+            except (ValueError, TypeError):
+                selector_position = None
+
         return cls(
             machine_state=machine_state,
             program_phase=program_phase,
@@ -501,6 +509,7 @@ class DishwasherStatus:
             auto_clean_warning=auto_clean_warning,
             checkup_state=checkup_state,
             r15=r15_val,
+            selector_position=selector_position,
         )
 
     @staticmethod

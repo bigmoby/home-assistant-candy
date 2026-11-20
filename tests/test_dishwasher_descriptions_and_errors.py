@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -535,12 +535,13 @@ async def test_persistent_notification_dishwasher_checkup_lifecycle(
         f"http://{entry.data['ip_address']}/http-read.json",
         json=raw_completed,
     )
-    aioclient_mock.post(
-        f"http://{entry.data['ip_address']}/http-write.json",
-        status=200,
-    )
-
-    with patch("custom_components.candy.pn_async_create") as mock_create:
+    with (
+        patch("custom_components.candy.pn_async_create") as mock_create,
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ) as mock_send,
+    ):
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -549,3 +550,4 @@ async def test_persistent_notification_dishwasher_checkup_lifecycle(
         assert kwargs["notification_id"] == checkup_notif_id
         assert "Check-up" in kwargs["title"]
         assert "Door lock" in args[1]
+        mock_send.assert_awaited_once_with("Write=1&StartStop=0&Program=11")

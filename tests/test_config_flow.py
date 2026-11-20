@@ -716,6 +716,7 @@ _IDLE_DISHWASHER = DishwasherStatus(
     auto_clean_warning=False,
     checkup_state=None,
     r15=0,
+    selector_position=None,
 )
 
 _IDLE_OVEN = OvenStatus(

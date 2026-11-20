@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
@@ -26,6 +27,9 @@ from custom_components.candy.client.model import (
     MachineState,
 )
 from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_PROGRAM_LANGUAGE,
+    CONF_KEY_PROGRAMS,
     UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
     UNIQUE_ID_DISHWASHER_BUZZER,
     UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
@@ -58,7 +62,7 @@ _RUNNING = "dishwasher/remote_running.json"
 
 _PANEL_START = (
     "DelayStart=0&ExtraDry=0&TreinUno=0&Eco=0&Program=P17"
-    "&MetaCarico=0&OpzProg=0&w1=17&StartStop=1"
+    "&MetaCarico=0&OpzProg=0&w1=3&StartStop=1"
 )
 
 
@@ -400,7 +404,10 @@ async def test_pause_and_resume(
 async def test_checkup_button(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
     entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
 
-    assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON) == "CheckUp=1"
+    assert (
+        await _press(hass, entry, UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
+        == "StartCheckUp=1"
+    )
 
 
 async def test_open_door_button_on_od_interface(
@@ -602,3 +609,119 @@ async def test_dishwasher_checkup_button_diagnostic_category(
     btn_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
 
     assert registry.async_get(btn_id).entity_category == EntityCategory.DIAGNOSTIC
+
+
+async def test_panel_start_resolves_w1_from_catalog(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When starting from panel and program matches catalog, resolve selector position for w1."""
+    cat_path = Path(__file__).parent / "fixtures" / "catalog_serial_40_brava_dw.json"
+    with open(cat_path, encoding="utf-8") as f:
+        catalog = json.load(f)
+
+    # Program 16 (Auto Daily) is at position 5 in catalog serial 40
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, Program="P16", r1="5"),
+        extra_config_data={
+            CONF_KEY_PROGRAMS: catalog["programs"],
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+        },
+    )
+    qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+    assert "w1=5" in qs
+    assert "Program=P16" in qs
+
+
+async def test_panel_start_resolves_w1_from_r1_fallback(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When starting from panel without catalog, use status.selector_position from r1."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, Program="P99", r1="3"),
+    )
+    qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+    assert "w1=3" in qs
+    assert "Program=P99" in qs
+
+
+async def test_start_masks_disallowed_options(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When a cycle is selected, options forbidden by available_options bitmask are masked out."""
+    cat_path = Path(__file__).parent / "fixtures" / "catalog_serial_40_brava_dw.json"
+    with open(cat_path, encoding="utf-8") as f:
+        catalog = json.load(f)
+
+    # In catalog serial 40, Program 20 (RAPIDO 24) has available_options: 8 (only 3-in-1)
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={
+            CONF_KEY_PROGRAMS: catalog["programs"],
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+            CONF_KEY_PROGRAM_LANGUAGE: "en",
+        },
+    )
+    # Select RAPIDO 24
+    select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select_id, "option": "Rapid 24' 50°C"},
+        blocking=True,
+    )
+    # Switches that are forbidden for this program become unavailable
+    assert (
+        _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH)
+        == "unavailable"
+    )
+    assert (
+        _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH) == "unavailable"
+    )
+    three_in_one_id = _entity_id(
+        hass, entry, "switch", UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH
+    )
+
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": three_in_one_id}, blocking=True
+    )
+
+    qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+    assert "Program=P20" in qs
+    assert "w1=8" in qs
+    assert "TreinUno=1" in qs
+    assert "ExtraDry=0" in qs
+    assert "Eco=0" in qs
+    assert "MetaCarico=0" in qs
+    assert "OpzProg=8" in qs
+
+
+async def test_checkup_button_hidden_on_legacy_dishwasher(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Legacy Family 1 dishwashers do not have a diagnostic check-up button."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeFSTouch"},
+    )
+    registry = er.async_get(hass)
+    assert (
+        registry.async_get_entity_id(
+            "button", DOMAIN, UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON.format(entry.entry_id)
+        )
+        is None
+    )
+
+
+def test_checkup_reset_command_builder() -> None:
+    """Checkup reset command builder returns Write=1&StartStop=0&Program=11."""
+    builder = ModernDishwasherCommandBuilder(open_door_supported=True)
+    assert builder.build_checkup() == {"StartCheckUp": 1}
+    assert builder.build_checkup_reset() == {"Write": 1, "StartStop": 0, "Program": 11}

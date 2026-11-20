@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_fixture
@@ -61,3 +63,14 @@ async def test_delay_number_unavailable_when_running(
     state = hass.states.get(delay_id)
     assert state is not None
     assert state.state == "unavailable"
+
+
+async def test_delay_number_step_adapts_to_r15_zero(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When r15 == 0, delay is in hours so step is 60."""
+    raw = json.loads(load_fixture(_READY))
+    raw["statusDWash"]["r15"] = "0"
+    entry = await init_integration(hass, aioclient_mock, json.dumps(raw))
+    delay_id = _entity_id(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)
+    assert hass.states.get(delay_id).attributes["step"] == 60

@@ -60,6 +60,10 @@ class DishwasherCommandBuilder(ABC):
     def build_checkup(self) -> dict[str, str | int]:
         """Build parameters to run diagnostic check-up."""
 
+    @abstractmethod
+    def build_checkup_reset(self) -> dict[str, str | int]:
+        """Build parameters to reset/dismiss completed diagnostic check-up."""
+
 
 class ModernDishwasherCommandBuilder(DishwasherCommandBuilder):
     """Command builder for modern Brava, Nautilus, and AXI dishwashers (Family 2 & 3)."""
@@ -128,7 +132,10 @@ class ModernDishwasherCommandBuilder(DishwasherCommandBuilder):
         return {"OpenDoorOpt": 7}
 
     def build_checkup(self) -> dict[str, str | int]:
-        return {"CheckUp": 1}
+        return {"StartCheckUp": 1}
+
+    def build_checkup_reset(self) -> dict[str, str | int]:
+        return {"Write": 1, "StartStop": 0, "Program": 11}
 
 
 class LegacyTouchDishwasherCommandBuilder(DishwasherCommandBuilder):
@@ -191,7 +198,10 @@ class LegacyTouchDishwasherCommandBuilder(DishwasherCommandBuilder):
         return {"OpenDoorOpt": 7}
 
     def build_checkup(self) -> dict[str, str | int]:
-        return {"CheckUp": 1}
+        return {"StartCheckUp": 1}
+
+    def build_checkup_reset(self) -> dict[str, str | int]:
+        return {"Write": 1, "StartStop": 0, "Program": 11}
 
 
 def get_dishwasher_command_builder(

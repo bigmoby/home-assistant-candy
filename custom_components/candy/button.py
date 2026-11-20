@@ -30,6 +30,7 @@ from .client import (
     WashingMachineWashProgram,
     get_dishwasher_command_builder,
     get_dryer_command_builder,
+    is_legacy_dishwasher,
     is_open_door_supported,
     load_downloadable_programs,
     parse_dish_programs,
@@ -173,8 +174,13 @@ async def async_setup_entry(
             CandyDishwasherStopButton(coordinator, config_entry, client),
             CandyDishwasherPauseButton(coordinator, config_entry, client),
             CandyDishwasherResumeButton(coordinator, config_entry, client),
-            CandyDishwasherCheckUpButton(coordinator, config_entry, client),
         ]
+        if not is_legacy_dishwasher(interface_type) and (
+            coordinator.data.r15 > 0 if coordinator.data else True
+        ):
+            dish_buttons.append(
+                CandyDishwasherCheckUpButton(coordinator, config_entry, client)
+            )
         if is_open_door_supported(interface_type):
             dish_buttons.append(
                 CandyDishwasherOpenDoorButton(coordinator, config_entry, client)
@@ -1478,8 +1484,10 @@ class CandyDishwasherStartButton(CandyDishwasherButtonBase):
             if entity_id is None:
                 return default_val
             state = self.hass.states.get(entity_id)
-            if state is None or state.state in ("unavailable", "unknown"):
+            if state is None or state.state == "unknown":
                 return default_val
+            if state.state == "unavailable":
+                return False
             return state.state == "on"
 
         program_option = _get_select_state(UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
@@ -1527,9 +1535,32 @@ class CandyDishwasherStartButton(CandyDishwasherButtonBase):
             pos_str = raw_code.lstrip("P").rstrip("+-")
             position = int(pos_str) if pos_str.isdigit() else 1
         else:
-            program_code = self.status.program
-            pos_str = self.status.program.lstrip("P").rstrip("+-")
-            position = int(pos_str) if pos_str.isdigit() else 1
+            raw_code = self.status.program
+            program_code = raw_code
+            matched = next(
+                (
+                    p
+                    for p in self._programs
+                    if f"P{p.cycle_id}" == raw_code
+                    or str(p.cycle_id) == raw_code.lstrip("P").rstrip("+-")
+                ),
+                None,
+            )
+            if matched is not None:
+                position = matched.selector_position
+                selected_prog = matched
+            elif self.status.selector_position is not None:
+                position = self.status.selector_position
+            else:
+                pos_str = raw_code.lstrip("P").rstrip("+-")
+                position = int(pos_str) if pos_str.isdigit() else 1
+
+        if selected_prog is not None:
+            extra_dry = extra_dry and bool(selected_prog.available_options & 1)
+            half_load = half_load and bool(selected_prog.available_options & 2)
+            eco = eco and bool(selected_prog.available_options & 4)
+            three_in_one = three_in_one and bool(selected_prog.available_options & 8)
+            open_door = open_door and bool(selected_prog.available_options & 16)
 
         params = builder.build_start(
             program_code=program_code,

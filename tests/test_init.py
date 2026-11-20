@@ -162,6 +162,7 @@ def test_make_off_status_dishwasher():
         auto_clean_warning=False,
         checkup_state=None,
         r15=0,
+        selector_position=None,
     )
     result = _make_off_status(status)
     assert result.machine_state == MachineState.OFF

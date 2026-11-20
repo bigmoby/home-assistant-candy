@@ -208,6 +208,12 @@ class CandyDishwasherDelayNumber(CoordinatorEntity, NumberEntity):
         return dishwasher_device_info(self.config_entry)
 
     @property
+    def native_step(self) -> float:
+        if isinstance(self.coordinator.data, DishwasherStatus) and self.status.r15 == 0:
+            return 60.0
+        return 30.0
+
+    @property
     def native_value(self) -> float:
         return self._delay_minutes
 
