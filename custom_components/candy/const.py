@@ -21,6 +21,9 @@ DATA_KEY_DRYER_WARNING_UNSUB = "dryer_warning_unsub"
 DATA_KEY_DRYER_CHECKUP_UNSUB = "dryer_checkup_unsub"
 DATA_KEY_DISHWASHER_CHECKUP_UNSUB = "dishwasher_checkup_unsub"
 DATA_KEY_DISHWASHER_WARNING_UNSUB = "dishwasher_warning_unsub"
+DATA_KEY_DISHWASHER_STATS_REFRESH_UNSUB = "dishwasher_stats_refresh_unsub"
+DATA_KEY_DISHWASHER_MAINT_UNSUB = "dishwasher_maint_unsub"
+DATA_KEY_DISHWASHER_STATS_COORDINATOR = "dishwasher_stats_coordinator"
 
 CONF_INTEGRATION_TITLE = "Candy"
 CONF_KEY_USE_ENCRYPTION = "use_encryption"
@@ -447,6 +450,15 @@ UNIQUE_ID_DISHWASHER_WATER_HARDNESS = "{0}-dishwasher_water_hardness"
 UNIQUE_ID_DISHWASHER_BUZZER = "{0}-dishwasher_buzzer"
 UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES = "{0}-dishwasher_lifetime_cycles"
 UNIQUE_ID_DISHWASHER_MAINT_CLEAN = "{0}-dishwasher_maint_clean"
+UNIQUE_ID_DISHWASHER_TOTAL_CYCLES = "{0}-dishwasher_total_cycles"
+UNIQUE_ID_DISHWASHER_MAINT_FILTER = "{0}-dishwasher_maint_filter"
+UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE = "{0}-dishwasher_maint_limescale"
+UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP = "{0}-dishwasher_maint_full_checkup"
+UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON = "{0}-dishwasher_maint_filter_reset"
+UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE_BUTTON = "{0}-dishwasher_maint_limescale_reset"
+UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON = (
+    "{0}-dishwasher_maint_full_checkup_reset"
+)
 
 DATA_KEY_DISHWASHER_START_OPTIONS = "dishwasher_start_options"
 

@@ -29,6 +29,7 @@ from .dryer_commands import (
 from .model import (
     DishwasherProgram as DishwasherProgram,
     DishwasherProgramPhase as DishwasherProgramPhase,
+    DishwasherStatistics as DishwasherStatistics,
     DishwasherStatus,
     DownloadableProgram as DownloadableProgram,
     OvenStatus,
@@ -133,6 +134,7 @@ class CandyClient:
         self.device_ip = device_ip
         self.encryption_key = encryption_key
         self.use_encryption = use_encryption
+        self.interface_type: str = ""
 
     @backoff.on_exception(
         backoff.expo, aiohttp.ClientError, max_tries=3, logger=__name__
@@ -211,10 +213,12 @@ class CandyClient:
             return endpoints
 
         # 2. Statistics counters (/http-getStatistics.json)
+        is_dw = "statusDWash" in telemetry
+        is_legacy_dw = is_dw and is_legacy_dishwasher(self.interface_type)
         has_stats_support = any(
             k in telemetry
             for k in ("statusLavatrice", "statusWD", "statusWM", "statusTD")
-        )
+        ) or (is_dw and not is_legacy_dw)
         if has_stats_support:
             try:
                 async with async_timeout.timeout(7):
@@ -225,9 +229,12 @@ class CandyClient:
                     "error": f"Error fetching statistics: {err!r}"
                 }
         else:
-            endpoints["http-getStatistics.json"] = {
-                "status": "Statistics counters not supported for this appliance family"
-            }
+            status_msg = (
+                "Statistics counters not supported for legacy dishwashers"
+                if is_legacy_dw
+                else "Statistics counters not supported for this appliance family"
+            )
+            endpoints["http-getStatistics.json"] = {"status": status_msg}
 
         return endpoints
 
@@ -302,10 +309,14 @@ class CandyClient:
     )
     @backoff.on_exception(backoff.expo, TimeoutError, max_tries=3, logger=__name__)
     @backoff.on_exception(backoff.expo, JSONDecodeError, max_tries=3, logger=__name__)
-    async def statistics_with_retry(self) -> WashingMachineStatistics:
+    async def statistics_with_retry(
+        self,
+    ) -> WashingMachineStatistics | DishwasherStatistics:
         return await self.fetch_statistics()
 
-    async def fetch_statistics(self) -> WashingMachineStatistics:
+    async def fetch_statistics(
+        self,
+    ) -> WashingMachineStatistics | DishwasherStatistics:
         resp_json = await self.fetch_raw_statistics()
         _LOGGER.debug(resp_json)
 
@@ -315,7 +326,10 @@ class CandyClient:
                 resp_json,
             )
 
-        return WashingMachineStatistics.from_json(resp_json["statusCounters"])
+        counters = resp_json["statusCounters"]
+        if any(k.startswith("s") and k[1:].isdigit() for k in counters):
+            return DishwasherStatistics.from_json(counters)
+        return WashingMachineStatistics.from_json(counters)
 
     async def set_wine_cooler_light(
         self, turn_on: bool, current_status: WineCoolerStatus

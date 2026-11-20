@@ -378,6 +378,18 @@
       "dishwasher_lifetime_cycles": {
         "name": "Completed cycles"
       },
+      "dishwasher_total_cycles": {
+        "name": "Total cycles"
+      },
+      "dishwasher_maint_full_checkup": {
+        "name": "Check-up maintenance remaining cycles"
+      },
+      "dishwasher_maint_limescale": {
+        "name": "Limescale maintenance remaining cycles"
+      },
+      "dishwasher_maint_filter": {
+        "name": "Filter maintenance remaining cycles"
+      },
       "wine_cooler": {
         "name": "Wine cooler"
       },
@@ -628,6 +640,15 @@
       "dishwasher_checkup_button": {
         "name": "Check-up"
       },
+      "dishwasher_maint_full_checkup_reset": {
+        "name": "Check-up maintenance reset"
+      },
+      "dishwasher_maint_limescale_reset": {
+        "name": "Limescale maintenance reset"
+      },
+      "dishwasher_maint_filter_reset": {
+        "name": "Filter maintenance reset"
+      },
       "wash_full_checkup": {
         "name": "Full check-up"
       },
@@ -700,6 +721,8 @@
       "washing_completed": "Washing completed",
       "drying_started": "Drying started",
       "drying_completed": "Drying completed",
+      "dishwashing_started": "Dishwashing started",
+      "dishwashing_completed": "Dishwashing completed",
       "clean_filter_needed": "Filter cleaning reminder",
       "water_tank_full": "Water tank full reminder",
       "error_reported": "Error reported",

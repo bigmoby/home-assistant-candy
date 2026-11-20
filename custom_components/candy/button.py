@@ -38,7 +38,12 @@ from .client import (
     parse_wash_programs,
     resolve_downloadable_programs,
 )
-from .client.model import DishwasherStatus, MachineState, WashProgramState
+from .client.model import (
+    DishwasherStatistics,
+    DishwasherStatus,
+    MachineState,
+    WashProgramState,
+)
 from .const import (
     CHECKUP_SCHEDULE_EVERY_CYCLE,
     CHECKUP_SCHEDULE_WEEKLY,
@@ -80,6 +85,9 @@ from .const import (
     UNIQUE_ID_DISHWASHER_ECO_SWITCH,
     UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH,
     UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH,
+    UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON,
+    UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON,
+    UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE_BUTTON,
     UNIQUE_ID_DISHWASHER_OPEN_DOOR_BUTTON,
     UNIQUE_ID_DISHWASHER_PAUSE_BUTTON,
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
@@ -190,6 +198,49 @@ async def async_setup_entry(
             dish_buttons.append(
                 CandyDishwasherOpenDoorButton(coordinator, config_entry, client)
             )
+
+        stats_coordinator = hass.data[DOMAIN][config_id].get(DATA_KEY_STATS_COORDINATOR)
+        if stats_coordinator is not None and config_entry.data.get(
+            CONF_KEY_MAINTENANCE_ENABLED
+        ):
+            dish_buttons.append(
+                DishwasherMaintResetButton(
+                    coordinator,
+                    config_entry,
+                    stats_coordinator,
+                    CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
+                    UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON,
+                    "Check-up maintenance reset",
+                    "dishwasher_maint_full_checkup_reset",
+                    "mdi:dishwasher-alert",
+                )
+            )
+            if config_entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
+                dish_buttons.append(
+                    DishwasherMaintResetButton(
+                        coordinator,
+                        config_entry,
+                        stats_coordinator,
+                        CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
+                        UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE_BUTTON,
+                        "Limescale maintenance reset",
+                        "dishwasher_maint_limescale_reset",
+                        "mdi:water-remove",
+                    )
+                )
+            if config_entry.data.get(CONF_KEY_MAINTENANCE_FILTER_ENABLED, True):
+                dish_buttons.append(
+                    DishwasherMaintResetButton(
+                        coordinator,
+                        config_entry,
+                        stats_coordinator,
+                        CONF_KEY_MAINTENANCE_LAST_FILTER,
+                        UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON,
+                        "Filter maintenance reset",
+                        "dishwasher_maint_filter_reset",
+                        "mdi:filter-remove",
+                    )
+                )
 
         async_add_entities(dish_buttons)
         return
@@ -828,6 +879,57 @@ class WashMaintResetButton(CoordinatorEntity, ButtonEntity):
         if self._stats_coordinator.data is not None:
             total = cast(
                 WashingMachineStatistics, self._stats_coordinator.data
+            ).total_cycles
+        new_data = dict(self.config_entry.data)
+        new_data[self._conf_key] = total
+        self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
+        self._stats_coordinator.async_update_listeners()
+
+
+class DishwasherMaintResetButton(CoordinatorEntity, ButtonEntity):
+    """Reset a dishwasher maintenance counter to its full threshold."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        stats_coordinator: DataUpdateCoordinator,
+        conf_key: str,
+        unique_id_template: str,
+        name: str,
+        translation_key: str,
+        icon: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self.config_entry = config_entry
+        self.config_id = config_entry.entry_id
+        self._stats_coordinator = stats_coordinator
+        self._conf_key = conf_key
+        self._unique_id_template = unique_id_template
+        self._attr_name = name
+        self._attr_translation_key = translation_key
+        self._attr_icon = icon
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def unique_id(self) -> str:
+        return self._unique_id_template.format(self.config_id)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return dishwasher_device_info(self.config_entry)
+
+    async def async_press(self) -> None:
+        total = 0
+        if self._stats_coordinator.data is not None:
+            total = cast(
+                DishwasherStatistics, self._stats_coordinator.data
             ).total_cycles
         new_data = dict(self.config_entry.data)
         new_data[self._conf_key] = total

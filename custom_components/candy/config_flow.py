@@ -25,6 +25,7 @@ from .client import (
     CandyClient,
     detect_encryption,
     discover_devices,
+    is_legacy_dishwasher,
     parse_wash_programs,
 )
 from .client.cloud import SimplyFiCloudError, fetch_appliance_data
@@ -72,6 +73,9 @@ from .const import (
     MODE_READ_ONLY,
     PROGRAM_LANGUAGES,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_MAINT_FILTER,
+    UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP,
+    UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE,
     UNIQUE_ID_TUMBLE_DRYER,
     UNIQUE_ID_WASH_MAINT_FILTER,
     UNIQUE_ID_WASH_MAINT_FULL_CHECKUP,
@@ -341,9 +345,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         if mode == MODE_FULL_CONTROL:
             options = ["update_cloud_data", "switch_to_read_only"]
-            if is_washing_machine:
-                options.append("maintenance_settings")
             interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if is_washing_machine or (
+                is_dishwasher and not is_legacy_dishwasher(interface_type)
+            ):
+                options.append("maintenance_settings")
             if supports_scheduled_checkup(interface_type, is_dryer):
                 options.append("checkup_settings")
             return self.async_show_form(
@@ -362,7 +368,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             )
 
         if not is_washing_machine:
-            if is_dishwasher or is_dryer:
+            if is_dryer or is_dishwasher:
                 return await self.async_step_update_cloud_data()
             return self.async_create_entry(data={})
 
@@ -518,15 +524,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     total_cycles, last_ft, MAINTENANCE_FILTER_THRESHOLD
                 )
             else:
-                current_sc = _current_remaining_cycles(
-                    self.hass, entry_id, UNIQUE_ID_WASH_MAINT_FULL_CHECKUP
-                )
-                current_ls = _current_remaining_cycles(
-                    self.hass, entry_id, UNIQUE_ID_WASH_MAINT_LIMESCALE
-                )
-                current_ft = _current_remaining_cycles(
-                    self.hass, entry_id, UNIQUE_ID_WASH_MAINT_FILTER
-                )
+                if self._is_dishwasher():
+                    uid_sc = UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP
+                    uid_ls = UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE
+                    uid_ft = UNIQUE_ID_DISHWASHER_MAINT_FILTER
+                else:
+                    uid_sc = UNIQUE_ID_WASH_MAINT_FULL_CHECKUP
+                    uid_ls = UNIQUE_ID_WASH_MAINT_LIMESCALE
+                    uid_ft = UNIQUE_ID_WASH_MAINT_FILTER
+                current_sc = _current_remaining_cycles(self.hass, entry_id, uid_sc)
+                current_ls = _current_remaining_cycles(self.hass, entry_id, uid_ls)
+                current_ft = _current_remaining_cycles(self.hass, entry_id, uid_ft)
                 sc_default = (
                     current_sc
                     if current_sc is not None
@@ -1016,6 +1024,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
 
         if self._is_dishwasher:
             self._config_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if not is_legacy_dishwasher(interface_type):
+                return await self.async_step_maintenance()
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
             )
@@ -1162,6 +1173,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 data=self._config_data,
             )
         if self._is_dishwasher:
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if not is_legacy_dishwasher(interface_type):
+                return await self.async_step_maintenance()
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
             )

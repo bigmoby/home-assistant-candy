@@ -372,6 +372,7 @@ class DishwasherStatus:
     last_cycle_counter: int | None
     auto_clean_warning: bool
     checkup_state: CheckUpState | None
+    checkup_result: CheckUpResult | None
     r15: int
     selector_position: int | None
 
@@ -479,6 +480,13 @@ class DishwasherStatus:
             except (ValueError, TypeError):
                 checkup_state = None
 
+        checkup_result: CheckUpResult | None = None
+        if "DisTestRes" in json:
+            try:
+                checkup_result = CheckUpResult.from_code(int(json["DisTestRes"]))
+            except (ValueError, TypeError):
+                checkup_result = None
+
         selector_position: int | None = None
         if "r1" in json:
             try:
@@ -508,6 +516,7 @@ class DishwasherStatus:
             last_cycle_counter=last_cycle_counter,
             auto_clean_warning=auto_clean_warning,
             checkup_state=checkup_state,
+            checkup_result=checkup_result,
             r15=r15_val,
             selector_position=selector_position,
         )
@@ -1111,6 +1120,39 @@ class WashingMachineStatistics:
             if k in ("Temp0to30", "Temp40", "Temp60to90") and v.isdigit()
         )
         return cls(total_cycles=total)
+
+
+@dataclass
+class DishwasherStatistics:
+    total_cycles: int
+
+    @classmethod
+    def from_json(cls, json: dict[str, Any]) -> DishwasherStatistics:
+        # Program run counters s1..s21
+        # Confirmed via Statistics.java:28-32 in decompiled Simply-Fi APK
+        has_program_counters = any(
+            k.startswith("s") and k[1:].isdigit() and 1 <= int(k[1:]) <= 21
+            for k in json
+        )
+        if has_program_counters:
+            total = sum(
+                int(v)
+                for k, v in json.items()
+                if k.startswith("s")
+                and k[1:].isdigit()
+                and 1 <= int(k[1:]) <= 21
+                and str(v).isdigit()
+            )
+            return cls(total_cycles=total)
+
+        # Fallback to temperature buckets s22 (0-30°C), s23 (40°C), s24 (60-90°C)
+        # Confirmed via TemperatureStatistics.java:25-27
+        temp_sum = sum(
+            int(v)
+            for k, v in json.items()
+            if k in ("s22", "s23", "s24") and str(v).isdigit()
+        )
+        return cls(total_cycles=temp_sum)
 
 
 class WineCoolerState(StatusCode):

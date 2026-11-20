@@ -58,6 +58,7 @@ from custom_components.candy.const import (
     NOTIF_ID_DRYER_FILTER,
     NOTIF_ID_DRYER_WATER_TANK,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
     UNIQUE_ID_WASH_TOTAL_CYCLES,
@@ -161,6 +162,7 @@ def test_make_off_status_dishwasher():
         last_cycle_counter=None,
         auto_clean_warning=False,
         checkup_state=None,
+        checkup_result=None,
         r15=0,
         selector_position=None,
     )
@@ -277,9 +279,20 @@ async def test_restore_last_known_statistics_from_state(hass: HomeAssistant):
     )
     hass.states.async_set(ent.entity_id, "42")
 
-    result = _restore_last_known_statistics(hass, entry.entry_id)
+    result = _restore_last_known_statistics(hass, entry.entry_id, False)
     assert result is not None
     assert result.total_cycles == 42
+
+    dw_ent = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(entry.entry_id),
+        config_entry=entry,
+    )
+    hass.states.async_set(dw_ent.entity_id, "55")
+    dw_result = _restore_last_known_statistics(hass, entry.entry_id, True)
+    assert dw_result is not None
+    assert dw_result.total_cycles == 55
 
 
 # ---------------------------------------------------------------------------

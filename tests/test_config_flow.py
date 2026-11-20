@@ -715,6 +715,7 @@ _IDLE_DISHWASHER = DishwasherStatus(
     last_cycle_counter=None,
     auto_clean_warning=False,
     checkup_state=None,
+    checkup_result=None,
     r15=0,
     selector_position=None,
 )
@@ -751,32 +752,68 @@ async def test_maintenance_step_skipped_for_non_washing_machine(
     assert CONF_KEY_MAINTENANCE_ENABLED not in result["data"]
 
 
-async def test_dishwasher_read_only_skips_maintenance(
+async def test_legacy_dishwasher_skips_maintenance(
     hass, no_discovery, detect_no_encryption
 ):
-    """Dishwasher in Read-Only mode skips maintenance step and creates entry."""
-    with patch(
-        "custom_components.candy.config_flow.CandyClient.status",
-        new_callable=AsyncMock,
-        return_value=_IDLE_DISHWASHER,
-    ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.66"}
-        )
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
-        assert result["step_id"] == "mode"
-
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input={CONF_KEY_MODE: MODE_READ_ONLY}
-        )
+    """Legacy dishwashers skip the maintenance step entirely."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    flow = hass.config_entries.flow._progress[result["flow_id"]]
+    flow._is_dishwasher = True
+    flow._config_data = {
+        CONF_IP_ADDRESS: "192.168.0.66",
+        CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeBuiltIn",
+    }
+    result = await flow.async_step_mode(user_input={CONF_KEY_MODE: MODE_READ_ONLY})
 
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
-    assert CONF_KEY_IS_WASHING_MACHINE not in result["data"]
-    assert CONF_KEY_MAINTENANCE_ENABLED not in result["data"]
-    assert result["data"].get(CONF_KEY_IS_DISHWASHER) is True
+    assert result["data"].get(CONF_KEY_MAINTENANCE_ENABLED) is None
+
+
+async def test_legacy_dishwasher_options_flow_skips_maintenance(hass):
+    """Options flow for legacy dishwasher creates entry immediately without maintenance."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="legacy-dw-options",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeBuiltIn",
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "update_cloud_data"
+
+
+async def test_modern_dishwasher_options_flow_shows_maintenance(hass):
+    """Options flow for modern dishwasher in Full Control offers maintenance."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="modern-dw-options",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "init"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "maintenance_settings"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "maintenance"
 
 
 async def test_tumble_dryer_read_only_skips_maintenance(

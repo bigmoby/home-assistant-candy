@@ -8,9 +8,11 @@ from custom_components.candy.client import (
     _xor_encrypt,
     detect_encryption,
     discover_devices,
+    is_legacy_dishwasher,
 )
 from custom_components.candy.client.decryption import decrypt
 from custom_components.candy.client.model import (
+    DishwasherStatistics,
     DishwasherStatus,
     MachineState,
     WashingMachineStatus,
@@ -19,6 +21,7 @@ from custom_components.candy.client.model import (
     WineCoolerState,
     WineCoolerStatus,
 )
+from custom_components.candy.helpers import is_modern_dishwasher
 
 from .common import (
     TEST_ENCRYPTED_HEX_RESPONSE,
@@ -579,3 +582,121 @@ async def test_discover_devices_non_200_probe(hass, aioclient_mock):
     aioclient_mock.get("http://192.168.0.1/http-read.json?encrypted=0", status=404)
     result = await discover_devices(async_get_clientsession(hass), "192.168.0.0")
     assert "192.168.0.1" not in result
+
+
+def test_dishwasher_statistics_from_json():
+    """Test DishwasherStatistics parses program counters and temperature fallback."""
+    # Program counters s1..s21
+    data = {f"s{i}": str(i) for i in range(1, 22)}
+    data["s22"] = (
+        "100"  # temp bucket, should not be double-counted when s1..s21 present
+    )
+    stats = DishwasherStatistics.from_json(data)
+    # Sum of 1..21 = 21 * 22 / 2 = 231
+    assert stats.total_cycles == 231
+
+    # Non-digit values ignored
+    partial_data = {"s1": "5", "s2": "invalid", "s3": "10"}
+    assert DishwasherStatistics.from_json(partial_data).total_cycles == 15
+
+    # Fallback to temperature buckets when s1..s21 are absent
+    temp_only = {"s22": "10", "s23": "20", "s24": "30"}
+    assert DishwasherStatistics.from_json(temp_only).total_cycles == 60
+
+
+def test_is_legacy_and_modern_dishwasher():
+    """Test interface family classification helpers for dishwashers."""
+    # Family 1 (Legacy)
+    for iface in (
+        "DishwasherInterfaceTypeBuiltIn",
+        "DishwasherInterfaceTypeFSTouch",
+        "DW_NFC_DIGIT_FS",
+    ):
+        assert is_legacy_dishwasher(iface) is True
+        assert is_modern_dishwasher(iface) is False
+
+    # Family 2 (Brava / Nautilus)
+    for iface in (
+        "BRAVA_BI_DIGIT_OD",
+        "DW_WIFI_FS_OD",
+        "DW_WIFI_FS",
+        "DW_WIFI_BI_OD",
+        "DW_WIFI_BI",
+        "DW_WIFI_HI_OD",
+        "DW_WIFI_HI",
+    ):
+        assert is_legacy_dishwasher(iface) is False
+        assert is_modern_dishwasher(iface) is True
+
+    # Family 3 (AXI / Smooth)
+    for iface in ("AXI_FS_SMOOTH_OD", "AXI_FS_SMOOTH", "AXI_HI_DIGIT"):
+        assert is_legacy_dishwasher(iface) is False
+        assert is_modern_dishwasher(iface) is True
+
+    # Edge cases
+    assert is_legacy_dishwasher(None) is False
+    assert is_legacy_dishwasher("") is False
+    assert is_modern_dishwasher(None) is False
+    assert is_modern_dishwasher("") is False
+
+
+async def test_fetch_statistics_dishwasher(hass, aioclient_mock):
+    """Test fetch_statistics parses DishwasherStatistics when statusCounters uses s1..s21."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        json={"response": "SUCCESS"},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        json={"statusCounters": {"s1": "12", "s2": "8", "s3": "5"}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    stats = await client.fetch_statistics()
+    assert isinstance(stats, DishwasherStatistics)
+    assert stats.total_cycles == 25
+
+
+async def test_fetch_all_endpoints_modern_vs_legacy_dishwasher(hass, aioclient_mock):
+    """Test fetch_all_endpoints probes statistics for modern dishwashers but skips legacy."""
+    telemetry = {"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}}
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json",
+        json={"response": "SUCCESS"},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json={"statusCounters": {"s1": "14"}},
+    )
+
+    # Modern Brava (Family 2) -> fetches statistics
+    modern_client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    modern_client.interface_type = "BRAVA_BI_DIGIT_OD"
+    endpoints = await modern_client.fetch_all_endpoints()
+    assert endpoints["http-read.json"] == telemetry
+    assert endpoints["http-getStatistics.json"] == {"statusCounters": {"s1": "14"}}
+
+    # Legacy Built-in (Family 1) -> skips statistics
+    legacy_client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    legacy_client.interface_type = "DishwasherInterfaceTypeBuiltIn"
+    endpoints_legacy = await legacy_client.fetch_all_endpoints()
+    assert endpoints_legacy["http-read.json"] == telemetry
+    assert (
+        "not supported for legacy"
+        in endpoints_legacy["http-getStatistics.json"]["status"]
+    )

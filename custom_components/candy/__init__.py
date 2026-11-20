@@ -29,10 +29,13 @@ from .client import (
     CandyClient,
     get_dishwasher_command_builder,
     get_dryer_command_builder,
+    is_legacy_dishwasher,
     parse_wash_programs,
 )
 from .client.model import (
+    CheckUpResult,
     CheckUpState,
+    DishwasherStatistics,
     DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
@@ -74,6 +77,8 @@ from .const import (
     DATA_KEY_COORDINATOR,
     DATA_KEY_DISHWASHER_CHECKUP_UNSUB,
     DATA_KEY_DISHWASHER_ERROR_UNSUB,
+    DATA_KEY_DISHWASHER_MAINT_UNSUB,
+    DATA_KEY_DISHWASHER_STATS_REFRESH_UNSUB,
     DATA_KEY_DISHWASHER_WARNING_UNSUB,
     DATA_KEY_DRYER_CHECKUP_UNSUB,
     DATA_KEY_DRYER_ERROR_UNSUB,
@@ -104,6 +109,7 @@ from .const import (
     NOTIF_ID_WASH_ERROR,
     PLATFORMS,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
     UNIQUE_ID_WASH_TOTAL_CYCLES,
@@ -235,14 +241,20 @@ def _restore_last_known_status(
 def _restore_last_known_statistics(
     hass: HomeAssistant,
     config_entry_id: str,
-) -> WashingMachineStatistics | None:
+    is_dishwasher: bool,
+) -> WashingMachineStatistics | DishwasherStatistics | None:
     """Read the persisted total-cycles value from HA's state machine.
 
-    Returns a WashingMachineStatistics populated from the last known sensor state,
-    or None if the entity was never registered or its state is not a valid integer.
+    Returns a WashingMachineStatistics or DishwasherStatistics populated from the
+    last known sensor state, or None if the entity was never registered or its state
+    is not a valid integer.
     """
     registry = er.async_get(hass)
-    unique_id = UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
+    unique_id = (
+        UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(config_entry_id)
+        if is_dishwasher
+        else UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
+    )
     entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
     if entity_id is None:
         return None
@@ -254,6 +266,8 @@ def _restore_last_known_statistics(
         entity_id,
         state.state,
     )
+    if is_dishwasher:
+        return DishwasherStatistics(total_cycles=int(state.state))
     return WashingMachineStatistics(total_cycles=int(state.state))
 
 
@@ -344,6 +358,7 @@ def _offline_dishwasher() -> DishwasherStatus:
         last_cycle_counter=None,
         auto_clean_warning=False,
         checkup_state=None,
+        checkup_result=None,
         r15=0,
         selector_position=None,
     )
@@ -487,8 +502,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     }
 
     if isinstance(coordinator.data, WashingMachineStatus):
-        last_known_statistics = _restore_last_known_statistics(
-            hass, config_entry.entry_id
+        last_known_statistics = cast(
+            WashingMachineStatistics | None,
+            _restore_last_known_statistics(hass, config_entry.entry_id, False),
         )
 
         async def update_statistics() -> WashingMachineStatistics:
@@ -499,7 +515,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 raise UpdateFailed("Machine is OFF; statistics unavailable.")
             try:
                 async with async_timeout.timeout(40):
-                    stats = await client.statistics_with_retry()
+                    stats = cast(
+                        WashingMachineStatistics,
+                        await client.statistics_with_retry(),
+                    )
                     last_known_statistics = stats
                     return stats
             except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
@@ -610,17 +629,105 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_ERROR_UNSUB] = (
             unsub_dishwasher_error
         )
-        unsub_dishwasher_checkup = _register_dishwasher_checkup_listener(
-            hass, config_entry, coordinator, client
-        )
-        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_CHECKUP_UNSUB] = (
-            unsub_dishwasher_checkup
-        )
         unsub_dishwasher_warning = _register_dishwasher_warning_listener(
             hass, config_entry, coordinator
         )
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_WARNING_UNSUB] = (
             unsub_dishwasher_warning
+        )
+
+        dw_stats_coordinator: DataUpdateCoordinator[DishwasherStatistics] | None = None
+        interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        if not is_legacy_dishwasher(interface_type):
+            last_known_dw_stats = cast(
+                DishwasherStatistics | None,
+                _restore_last_known_statistics(hass, config_entry.entry_id, True),
+            )
+
+            async def update_dw_statistics() -> DishwasherStatistics:
+                nonlocal last_known_dw_stats
+                if not coordinator.last_update_success:
+                    if last_known_dw_stats is not None:
+                        return last_known_dw_stats
+                    raise UpdateFailed("Dishwasher is offline; statistics unavailable.")
+                try:
+                    async with async_timeout.timeout(40):
+                        stats = cast(
+                            DishwasherStatistics,
+                            await client.statistics_with_retry(),
+                        )
+                        if (
+                            stats.total_cycles == 0
+                            and last_known_dw_stats is not None
+                            and last_known_dw_stats.total_cycles > 0
+                        ):
+                            _LOGGER.warning(
+                                "Ignoring transient total_cycles=0 reading; returning last known value (%s).",
+                                last_known_dw_stats.total_cycles,
+                            )
+                            return last_known_dw_stats
+                        last_known_dw_stats = stats
+                        return stats
+                except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
+                    if last_known_dw_stats is not None:
+                        _LOGGER.warning(
+                            "Failed to fetch statistics (%s); returning last known value.",
+                            repr(err),
+                        )
+                        return last_known_dw_stats
+                    raise UpdateFailed(f"Error fetching statistics: {err!r}") from err
+
+            dw_stats_coordinator = DataUpdateCoordinator(
+                hass,
+                _LOGGER,
+                name=f"{DOMAIN}_dishwasher_statistics",
+                update_interval=timedelta(hours=1),
+                update_method=update_dw_statistics,
+            )
+            if last_known_dw_stats is not None:
+                dw_stats_coordinator.async_set_updated_data(last_known_dw_stats)
+            elif not coordinator.last_update_success:
+                pass
+            else:
+                await dw_stats_coordinator.async_refresh()
+
+            dw_stats_entity_id = er.async_get(hass).async_get_entity_id(
+                "sensor",
+                DOMAIN,
+                UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(config_entry.entry_id),
+            )
+            if (
+                dw_stats_coordinator.last_update_success
+                or dw_stats_entity_id is not None
+            ):
+                hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_COORDINATOR] = (
+                    dw_stats_coordinator
+                )
+
+            if (
+                config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED)
+                and dw_stats_coordinator is not None
+            ):
+                unsub_dw_maint = _register_maintenance_notifications(
+                    hass, config_entry, dw_stats_coordinator, coordinator
+                )
+                hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_MAINT_UNSUB] = (
+                    unsub_dw_maint
+                )
+
+            if dw_stats_coordinator is not None:
+                unsub_dw_refresh = _register_stats_refresh_listener(
+                    hass, config_entry, coordinator, dw_stats_coordinator
+                )
+                hass.data[DOMAIN][config_entry.entry_id][
+                    DATA_KEY_STATS_REFRESH_UNSUB
+                ] = unsub_dw_refresh
+
+        unsub_dishwasher_checkup = _register_dishwasher_checkup_listener(
+            hass, config_entry, coordinator, client, dw_stats_coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_CHECKUP_UNSUB] = (
+            unsub_dishwasher_checkup
         )
 
     # Backfill missing keys for legacy entries
@@ -654,11 +761,24 @@ def _register_maintenance_notifications(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     stats_coordinator: DataUpdateCoordinator[Any],
+    coordinator: DataUpdateCoordinator[Any] | None = None,
 ) -> Callable[[], None]:
     entry_id = config_entry.entry_id
-    hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
-    limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
     lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
+
+    def _get_limescale_threshold() -> int:
+        if coordinator is not None:
+            status = coordinator.data
+            hardness = getattr(status, "water_hardness", None)
+            if (
+                hardness is None
+                or hardness < 0
+                or hardness >= len(MAINTENANCE_HARDNESS_THRESHOLDS)
+            ):
+                hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+            return MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
+        hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+        return MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
 
     _MAINTENANCE_ITEMS = [
         (
@@ -673,7 +793,7 @@ def _register_maintenance_notifications(
         _MAINTENANCE_ITEMS.append(
             (
                 CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
-                limescale_threshold,
+                _get_limescale_threshold(),
                 NOTIF_ID_MAINT_LIMESCALE.format(entry_id),
                 localized_notification_text("limescale_title", lang),
                 localized_notification_text("limescale_message", lang),
@@ -691,8 +811,9 @@ def _register_maintenance_notifications(
         )
 
     def _on_stats_update() -> None:
-        stats: WashingMachineStatistics | None = cast(
-            WashingMachineStatistics | None, stats_coordinator.data
+        stats: WashingMachineStatistics | DishwasherStatistics | None = cast(
+            WashingMachineStatistics | DishwasherStatistics | None,
+            stats_coordinator.data,
         )
         if stats is None:
             return
@@ -836,7 +957,10 @@ def _register_full_checkup_listener(
                     if stats_coordinator.data is not None:
                         total = stats_coordinator.data.total_cycles
                     else:
-                        restored = _restore_last_known_statistics(hass, entry_id)
+                        restored = cast(
+                            WashingMachineStatistics | None,
+                            _restore_last_known_statistics(hass, entry_id, False),
+                        )
                         if restored is not None:
                             total = restored.total_cycles
 
@@ -955,7 +1079,10 @@ def _register_limescale_listener(
                         if stats_coordinator.data is not None:
                             total = stats_coordinator.data.total_cycles
                         else:
-                            restored = _restore_last_known_statistics(hass, entry_id)
+                            restored = cast(
+                                WashingMachineStatistics | None,
+                                _restore_last_known_statistics(hass, entry_id, False),
+                            )
                             if restored is not None:
                                 total = restored.total_cycles
 
@@ -982,19 +1109,19 @@ def _register_stats_refresh_listener(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
-    stats_coordinator: DataUpdateCoordinator[WashingMachineStatistics],
+    stats_coordinator: DataUpdateCoordinator[Any],
 ) -> Callable[[], None]:
-    """Refresh statistics when a wash cycle transitions into a finished state."""
-    initial = cast(WashingMachineStatus | None, coordinator.data)
+    """Refresh statistics when a cycle transitions into a finished state."""
+    initial = coordinator.data
     prev_state: list[MachineState | None] = [
-        initial.machine_state if initial is not None else None
+        getattr(initial, "machine_state", None) if initial is not None else None
     ]
 
     def _on_status_update() -> None:
-        status = cast(WashingMachineStatus | None, coordinator.data)
+        status = coordinator.data
         if status is None:
             return
-        curr = status.machine_state
+        curr = getattr(status, "machine_state", None)
         prev = prev_state[0]
         prev_state[0] = curr
         if curr in _FINISHED_STATES and prev not in _FINISHED_STATES:
@@ -1343,6 +1470,7 @@ def _register_dishwasher_checkup_listener(
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[Any],
     client: CandyClient,
+    stats_coordinator: DataUpdateCoordinator[DishwasherStatistics] | None = None,
 ) -> Callable[[], None]:
     """Register a coordinator listener that handles dishwasher Check-up completion."""
     initial = cast(DishwasherStatus | None, coordinator.data)
@@ -1385,25 +1513,77 @@ def _register_dishwasher_checkup_listener(
             )
             pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
 
-            if status.remote_control:
-                interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-                builder = get_dishwasher_command_builder(interface_type)
-                reset_cmd = builder.build_checkup_reset()
+            new_data = dict(config_entry.data)
+            new_data[CONF_KEY_CHECKUP_LAST_DATE] = dt_util.utcnow().timestamp()
+            res = getattr(status, "checkup_result", None)
+            new_data[CONF_KEY_CHECKUP_LAST_RESULT] = (
+                res.code if res is not None and res.code != 0 else CheckUpResult.OK.code
+            )
+            new_data[CONF_KEY_CHECKUP_PENDING] = False
+            hass.config_entries.async_update_entry(config_entry, data=new_data)
+            coordinator.async_update_listeners()
 
-                async def _send_reset() -> None:
-                    try:
-                        await client.send_command(urlencode(reset_cmd, quote_via=quote))
-                        await asyncio.sleep(5)
-                        await coordinator.async_request_refresh()
-                    except Exception as err:
-                        _LOGGER.warning(
-                            "Failed to reset dishwasher check-up state: %s", err
+            needs_reset = status.remote_control
+            if needs_reset or stats_coordinator is not None:
+
+                async def _handle_dishwasher_checkup_completion() -> None:
+                    if needs_reset:
+                        interface_type = config_entry.data.get(
+                            CONF_KEY_INTERFACE_TYPE, ""
                         )
+                        builder = get_dishwasher_command_builder(interface_type)
+                        reset_cmd = builder.build_checkup_reset()
+                        try:
+                            await client.send_command(
+                                urlencode(reset_cmd, quote_via=quote)
+                            )
+                            await asyncio.sleep(5)
+                            await coordinator.async_request_refresh()
+                        except Exception as err:
+                            _LOGGER.warning(
+                                "Failed to reset dishwasher check-up state: %s", err
+                            )
+
+                    if stats_coordinator is not None:
+                        await stats_coordinator.async_request_refresh()
+                        total: int | None = None
+                        if stats_coordinator.data is not None:
+                            total = stats_coordinator.data.total_cycles
+                        else:
+                            restored = cast(
+                                DishwasherStatistics | None,
+                                _restore_last_known_statistics(hass, entry_id, True),
+                            )
+                            if restored is not None:
+                                total = restored.total_cycles
+
+                        current_baseline = config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, 0
+                        )
+                        if (
+                            total is not None
+                            and total > 0
+                            and total >= current_baseline
+                        ):
+                            new_entry_data = dict(config_entry.data)
+                            new_entry_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = (
+                                total
+                            )
+                            hass.config_entries.async_update_entry(
+                                config_entry, data=new_entry_data
+                            )
+                            stats_coordinator.async_update_listeners()
+                        elif total is not None and total < current_baseline:
+                            _LOGGER.warning(
+                                "Ignoring cycle count %s lower than current baseline %s",
+                                total,
+                                current_baseline,
+                            )
 
                 config_entry.async_create_background_task(
                     hass,
-                    _send_reset(),
-                    name=f"{DOMAIN}_{config_entry.entry_id}_send_dishwasher_checkup_reset",
+                    _handle_dishwasher_checkup_completion(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_complete_dishwasher_checkup",
                 )
 
     return coordinator.async_add_listener(_on_status_update)
@@ -1426,6 +1606,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DATA_KEY_DRYER_CHECKUP_UNSUB,
             DATA_KEY_DISHWASHER_CHECKUP_UNSUB,
             DATA_KEY_DISHWASHER_WARNING_UNSUB,
+            DATA_KEY_DISHWASHER_MAINT_UNSUB,
+            DATA_KEY_DISHWASHER_STATS_REFRESH_UNSUB,
             DATA_KEY_LIMESCALE_UNSUB,
         ):
             unsub = entry_data.get(key)
