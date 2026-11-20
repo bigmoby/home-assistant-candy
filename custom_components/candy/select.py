@@ -37,7 +37,6 @@ from .const import (
     CONF_KEY_PROGRAMS,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
-    DATA_KEY_DISHWASHER_START_OPTIONS,
     DISHWASHER_PROGRAM_PANEL,
     DISHWASHER_PROGRAMS,
     DOMAIN,
@@ -75,7 +74,6 @@ from .const import (
     WATER_HARDNESS_OPTIONS,
     WATER_HARDNESS_TO_VALUE,
 )
-from .dishwasher import DishwasherStartOptions
 from .helpers import (
     dishwasher_device_info,
     dry_target_label_for_interface,
@@ -1492,8 +1490,4 @@ class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         self._selected_option = option
-        opts = self.hass.data[DOMAIN][self.config_id].setdefault(
-            DATA_KEY_DISHWASHER_START_OPTIONS, DishwasherStartOptions()
-        )
-        opts.program = option
         self.async_write_ha_state()

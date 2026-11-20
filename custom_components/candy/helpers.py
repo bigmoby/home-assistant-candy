@@ -10,6 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from .client import is_legacy_dishwasher, parse_wash_programs
 from .client.dryer_commands import is_dualtech_dryer_interface
 from .client.model import (
+    _PROGRAM_NAMES,
     DishwasherStatus,
     TumbleDryerStatus,
     WashingMachineStatus,
@@ -28,6 +29,8 @@ from .const import (
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WASHER_DRYER,
     DEVICE_NAME_WASHING_MACHINE,
+    DISHWASHER_PROGRAM_NAME_KEYS,
+    DISHWASHER_TELEMETRY_TO_KEYS,
     DOMAIN,
     DRY_TARGET_TO_VALUE,
     DUALTECH_DRY_TARGET_TO_VALUE,
@@ -320,3 +323,86 @@ def get_dishwasher_warning_strings(warning_type: str, language: str) -> tuple[st
     else:
         raise ValueError(f"Unsupported dishwasher warning type: {warning_type}")
     return title, message
+
+
+def resolve_dishwasher_program_name(
+    program_identifier: str,
+    language: str,
+) -> str:
+    """Resolve localized friendly program name for select key or hardware register."""
+    if not program_identifier:
+        return ""
+    # 1. Match select option key (e.g. eco_45)
+    name_key = DISHWASHER_PROGRAM_NAME_KEYS.get(program_identifier)
+    if name_key is not None:
+        trans = _PROGRAM_NAMES.get(name_key, {})
+        resolved = _lookup_translation(trans, language)
+        if resolved:
+            return resolved
+
+    # 2. Match hardware telemetry register (e.g. P8, P2, P1+)
+    telemetry_match = DISHWASHER_TELEMETRY_TO_KEYS.get(program_identifier)
+    if telemetry_match is not None:
+        trans = _PROGRAM_NAMES.get(telemetry_match[0], {})
+        resolved = _lookup_translation(trans, language)
+        if resolved:
+            return resolved
+
+    # 3. Fallback to raw program identifier
+    return program_identifier
+
+
+def resolve_dishwasher_program_description(
+    program_identifier: str,
+    language: str,
+) -> str | None:
+    """Resolve localized multi-line description for select key or hardware register."""
+    if not program_identifier:
+        return None
+    # 1. Match select option key (e.g. eco_45)
+    name_key = DISHWASHER_PROGRAM_NAME_KEYS.get(program_identifier)
+    if name_key is not None:
+        desc_key = f"{name_key}_DESCRIPTION"
+        trans = _PROGRAM_NAMES.get(desc_key, {})
+        return _lookup_translation(trans, language)
+
+    # 2. Match hardware telemetry register (e.g. P8, P2, P1+)
+    telemetry_match = DISHWASHER_TELEMETRY_TO_KEYS.get(program_identifier)
+    if telemetry_match is not None:
+        trans = _PROGRAM_NAMES.get(telemetry_match[1], {})
+        return _lookup_translation(trans, language)
+
+    # 3. Direct description key or candidate keys
+    for candidate_key in (
+        f"{program_identifier}_DESCRIPTION",
+        f"DW_{program_identifier}_DESCRIPTION",
+    ):
+        trans = _PROGRAM_NAMES.get(candidate_key, {})
+        resolved = _lookup_translation(trans, language)
+        if resolved:
+            return resolved
+
+    # 4. Search _PROGRAM_NAMES for program whose localized name matches program_identifier
+    for k, v in _PROGRAM_NAMES.items():
+        if not k.endswith("_DESCRIPTION") and isinstance(v, dict):
+            if any(name == program_identifier for name in v.values()):
+                desc_trans = _PROGRAM_NAMES.get(f"{k}_DESCRIPTION", {})
+                resolved = _lookup_translation(desc_trans, language)
+                if resolved:
+                    return resolved
+
+    return None
+
+
+def _lookup_translation(
+    translations: dict[str, str],
+    language: str,
+) -> str | None:
+    if not translations:
+        return None
+    lang_lower = language.lower()
+    if lang_lower in translations:
+        return translations[lang_lower]
+    if "en" in translations:
+        return translations["en"]
+    return next(iter(translations.values()), None)

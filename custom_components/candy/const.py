@@ -460,8 +460,6 @@ UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON = (
     "{0}-dishwasher_maint_full_checkup_reset"
 )
 
-DATA_KEY_DISHWASHER_START_OPTIONS = "dishwasher_start_options"
-
 # Select option that keeps the program chosen on the machine panel
 DISHWASHER_PROGRAM_PANEL = "panel"
 # Select option -> program code used by the local API, in panel order.

@@ -18,7 +18,7 @@ from custom_components.candy.const import (
     DISHWASHER_PROGRAMS,
     DISHWASHER_TELEMETRY_TO_KEYS,
 )
-from custom_components.candy.dishwasher import (
+from custom_components.candy.helpers import (
     resolve_dishwasher_program_description,
     resolve_dishwasher_program_name,
 )

@@ -72,7 +72,6 @@ from .const import (
     CONF_KEY_SERIAL_NUMBER,
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_COORDINATOR,
-    DATA_KEY_DISHWASHER_START_OPTIONS,
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WRITE_PENDING,
     DEVICE_NAME_DISHWASHER,
@@ -165,16 +164,14 @@ from .const import (
     WASH_OPTION_DURATION_DELTAS_STANDARD,
     WASH_OPTIONS,
 )
-from .dishwasher import (
-    resolve_dishwasher_program_description,
-    resolve_dishwasher_program_name,
-)
 from .helpers import (
     cycles_remaining,
     dry_target_label_for_interface,
     get_dishwasher_error_notification_strings,
     get_dryer_error_notification_strings,
     is_washer_dryer,
+    resolve_dishwasher_program_description,
+    resolve_dishwasher_program_name,
     supports_autodose,
     wash_device_name,
 )
@@ -2387,11 +2384,21 @@ class CandyDishwasherProgramDescriptionSensor(CandyBaseSensor):
         if status.running:
             return resolve_dishwasher_program_description(status.program, lang)
 
-        options = self.hass.data[DOMAIN][self.config_id].get(
-            DATA_KEY_DISHWASHER_START_OPTIONS
-        )
-        if options is not None and options.program != DISHWASHER_PROGRAM_PANEL:
-            desc = resolve_dishwasher_program_description(options.program, lang)
+        registry = er.async_get(self.hass)
+        select_uid = UNIQUE_ID_DISHWASHER_PROGRAM_SELECT.format(self.config_id)
+        select_eid = registry.async_get_entity_id("select", DOMAIN, select_uid)
+        selected_option: str | None = None
+        if select_eid is not None:
+            select_state = self.hass.states.get(select_eid)
+            if select_state is not None and select_state.state not in (
+                "unknown",
+                "unavailable",
+                DISHWASHER_PROGRAM_PANEL,
+            ):
+                selected_option = select_state.state
+
+        if selected_option is not None:
+            desc = resolve_dishwasher_program_description(selected_option, lang)
             if desc is not None:
                 return desc
 
