@@ -6,11 +6,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import (
+    CONF_KEY_CHECKUP_ENABLED,
+    CONF_KEY_CHECKUP_LAST_DATE,
+    CONF_KEY_CHECKUP_LAST_RESULT,
+    CONF_KEY_CHECKUP_PENDING,
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MODE,
@@ -31,12 +36,18 @@ from custom_components.candy.client.model import (
     WashingMachineStatistics,
     WashingMachineStatus,
 )
-from custom_components.candy.const import MODE_READ_ONLY
+from custom_components.candy.const import (
+    MODE_READ_ONLY,
+    UNIQUE_ID_WASH_CHECKUP_RESULT,
+    UNIQUE_ID_WASH_LAST_CHECKUP,
+    UNIQUE_ID_WASH_TOTAL_CYCLES,
+)
 
 from .common import TEST_IP
 
 _STATS_50_CYCLES = '{"statusCounters": {"Temp0to30": "30", "Temp40": "20"}}'
 _STATS_51_CYCLES = '{"statusCounters": {"Temp0to30": "31", "Temp40": "20"}}'
+_STATS_288_CYCLES = '{"statusCounters": {"Temp0to30": "288"}}'
 
 _RUNNING_CHECKUP_JSON = """{
   "statusLavatrice": {
@@ -114,6 +125,7 @@ async def _setup(
     status_json: str,
     **extra_data,
 ) -> MockConfigEntry:
+    stats_json = str(extra_data.pop("stats_json", _STATS_50_CYCLES))
     entry = _make_entry(**extra_data)
     aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=status_json)
     aioclient_mock.get(
@@ -122,7 +134,7 @@ async def _setup(
     )
     aioclient_mock.get(
         f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
-        text=_STATS_50_CYCLES,
+        text=stats_json,
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -209,6 +221,9 @@ async def test_full_checkup_completion_lifecycle(
 
     # 3. Counter reset to fresh total cycles (51 from _STATS_51_CYCLES)
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 51
+    assert CONF_KEY_CHECKUP_LAST_DATE in entry.data
+    assert entry.data[CONF_KEY_CHECKUP_LAST_RESULT] == 1
+    assert entry.data[CONF_KEY_CHECKUP_PENDING] is False
 
     # 4. Appliance reset command sent and settling delay performed
     mock_send.assert_called_once()
@@ -427,8 +442,86 @@ async def test_full_checkup_reset_uses_background_task(
         await hass.async_block_till_done()
 
         task_names = [call.kwargs.get("name") for call in mock_bg_task.call_args_list]
-        assert f"{DOMAIN}_{entry.entry_id}_send_full_checkup_reset" in task_names
-        assert f"{DOMAIN}_{entry.entry_id}_update_full_checkup_baseline" in task_names
+        assert f"{DOMAIN}_{entry.entry_id}_complete_full_checkup" in task_names
+
+
+async def test_full_checkup_completion_ignores_transient_zero(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """A transient zero reading on checkup completion does not overwrite a positive baseline."""
+    _STATS_ZERO = (
+        '{"statusCounters": {"Temp0to30": "0", "Temp40": "0", "Temp60to90": "0"}}'
+    )
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _RUNNING_CHECKUP_JSON,
+        **{CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 50},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_ZERO)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # Baseline remains 50, not overwritten by transient 0
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 50
+
+
+async def test_full_checkup_completion_recovers_baseline_from_restored_state_when_transient_zero(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """When machine returns transient zero after checkup, baseline updates from restored sensor state."""
+    _STATS_ZERO = (
+        '{"statusCounters": {"Temp0to30": "0", "Temp40": "0", "Temp60to90": "0"}}'
+    )
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _RUNNING_CHECKUP_JSON,
+        stats_json=_STATS_288_CYCLES,
+        **{CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 287},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
+
+    # Precondition: sensor state exists in HA with 288 cycles
+    registry = er.async_get(hass)
+    cycles_ent_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_TOTAL_CYCLES.format(entry.entry_id)
+    )
+    assert cycles_ent_id is not None
+    hass.states.async_set(cycles_ent_id, "288")
+
+    # Simulate that stats_coordinator had no prior data (e.g. startup while off)
+    stats_coordinator.async_set_updated_data(None)
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_ZERO)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # Baseline updated to 288 (recovered from restored state) instead of being stuck at 287
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 288
 
 
 def test_full_checkup_coordinator_data_none(
@@ -572,7 +665,12 @@ async def test_full_checkup_completion_restores_from_storage_when_stats_none(
     stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
     stats_coordinator.async_set_updated_data(None)
 
-    restored_stats = WashingMachineStatistics(total_cycles=388)
+    restored_stats = WashingMachineStatistics(
+        total_cycles=388,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
 
     with (
         patch("custom_components.candy.pn_async_create"),
@@ -641,6 +739,80 @@ async def test_full_checkup_completion_dualtech(
     assert "StSt=0" in qs
     assert "PrNm=2" in qs
     assert any(c.args == (5,) for c in mock_sleep.call_args_list)
+
+
+async def test_full_checkup_populates_last_checkup_and_result_sensors(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """Full checkup completion updates last check-up date and result sensors even without DisTestRes."""
+    smartpro_running_json = """{
+      "statusLavatrice": {
+        "WiFiStatus": "1", "Err": "0", "MachMd": "2", "PrNm": "2", "PrCode": "65",
+        "PrPh": "0", "SLevel": "3", "Temp": "60", "SpinSp": "14", "DelVal": "0",
+        "RemTime": "180", "FillR": "0", "CheckUpState": "1"
+      }
+    }"""
+    smartpro_completed_json = """{
+      "statusLavatrice": {
+        "WiFiStatus": "1", "Err": "0", "MachMd": "1", "PrNm": "2", "PrCode": "65",
+        "PrPh": "0", "SLevel": "3", "Temp": "60", "SpinSp": "14", "DelVal": "0",
+        "RemTime": "0", "FillR": "0", "CheckUpState": "2"
+      }
+    }"""
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        smartpro_running_json,
+        **{
+            CONF_KEY_INTERFACE_TYPE: "SMARTPRO_5DIG_STM_NEL",
+            CONF_KEY_CHECKUP_ENABLED: True,
+        },
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    registry = er.async_get(hass)
+    res_entity = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_CHECKUP_RESULT.format(entry.entry_id)
+    )
+    date_entity = registry.async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_LAST_CHECKUP.format(entry.entry_id)
+    )
+    assert res_entity is not None
+    assert date_entity is not None
+
+    # Before completion: result is not_run, last check-up is unknown
+    state_res = hass.states.get(res_entity)
+    state_date = hass.states.get(date_entity)
+    assert state_res is not None
+    assert state_res.state == "not_run"
+    assert state_date is not None
+    assert state_date.state == "unknown"
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, smartpro_completed_json, _STATS_51_CYCLES)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # After completion: entry data has timestamp and result
+    assert CONF_KEY_CHECKUP_LAST_DATE in entry.data
+    assert entry.data[CONF_KEY_CHECKUP_LAST_RESULT] == 1
+
+    # Sensors are populated!
+    state_res = hass.states.get(res_entity)
+    state_date = hass.states.get(date_entity)
+    assert state_res is not None
+    assert state_res.state == "ok"
+    assert state_date is not None
+    assert state_date.state not in ("unknown", "unavailable")
 
 
 _TD_RUNNING_CHECKUP_JSON = """{

@@ -103,6 +103,19 @@ def _parse_json_safe(text: str | bytes) -> dict[str, Any]:
     return json.loads(text)
 
 
+def is_new_statistics_interface(interface_type: str) -> bool:
+    """Return True if the appliance interface uses the modern GetStat write command.
+
+    Confirmed via WasherInterfaceType.kt:supportsNewStatistics (classes4.dex):
+    Smart Pro (SMARTPRO), Hoover H-WASH 300 (HWASH300 / HWASH_300), and X-Care (XCARE)
+    interfaces use GET /http-write.json with GetStat=1 instead of legacy prepareStatistics/getStatistics.
+    """
+    if not interface_type:
+        return False
+    upper = interface_type.upper()
+    return upper.startswith(("SMARTPRO", "HWASH300", "HWASH_300", "XCARE"))
+
+
 class CandyClient:
     def __init__(
         self,
@@ -110,6 +123,7 @@ class CandyClient:
         device_ip: str,
         encryption_key: str,
         use_encryption: bool,
+        interface_type: str,
     ):
         self.session = (
             session  # Session is the default HA session, shouldn't be cleaned up
@@ -117,6 +131,7 @@ class CandyClient:
         self.device_ip = device_ip
         self.encryption_key = encryption_key
         self.use_encryption = use_encryption
+        self.interface_type = interface_type
 
     @backoff.on_exception(
         backoff.expo, aiohttp.ClientError, max_tries=3, logger=__name__
@@ -162,8 +177,8 @@ class CandyClient:
         url = _status_url(self.device_ip, self.use_encryption)
         return await self._fetch_and_decode_endpoint(url)
 
-    async def fetch_raw_statistics(self) -> dict[str, Any]:
-        """Fetch statistics counters handshake (prepareStatistics -> getStatistics)."""
+    async def _fetch_legacy_raw_statistics(self) -> dict[str, Any]:
+        """Fetch statistics via legacy prepareStatistics -> getStatistics handshake."""
         prepare_url = _prepare_statistics_url(self.device_ip, self.use_encryption)
         try:
             async with _LIMITER, self.session.get(prepare_url) as resp:
@@ -175,6 +190,34 @@ class CandyClient:
 
         url = _statistics_url(self.device_ip, self.use_encryption)
         return await self._fetch_and_decode_endpoint(url)
+
+    async def _fetch_new_raw_statistics(self) -> dict[str, Any]:
+        """Fetch statistics via modern GetStat=1 command on /http-write.json."""
+        url = _new_statistics_url(
+            self.device_ip, self.use_encryption, self.encryption_key
+        )
+        return await self._fetch_and_decode_endpoint(url)
+
+    async def fetch_raw_statistics(self) -> dict[str, Any]:
+        """Fetch statistics counters payload according to interface protocol."""
+        if is_new_statistics_interface(self.interface_type):
+            return await self._fetch_new_raw_statistics()
+
+        try:
+            return await self._fetch_legacy_raw_statistics()
+        except (
+            aiohttp.ClientConnectionError,
+            aiohttp.ServerDisconnectedError,
+        ) as err:
+            if not self.interface_type:
+                _LOGGER.debug(
+                    "Legacy statistics endpoint failed (%s); probing GetStat=1 protocol",
+                    err,
+                )
+                stats = await self._fetch_new_raw_statistics()
+                self.interface_type = "SMARTPRO_AUTODETECTED"
+                return stats
+            raise
 
     async def fetch_all_endpoints(self) -> dict[str, Any]:
         """Fetch all supported device endpoints with timeout and error handling."""
@@ -396,6 +439,15 @@ def _write_url(device_ip: str, use_encryption: bool, data: str) -> str:
 
 def _statistics_url(device_ip: str, use_encryption: bool) -> str:
     return f"http://{device_ip}/http-getStatistics.json?encrypted={1 if use_encryption else 0}"
+
+
+def _new_statistics_url(
+    device_ip: str, use_encryption: bool, encryption_key: str
+) -> str:
+    if use_encryption and encryption_key:
+        hex_data = _xor_encrypt("GetStat=1", encryption_key)
+        return _write_url(device_ip, True, hex_data)
+    return _write_url(device_ip, False, "GetStat=1")
 
 
 def _prepare_statistics_url(device_ip: str, use_encryption: bool) -> str:

@@ -1,3 +1,4 @@
+import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
 from pytest_homeassistant_custom_component.common import load_fixture
@@ -8,6 +9,7 @@ from custom_components.candy.client import (
     _xor_encrypt,
     detect_encryption,
     discover_devices,
+    is_new_statistics_interface,
 )
 from custom_components.candy.client.decryption import decrypt
 from custom_components.candy.client.model import (
@@ -43,6 +45,7 @@ async def test_idle(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     status = await client.status()
 
@@ -66,6 +69,7 @@ async def test_delayed_start_wait(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     status = await client.status()
 
@@ -87,6 +91,7 @@ async def test_no_fillr_property(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     status = await client.status()
 
@@ -155,6 +160,7 @@ async def test_status_encryption_with_key(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key="TqaM9Jxh8I1MmcGA",
         use_encryption=True,
+        interface_type="",
     )
     status = await client.status()
 
@@ -172,6 +178,7 @@ async def test_status_encryption_without_key(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key="",
         use_encryption=True,
+        interface_type="",
     )
     status = await client.status()
 
@@ -189,6 +196,7 @@ async def test_status_unknown_device_type(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     with pytest.raises(Exception, match="Unable to detect machine type"):
         await client.status()
@@ -202,6 +210,7 @@ async def test_send_command_encrypted(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY,
         use_encryption=True,
+        interface_type="",
     )
     await client.send_command("Write=1&StSt=0")
 
@@ -216,6 +225,7 @@ async def test_send_command_error_response(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     with pytest.raises(ValueError, match="Write command failed"):
         await client.send_command("Write=1")
@@ -233,6 +243,7 @@ async def test_fetch_statistics_encrypted_empty_key(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=True,
+        interface_type="",
     )
     stats = await client.fetch_statistics()
     assert stats.total_cycles == 388
@@ -254,6 +265,7 @@ async def test_fetch_statistics_encrypted_with_key(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY,
         use_encryption=True,
+        interface_type="",
     )
     stats = await client.fetch_statistics()
     assert stats.total_cycles == 388
@@ -273,6 +285,7 @@ async def test_fetch_statistics_missing_status_counters(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     with pytest.raises(Exception, match="Unable to parse statistics"):
         await client.fetch_statistics()
@@ -312,6 +325,7 @@ async def test_status_wine_cooler(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key="",
         use_encryption=False,
+        interface_type="",
     )
     status = await client.status()
 
@@ -354,6 +368,7 @@ async def test_set_wine_cooler_light_encrypted(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=key,
         use_encryption=True,
+        interface_type="",
     )
 
     status = WineCoolerStatus(
@@ -382,6 +397,7 @@ async def test_special_program_recipe_id(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     status = await client.status()
     assert isinstance(status, WashingMachineStatus)
@@ -400,6 +416,7 @@ async def test_fetch_raw_status(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     data = await client.fetch_raw_status()
     assert data == raw_payload
@@ -420,6 +437,7 @@ async def test_fetch_raw_statistics(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     data = await client.fetch_raw_statistics()
     assert data == stats_payload
@@ -441,6 +459,7 @@ async def test_fetch_all_endpoints_success(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     endpoints = await client.fetch_all_endpoints()
     assert endpoints["http-read.json"] == telemetry
@@ -457,6 +476,7 @@ async def test_fetch_all_endpoints_read_error(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     endpoints = await client.fetch_all_endpoints()
     assert "error" in endpoints["http-read.json"]
@@ -477,6 +497,7 @@ async def test_client_plaintext_json_fallback_when_encrypted(hass, aioclient_moc
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY,
         use_encryption=True,
+        interface_type="",
     )
     data = await client.fetch_raw_status()
     assert "statusLavatrice" in data
@@ -493,6 +514,7 @@ async def test_fetch_all_endpoints_stats_error(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     endpoints = await client.fetch_all_endpoints()
     assert endpoints["http-read.json"] == telemetry
@@ -510,6 +532,7 @@ async def test_fetch_all_endpoints_non_stats_appliance(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     endpoints = await client.fetch_all_endpoints()
     assert endpoints["http-read.json"] == telemetry
@@ -524,6 +547,7 @@ async def test_set_water_hardness_invalid(hass):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     with pytest.raises(ValueError, match="Invalid water hardness level: 0"):
         await client.set_water_hardness(0)
@@ -542,6 +566,7 @@ async def test_resume_good_night(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
         use_encryption=False,
+        interface_type="",
     )
     await client.resume_good_night()
     assert aioclient_mock.call_count == 1
@@ -558,6 +583,7 @@ async def test_set_wine_cooler_light_dual_zone(hass, aioclient_mock):
         device_ip=TEST_IP,
         encryption_key="",
         use_encryption=False,
+        interface_type="",
     )
     status = WineCoolerStatus(
         machine_state=WineCoolerState.ON,
@@ -579,3 +605,110 @@ async def test_discover_devices_non_200_probe(hass, aioclient_mock):
     aioclient_mock.get("http://192.168.0.1/http-read.json?encrypted=0", status=404)
     result = await discover_devices(async_get_clientsession(hass), "192.168.0.0")
     assert "192.168.0.1" not in result
+
+
+def test_is_new_statistics_interface():
+    """Test detection of interfaces using the modern GetStat write command."""
+    assert is_new_statistics_interface("SMARTPRO_5DIG_STM_NEL") is True
+    assert is_new_statistics_interface("smartpro_digit") is True
+    assert is_new_statistics_interface("HWASH300_4DIG") is True
+    assert is_new_statistics_interface("HWASH_300_TOP") is True
+    assert is_new_statistics_interface("XCARE_5DIG") is True
+    assert is_new_statistics_interface("RAPIDO_4DIG_STM_NEL") is False
+    assert is_new_statistics_interface("BIANCA") is False
+    assert is_new_statistics_interface("3D_DUAL") is False
+    assert is_new_statistics_interface("") is False
+
+
+async def test_fetch_statistics_smartpro_plaintext(hass, aioclient_mock):
+    """Test Smart Pro fetch_statistics queries /http-write.json with GetStat=1 in plaintext."""
+    stats_payload = {"statusCounters": {"Temp40": "15"}}
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&GetStat=1",
+        json=stats_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="SMARTPRO_5DIG_STM_NEL",
+    )
+    stats = await client.fetch_statistics()
+    assert stats.total_cycles == 15
+    # Confirm prepareStatistics and getStatistics were never called
+    assert aioclient_mock.call_count == 1
+
+
+async def test_fetch_statistics_smartpro_encrypted(hass, aioclient_mock):
+    """Test Smart Pro fetch_statistics queries /http-write.json with encrypted GetStat=1."""
+    stats_json = b'{"statusCounters": {"Temp40": "25"}}'
+    key = TEST_ENCRYPTION_KEY.encode()
+    encrypted_hex = decrypt(key, stats_json).hex()
+    cmd_hex = _xor_encrypt("GetStat=1", TEST_ENCRYPTION_KEY)
+
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=1&data={cmd_hex}",
+        text=encrypted_hex,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY,
+        use_encryption=True,
+        interface_type="SMARTPRO_5DIG_STM_NEL",
+    )
+    stats = await client.fetch_statistics()
+    assert stats.total_cycles == 25
+    assert aioclient_mock.call_count == 1
+
+
+async def test_fetch_statistics_unknown_interface_disconnect_probes_getstat(
+    hass, aioclient_mock
+):
+    """Test unknown interface probing GetStat=1 when legacy prepareStatistics disconnects."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        exc=aiohttp.ServerDisconnectedError("Server disconnected"),
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        exc=aiohttp.ServerDisconnectedError("Server disconnected"),
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&GetStat=1",
+        json={"statusCounters": {"Temp40": "42"}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    stats = await client.fetch_statistics()
+    assert stats.total_cycles == 42
+    assert client.interface_type == "SMARTPRO_AUTODETECTED"
+
+
+async def test_fetch_statistics_known_legacy_interface_does_not_probe_getstat(
+    hass, aioclient_mock
+):
+    """Test known legacy interface raises immediately on disconnect without probing GetStat."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        exc=aiohttp.ServerDisconnectedError("Server disconnected"),
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        exc=aiohttp.ServerDisconnectedError("Server disconnected"),
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="RAPIDO_4DIG_STM_NEL",
+    )
+    with pytest.raises(aiohttp.ServerDisconnectedError):
+        await client.fetch_statistics()
