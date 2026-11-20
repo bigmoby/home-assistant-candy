@@ -301,12 +301,14 @@ cards:
                 name: 3-in-1 tabs
                 icon: mdi:pill
         # Note: Auto-open door switch is only available on models equipped with motorized door release (_OD models).
-        # If your dishwasher model does not have auto-open door, remove or comment out this conditional card.
+        # We match explicit 'on' / 'off' states so models without auto-open door cleanly hide this card instead of showing "Entity not found".
         - type: conditional
           conditions:
             - condition: state
               entity: switch.<machine_name>_auto_open_door
-              state_not: unavailable
+              state:
+                - "on"
+                - "off"
           card:
             type: tile
             entity: switch.<machine_name>_auto_open_door
@@ -485,7 +487,8 @@ cards:
               perform_action: button.press
               target:
                 entity_id: button.<machine_name>_stop
-        # Motorized door release button (shown for _OD models when available)
+        # Motorized door release button (shown for _OD models when available).
+        # If your dishwasher model does not have motorized door release, remove or comment out this conditional card.
         - type: conditional
           conditions:
             - condition: state
