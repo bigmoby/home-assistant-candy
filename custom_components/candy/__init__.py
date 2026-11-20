@@ -585,13 +585,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 unsub_checkup
             )
 
-        if stats_coordinator is not None:
-            unsub_stats_refresh = _register_stats_refresh_listener(
-                hass, config_entry, coordinator, stats_coordinator
-            )
-            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
-                unsub_stats_refresh
-            )
+        unsub_stats_refresh = _register_stats_refresh_listener(
+            hass, config_entry, coordinator, stats_coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
+            unsub_stats_refresh
+        )
 
         unsub_full_checkup = _register_full_checkup_listener(
             hass, config_entry, coordinator, stats_coordinator, client
