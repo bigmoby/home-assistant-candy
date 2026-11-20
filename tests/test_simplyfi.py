@@ -202,6 +202,20 @@ def test_fetch_new_statistics_json() -> None:
         assert result == {"statusCounters": {"Program1": "10"}}
 
 
+def test_fetch_new_statistics_json_encrypted_hex() -> None:
+    """Test fetch_new_statistics_json decrypts hex-encoded XOR ciphertext."""
+    plaintext = '{"statusCounters": {"Program1": "25", "Temp0to30": "10"}}'
+    key = "testkey12345678"
+    hex_ciphertext = simplyfi.xor_encrypt_string(plaintext, key)
+
+    with patch(
+        "simplyfi.send_write_command_payload",
+        return_value=hex_ciphertext,
+    ):
+        result = simplyfi.fetch_new_statistics_json("192.168.1.50", 80, key, True, 5)
+        assert result == {"statusCounters": {"Program1": "25", "Temp0to30": "10"}}
+
+
 def test_run_stats_falls_back_to_getstat() -> None:
     """Test run_stats probes GetStat=1 when legacy handshake fails."""
     stdout_buf = io.StringIO()

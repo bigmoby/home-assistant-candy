@@ -477,7 +477,20 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 raise UpdateFailed("Machine is OFF; statistics unavailable.")
             try:
                 async with async_timeout.timeout(40):
-                    stats = await client.statistics_with_retry()
+                    stats = cast(
+                        WashingMachineStatistics,
+                        await client.statistics_with_retry(),
+                    )
+                    if (
+                        stats.total_cycles == 0
+                        and last_known_statistics is not None
+                        and last_known_statistics.total_cycles > 0
+                    ):
+                        _LOGGER.warning(
+                            "Ignoring transient total_cycles=0 reading; returning last known value (%s).",
+                            last_known_statistics.total_cycles,
+                        )
+                        return last_known_statistics
                     last_known_statistics = stats
                     return stats
             except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
@@ -777,58 +790,69 @@ def _register_full_checkup_listener(
             hass.config_entries.async_update_entry(config_entry, data=new_data)
             coordinator.async_update_listeners()
 
-            if stats_coordinator is not None:
-
-                async def _update_baseline() -> None:
-                    await stats_coordinator.async_request_refresh()
-                    total: int | None = None
-                    if stats_coordinator.data is not None:
-                        total = stats_coordinator.data.total_cycles
-                    else:
-                        restored = _restore_last_known_statistics(hass, entry_id)
-                        if restored is not None:
-                            total = restored.total_cycles
-
-                    if total is not None:
-                        new_data = dict(config_entry.data)
-                        new_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = total
-                        hass.config_entries.async_update_entry(
-                            config_entry, data=new_data
-                        )
-                        stats_coordinator.async_update_listeners()
-
-                config_entry.async_create_background_task(
-                    hass,
-                    _update_baseline(),
-                    name=f"{DOMAIN}_{config_entry.entry_id}_update_full_checkup_baseline",
-                )
-
-            if (
+            needs_reset = (
                 config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
                 and status.remote_control
-            ):
-                interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-                reset_prnm = 2 if is_dualtech(interface_type) else 11
+            )
+            if needs_reset or stats_coordinator is not None:
 
-                async def _send_reset() -> None:
-                    try:
-                        await client.send_command(
-                            urlencode(
-                                {"Write": 1, "StSt": 0, "PrNm": reset_prnm},
-                                quote_via=quote,
+                async def _handle_full_checkup_completion() -> None:
+                    if needs_reset:
+                        interface_type = config_entry.data.get(
+                            CONF_KEY_INTERFACE_TYPE, ""
+                        )
+                        reset_prnm = 2 if is_dualtech(interface_type) else 11
+                        try:
+                            await client.send_command(
+                                urlencode(
+                                    {"Write": 1, "StSt": 0, "PrNm": reset_prnm},
+                                    quote_via=quote,
+                                )
                             )
+                            await asyncio.sleep(5)
+                            await coordinator.async_request_refresh()
+                        except Exception as err:
+                            _LOGGER.warning(
+                                "Failed to reset appliance check-up state: %s", err
+                            )
+
+                    if stats_coordinator is not None:
+                        await stats_coordinator.async_request_refresh()
+                        total: int | None = None
+                        if stats_coordinator.data is not None:
+                            total = stats_coordinator.data.total_cycles
+                        else:
+                            restored = _restore_last_known_statistics(hass, entry_id)
+                            if restored is not None:
+                                total = restored.total_cycles
+
+                        current_baseline = config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, 0
                         )
-                        await asyncio.sleep(5)
-                        await coordinator.async_request_refresh()
-                    except Exception as err:
-                        _LOGGER.warning(
-                            "Failed to reset appliance check-up state: %s", err
-                        )
+                        if (
+                            total is not None
+                            and total > 0
+                            and total >= current_baseline
+                        ):
+                            new_entry_data = dict(config_entry.data)
+                            new_entry_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = (
+                                total
+                            )
+                            hass.config_entries.async_update_entry(
+                                config_entry, data=new_entry_data
+                            )
+                            stats_coordinator.async_update_listeners()
+                        elif total is not None and total < current_baseline:
+                            _LOGGER.warning(
+                                "Ignoring cycle count %s lower than current baseline %s",
+                                total,
+                                current_baseline,
+                            )
 
                 config_entry.async_create_background_task(
                     hass,
-                    _send_reset(),
-                    name=f"{DOMAIN}_{config_entry.entry_id}_send_full_checkup_reset",
+                    _handle_full_checkup_completion(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_complete_full_checkup",
                 )
 
     return coordinator.async_add_listener(_on_status_update)
@@ -908,13 +932,26 @@ def _register_limescale_listener(
                             if restored is not None:
                                 total = restored.total_cycles
 
-                        if total is not None:
+                        current_baseline = config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_LIMESCALE, 0
+                        )
+                        if (
+                            total is not None
+                            and total > 0
+                            and total >= current_baseline
+                        ):
                             new_data = dict(config_entry.data)
                             new_data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] = total
                             hass.config_entries.async_update_entry(
                                 config_entry, data=new_data
                             )
                             stats_coordinator.async_update_listeners()
+                        elif total is not None and total < current_baseline:
+                            _LOGGER.warning(
+                                "Ignoring cycle count %s lower than current baseline %s",
+                                total,
+                                current_baseline,
+                            )
 
                     config_entry.async_create_background_task(
                         hass,

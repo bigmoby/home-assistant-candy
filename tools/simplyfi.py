@@ -478,6 +478,15 @@ def fetch_new_statistics_json(
     )
     if not resp_text:
         raise CandyProtocolError("Empty statistics payload returned from GetStat=1")
+
+    if use_encryption and key and not (resp_text.startswith("{") and resp_text.endswith("}")):
+        try:
+            raw_bytes = bytes.fromhex(resp_text)
+            decrypted = xor_decrypt_bytes(raw_bytes, key)
+            resp_text = decrypted.decode("utf-8", errors="replace").strip().strip("\x00").strip()
+        except ValueError as exc:
+            raise CandyProtocolError(f"Failed to hex-decode GetStat=1 response: {exc}") from exc
+
     try:
         data = json.loads(resp_text)
         if isinstance(data, dict) and "statusCounters" in data:

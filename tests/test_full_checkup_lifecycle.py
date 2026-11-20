@@ -439,8 +439,40 @@ async def test_full_checkup_reset_uses_background_task(
         await hass.async_block_till_done()
 
         task_names = [call.kwargs.get("name") for call in mock_bg_task.call_args_list]
-        assert f"{DOMAIN}_{entry.entry_id}_send_full_checkup_reset" in task_names
-        assert f"{DOMAIN}_{entry.entry_id}_update_full_checkup_baseline" in task_names
+        assert f"{DOMAIN}_{entry.entry_id}_complete_full_checkup" in task_names
+
+
+async def test_full_checkup_completion_ignores_transient_zero(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+):
+    """A transient zero reading on checkup completion does not overwrite a positive baseline."""
+    _STATS_ZERO = (
+        '{"statusCounters": {"Temp0to30": "0", "Temp40": "0", "Temp60to90": "0"}}'
+    )
+    entry = await _setup(
+        hass,
+        aioclient_mock,
+        _RUNNING_CHECKUP_JSON,
+        **{CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 50},
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    with (
+        patch("custom_components.candy.pn_async_create"),
+        patch("custom_components.candy.pn_async_dismiss"),
+        patch(
+            "custom_components.candy.client.CandyClient.send_command",
+            new_callable=AsyncMock,
+        ),
+        patch("custom_components.candy.asyncio.sleep"),
+    ):
+        _mock_status(aioclient_mock, _COMPLETED_CHECKUP_JSON, _STATS_ZERO)
+        await coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    # Baseline remains 50, not overwritten by transient 0
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 50
 
 
 def test_full_checkup_coordinator_data_none(
