@@ -105,7 +105,7 @@ Washer-dryers combine standard washing controls with dedicated drying management
 
 - **Wash Programs:** Select from your machine's full range of localized cycles (e.g. *Eco 45°C*, *Intensive 75°C*, *Universal 60°C*, *Auto Daily*, *Zoom 39'*, *Rapid 24'*, *Prewash*).
 - **Wash Options:** Toggle tailored wash stages including **Eco**, **Half Load**, **Extra Dry**, and **3-in-1** tablet detergent mode.
-- **Motorized Door Opening:** On supported models equipped with motorized latches (`_OD` interface suffix), enable automatic door opening during drying or tap **Open Door** to release the door immediately from Home Assistant.
+- **Motorized Door Opening:** On supported models equipped with motorized latches, enable automatic door opening during drying or tap **Open Door** to release the door immediately from Home Assistant.
 - **Delay Start:** Program start delays in minutes or hours to run dishes during cheaper off-peak electricity hours.
 - **Door Safety & Interlocks:** Cycles are safely locked out whenever the door is open or the physical knob is turned away from the Wi-Fi position.
 
