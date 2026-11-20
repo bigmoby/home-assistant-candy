@@ -94,8 +94,8 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 ## 🛠️ Installation
 
 ### Method 1: HACS (Recommended)
-1. Install [HACS](https://hacs.xyz/). Not required since Home Assistant 2026.11, where it has been ren
-2. Go to the HACS integrations page, search for `Candy Simply-Fi` and download it.
+1. Install [HACS](https://hacs.xyz/). Not required since Home Assistant 2026.11, renamed to **Marketplace**.
+2. Go to the HACS/Marketplace page, search for `Candy Simply-Fi` and download it.
 3. Restart Home Assistant.
 4. Go to **Settings > Devices & Services**, click **Add integration** and search for `Candy`.
 5. Enter the **IP Address** of your appliance.
