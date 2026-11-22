@@ -93,6 +93,7 @@ from .const import (
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
     UNIQUE_ID_WASH_TOTAL_CYCLES,
+    UNIQUE_ID_WASHER_DRYER,
     UNIQUE_ID_WASHING_MACHINE,
     UNIQUE_ID_WINE_COOLER,
 )
@@ -112,6 +113,9 @@ _OFF_INFERRED_STATES = {
     MachineState.FINISHED1,
     MachineState.FINISHED2,
     MachineState.IDLE,
+    MachineState.DELAYED_START_SELECTION,
+    MachineState.DELAYED_START_PROGRAMMED,
+    DishwasherState.FINISHED,
     DishwasherState.IDLE,
     OvenState.IDLE,
     WineCoolerState.OFF,
@@ -199,6 +203,7 @@ def _restore_last_known_status(
     ]
     candidates: list[tuple[str, StatusFactory]] = [
         (UNIQUE_ID_WASHING_MACHINE.format(config_entry_id), _offline_washing_machine),
+        (UNIQUE_ID_WASHER_DRYER.format(config_entry_id), _offline_washing_machine),
         (UNIQUE_ID_TUMBLE_DRYER.format(config_entry_id), _offline_tumble_dryer),
         (UNIQUE_ID_DISHWASHER.format(config_entry_id), _offline_dishwasher),
         (UNIQUE_ID_OVEN.format(config_entry_id), _offline_oven),
@@ -385,9 +390,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     async def update_status():
         nonlocal last_known_status, consecutive_timeouts
         prev_state = getattr(last_known_status, "machine_state", None)
-        can_infer_off = (
-            prev_state in _OFF_INFERRED_STATES or prev_state == MachineState.OFF
-        )
+        is_already_off = prev_state in (MachineState.OFF, WineCoolerState.OFF)
+        can_infer_off = prev_state in _OFF_INFERRED_STATES or is_already_off
         # When we can fall back to Off, use a short timeout — this cuts the stall caused by
         # the OS TCP retransmit cycle (~13s) for offline devices. 7s is chosen to guarantee
         # the rate limiter (max_rate=1, time_period=3s) clears before the HTTP request starts,
@@ -407,7 +411,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 return status
         except (TimeoutError, aiohttp.ClientError) as err:
             consecutive_timeouts += 1
-            if prev_state == MachineState.OFF:
+            if is_already_off:
                 coordinator.update_interval = SCAN_INTERVAL_RESTING
                 last_known_status = _make_off_status(last_known_status)
                 return last_known_status
