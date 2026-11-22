@@ -324,6 +324,73 @@ def test_dishwasher_parser_resilience() -> None:
     assert DishwasherStatus.from_json(payload).program == "P1"
 
 
+def test_dishwasher_telemetry_fuzzing_all_registers() -> None:
+    """Fuzz all modern dishwasher registers with corrupt, invalid, and edge-case values."""
+    payload = copy.deepcopy(BASE_DISHWASHER_JSON)
+    payload.update(
+        {
+            "r1": "corrupt_pos",
+            "r2": "2",
+            "r6": "corrupt_buzzer",
+            "r7": "corrupt_hardness",
+            "r8": "corrupt_counter",
+            "r9": "NULL",
+            "r15": "corrupt_unit",
+            "RemTime": "corrupt_time",
+            "DelayStart": "corrupt_delay",
+            "CheckUp": "corrupt_checkup",
+            "DisTestRes": "corrupt_result",
+            "StatoDWash": "corrupt_mode",
+        }
+    )
+
+    # Must parse without throwing exceptions
+    status = DishwasherStatus.from_json(payload)
+    assert status.machine_state == MachineState.IDLE
+    assert status.remaining_minutes == 0
+    assert status.delayed_start_minutes is None
+    assert status.selector_position is None
+    assert status.buzzer_level is None
+    assert status.buzzer is None
+    assert status.water_hardness is None
+    assert status.last_cycle_counter is None
+    assert status.remember_last_cycle is None
+    assert status.auto_clean_warning is False
+    assert status.checkup_state is None
+    assert status.checkup_result is None
+
+    # Valid values test
+    payload.update(
+        {
+            "r1": "3",
+            "r6": "2",
+            "r7": "5",
+            "r8": "1",
+            "r9": "H_CLEAN_REQUIRED",
+            "r15": "1",
+            "CheckUp": "2",
+            "DisTestRes": "0",
+            "OpenDoorOpt": "1",
+            "DelayStart": "45",
+            "StatoDWash": "3",
+            "RemTime": "90",
+        }
+    )
+    status_valid = DishwasherStatus.from_json(payload)
+    assert status_valid.selector_position == 3
+    assert status_valid.buzzer_level == 2
+    assert status_valid.buzzer is True
+    assert status_valid.water_hardness == 5
+    assert status_valid.last_cycle_counter == 1
+    assert status_valid.remember_last_cycle is True
+    assert status_valid.auto_clean_warning is True
+    assert status_valid.checkup_state == CheckUpState.COMPLETED
+    assert status_valid.checkup_result == CheckUpResult.NOT_RUN
+    assert status_valid.door_open_allowed is True
+    assert status_valid.delayed_start_minutes == 45
+    assert status_valid.remaining_minutes == 90
+
+
 def test_oven_parser_resilience() -> None:
     """Oven parser must convert Fahrenheit to Celsius without error."""
     payload = copy.deepcopy(BASE_OVEN_JSON)

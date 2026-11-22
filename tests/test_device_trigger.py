@@ -6,6 +6,7 @@ from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_PLATFORM, CONF
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.candy.client.model import (
+    DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
     MachineState,
@@ -15,6 +16,7 @@ from custom_components.candy.client.model import (
     WashProgramState,
 )
 from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
@@ -218,6 +220,64 @@ async def test_get_triggers_tumble_dryer(hass):
         "water_tank_full",
         "error_reported",
     }
+
+
+async def test_get_triggers_legacy_dishwasher_excludes_maintenance(hass):
+    """Legacy dishwashers return only state triggers, excluding checkup and limescale triggers."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="gt-legacy-dw",
+        data={
+            CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeBuiltIn",
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    status = DishwasherStatus(
+        machine_state=MachineState.IDLE,
+        program_phase=None,
+        program="P1",
+        remaining_minutes=0,
+        delayed_start_minutes=None,
+        door_open=False,
+        door_open_allowed=None,
+        eco_mode=False,
+        remote_control=True,
+        salt_empty=False,
+        rinse_aid_empty=False,
+        running=False,
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=None,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        remember_last_cycle=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        checkup_result=None,
+        r15=0,
+        selector_position=None,
+    )
+
+    coordinator = MagicMock()
+    coordinator.data = status
+    hass.data[DOMAIN] = {entry.entry_id: {DATA_KEY_COORDINATOR: coordinator}}
+
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = _mock_device(entry.entry_id)
+        result = await async_get_triggers(hass, device_id="dev-legacy-dw")
+
+    types = {t[CONF_TYPE] for t in result}
+    assert types == {
+        "dishwashing_started",
+        "dishwashing_completed",
+        "error_reported",
+    }
+    assert "maintenance_full_checkup_due" not in types
+    assert "maintenance_limescale_due" not in types
 
 
 # ---------------------------------------------------------------------------

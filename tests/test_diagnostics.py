@@ -7,7 +7,10 @@ from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.candy.client.model import DishwasherStatus
 from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_IS_DISHWASHER,
     CONF_KEY_MAC_ADDRESS,
     CONF_KEY_SERIAL_NUMBER,
     DATA_KEY_CLIENT,
@@ -370,3 +373,72 @@ async def test_diagnostics_arbitrary_object_serialization(hass):
 
     result = await async_get_config_entry_diagnostics(hass, entry)
     assert result["coordinator_data"] == "custom_str_representation"
+
+
+async def test_diagnostics_dishwasher_happy_path_with_dissection(hass):
+    """Test diagnostics for a dishwasher entry including dissection of statusDWash."""
+    dw_read_payload = {
+        "statusDWash": {
+            "StatoWiFi": "1",
+            "StatoDWash": "0",
+            "CodiceErrore": "E0",
+            "StartStop": "0",
+            "Program": "P1",
+            "OpzProg": "p",
+            "DelayStart": "0",
+            "RemTime": "0",
+            "OpenDoor": "0",
+            "MissSalt": "0",
+            "MissRinse": "0",
+        }
+    }
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="diag-dw-happy",
+        data={
+            CONF_IP_ADDRESS: "192.168.1.150",
+            CONF_PASSWORD: "secret_dw_password",
+            CONF_KEY_MAC_ADDRESS: "11:22:33:44:55:66",
+            CONF_KEY_SERIAL_NUMBER: "SN_DW_12345",
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    status = DishwasherStatus.from_json(dw_read_payload["statusDWash"])
+    coordinator = MagicMock()
+    coordinator.data = status
+
+    client = MagicMock()
+    client.fetch_all_endpoints = AsyncMock(
+        return_value={"http-read.json": dw_read_payload}
+    )
+
+    hass.data[DOMAIN] = {
+        entry.entry_id: {
+            DATA_KEY_COORDINATOR: coordinator,
+            DATA_KEY_CLIENT: client,
+        }
+    }
+
+    result = await async_get_config_entry_diagnostics(hass, entry)
+
+    # Redactions
+    config_data = result["config_entry"]
+    assert config_data[CONF_IP_ADDRESS] == "**REDACTED**"
+    assert config_data[CONF_PASSWORD] == "**REDACTED**"
+    assert config_data[CONF_KEY_MAC_ADDRESS] == "**REDACTED**"
+    assert config_data[CONF_KEY_SERIAL_NUMBER] == "**REDACTED**"
+
+    # Dissection
+    dissection = result["dissection"]
+    assert dissection["appliance_family"] == "Dishwasher"
+    registers = {r["register"]: r for r in dissection["decoded_registers"]}
+    assert registers["StatoDWash"]["meaning"] == "Idle / Ready"
+    assert registers["OpenDoor"]["meaning"] == "Door CLOSED"
+
+    # Coordinator data serialized
+    assert isinstance(result["coordinator_data"], dict)
+    assert result["coordinator_data"]["program"] == "P1+"
