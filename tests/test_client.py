@@ -661,6 +661,28 @@ async def test_fetch_statistics_dishwasher(hass, aioclient_mock):
     assert stats.total_cycles == 25
 
 
+async def test_fetch_statistics_modern_dishwasher_empty_counters(hass, aioclient_mock):
+    """Test fetch_statistics parses DishwasherStatistics when modern dishwasher returns empty counters."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        json={"response": "SUCCESS"},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        json={"statusCounters": {}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    client.interface_type = "BRAVA_BI_DIGIT_OD"
+    stats = await client.fetch_statistics()
+    assert isinstance(stats, DishwasherStatistics)
+    assert stats.total_cycles == 0
+
+
 async def test_fetch_all_endpoints_modern_vs_legacy_dishwasher(hass, aioclient_mock):
     """Test fetch_all_endpoints probes statistics for modern dishwashers but skips legacy."""
     telemetry = {"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}}

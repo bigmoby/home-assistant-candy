@@ -616,6 +616,96 @@ async def test_state_trigger_drying_completed(hass):
         assert mock_job.call_count == 1
 
 
+def _make_dw_status(
+    state: MachineState, error_code: str | None = None
+) -> DishwasherStatus:
+    return DishwasherStatus(
+        machine_state=state,
+        program_phase=None,
+        program="P1",
+        remaining_minutes=0,
+        delayed_start_minutes=None,
+        door_open=False,
+        door_open_allowed=None,
+        eco_mode=False,
+        remote_control=True,
+        salt_empty=False,
+        rinse_aid_empty=False,
+        running=(state == MachineState.RUNNING),
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=error_code,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        remember_last_cycle=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        checkup_result=None,
+        r15=0,
+        selector_position=None,
+    )
+
+
+async def _attach_dw_state_cb(hass, trigger_type, initial_state):
+    """Set up a dishwasher state trigger and return (coordinator, on_update callback)."""
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=f"scb-dw-{trigger_type}", data={})
+    entry.add_to_hass(hass)
+
+    coordinator = MagicMock()
+    coordinator.data = _make_dw_status(initial_state)
+    captured = []
+    coordinator.async_add_listener = lambda cb: captured.append(cb) or (lambda: None)
+
+    hass.data[DOMAIN] = {entry.entry_id: {DATA_KEY_COORDINATOR: coordinator}}
+
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = _mock_device(entry.entry_id)
+        await async_attach_trigger(
+            hass, _trigger_config(trigger_type), MagicMock(), {"trigger_data": {}}
+        )
+
+    assert len(captured) == 1
+    return coordinator, captured[0]
+
+
+async def test_state_trigger_dishwashing_started(hass):
+    """dishwashing_started fires on IDLE->RUNNING but not RUNNING->RUNNING or PAUSED->RUNNING."""
+    coordinator, on_update = await _attach_dw_state_cb(
+        hass, "dishwashing_started", MachineState.IDLE
+    )
+
+    with patch.object(hass, "async_run_hass_job") as mock_job:
+        coordinator.data = _make_dw_status(MachineState.RUNNING)
+        on_update()
+        assert mock_job.call_count == 1
+
+        on_update()
+        assert mock_job.call_count == 1
+
+        coordinator.data = _make_dw_status(MachineState.PAUSED)
+        on_update()
+        coordinator.data = _make_dw_status(MachineState.RUNNING)
+        on_update()
+        assert mock_job.call_count == 1
+
+
+async def test_state_trigger_dishwashing_completed(hass):
+    """dishwashing_completed fires when entering FINISHED1 from non-finished state."""
+    coordinator, on_update = await _attach_dw_state_cb(
+        hass, "dishwashing_completed", MachineState.RUNNING
+    )
+
+    with patch.object(hass, "async_run_hass_job") as mock_job:
+        coordinator.data = _make_dw_status(MachineState.FINISHED1)
+        on_update()
+        assert mock_job.call_count == 1
+
+        on_update()
+        assert mock_job.call_count == 1
+
+
 async def test_dryer_warning_trigger_clean_filter_needed(hass):
     """clean_filter_needed fires when need_clean_filter transitions from False to True."""
 

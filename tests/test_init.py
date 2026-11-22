@@ -72,6 +72,7 @@ from custom_components.candy.const import (
     CONF_KEY_IS_DISHWASHER,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
+    CONF_KEY_MAINTENANCE_LAST_FILTER,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
     CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED,
@@ -1904,6 +1905,74 @@ async def test_maintenance_notification_hardness_fallback_and_options(
     _register_maintenance_notifications(
         hass, entry_limescale, stats_coordinator, coordinator=None
     )
+
+
+async def test_dishwasher_maintenance_notifications_inferred_from_coordinator(
+    hass: HomeAssistant,
+):
+    """When CONF_KEY_IS_DISHWASHER is absent, _register_maintenance_notifications
+    infers dishwasher from coordinator.data.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-dw-maint-inferred",
+        data={
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+            CONF_KEY_MAINTENANCE_FILTER_ENABLED: True,
+            CONF_KEY_MAINTENANCE_LAST_FILTER: 0,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    status = DishwasherStatus(
+        machine_state=MachineState.IDLE,
+        program_phase=None,
+        program="P1",
+        remaining_minutes=0,
+        delayed_start_minutes=None,
+        door_open=False,
+        door_open_allowed=None,
+        eco_mode=False,
+        remote_control=True,
+        salt_empty=False,
+        rinse_aid_empty=False,
+        running=False,
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=None,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        remember_last_cycle=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        checkup_result=None,
+        r15=0,
+        selector_position=None,
+    )
+    coordinator = MagicMock()
+    coordinator.data = status
+
+    stats_coordinator = MagicMock()
+    stats_coordinator.data = DishwasherStatistics(total_cycles=30)
+    listener_cb = None
+
+    def _capture(cb):
+        nonlocal listener_cb
+        listener_cb = cb
+        return lambda: None
+
+    stats_coordinator.async_add_listener = _capture
+
+    with patch("custom_components.candy.pn_async_create") as mock_pn:
+        _register_maintenance_notifications(
+            hass, entry, stats_coordinator, coordinator=coordinator
+        )
+        assert listener_cb is not None
+        listener_cb()
+        assert mock_pn.call_count == 1
+        assert "filter" in mock_pn.call_args[1]["notification_id"]
 
 
 async def test_dishwasher_warning_listener_lifecycle(hass: HomeAssistant):

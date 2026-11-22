@@ -34,7 +34,6 @@ from .const import (
     DATA_KEY_COORDINATOR,
     DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
-    DISHWASHER_PROGRAMS,
     DOMAIN,
     MODE_FULL_CONTROL,
     UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
@@ -54,6 +53,7 @@ from .const import (
 from .coordinator import CandyDataUpdateCoordinator
 from .helpers import (
     dishwasher_device_info,
+    find_dishwasher_program,
     remote_control_enabled,
     supports_autodose,
     wash_device_info,
@@ -565,19 +565,7 @@ class _CandyDishwasherSwitchBase(CoordinatorEntity, SwitchEntity):
                 lang = self.config_entry.data.get(
                     CONF_KEY_PROGRAM_LANGUAGE, self.hass.config.language
                 )
-                return next(
-                    (
-                        p
-                        for p in self._programs
-                        if p.localized_name(lang) == state.state
-                        or p.name == state.state
-                        or (
-                            state.state in DISHWASHER_PROGRAMS
-                            and f"P{p.cycle_id}" == DISHWASHER_PROGRAMS[state.state]
-                        )
-                    ),
-                    None,
-                )
+                return find_dishwasher_program(self._programs, state.state, lang)
         return None
 
     @property

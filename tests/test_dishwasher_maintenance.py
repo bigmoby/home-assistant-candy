@@ -21,6 +21,7 @@ from custom_components.candy.const import (
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
     CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED,
     CONF_KEY_WATER_HARDNESS,
+    DATA_KEY_STATS_COORDINATOR,
     UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
     UNIQUE_ID_DISHWASHER_MAINT_FILTER,
     UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON,
@@ -362,3 +363,54 @@ async def test_dishwasher_device_triggers(
     assert "maintenance_full_checkup_due" in types
     assert "maintenance_limescale_due" in types
     assert "maintenance_filter_due" in types
+
+
+async def test_modern_dishwasher_maintenance_reset_button_when_offline_uses_restored_stats(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When appliance is offline and stats_coordinator.data is None, reset button recovers baseline from restored stats."""
+    status = _make_status_json(
+        _READY_FIXTURE,
+        {"r7": "3", "StatoWiFi": "1", "StatoDWash": "2"},
+    )
+    stats = json.dumps({"statusCounters": {"s1": "20", "s2": "10"}})
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        status,
+        stats,
+        {
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+            CONF_KEY_WATER_HARDNESS: 2,
+        },
+    )
+
+    registry = er.async_get(hass)
+    stats_coord = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
+
+    total_sensor_id = registry.async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(entry.entry_id),
+    )
+    assert total_sensor_id is not None
+    hass.states.async_set(total_sensor_id, "30")
+
+    # Simulate device going offline (stats coordinator data is None)
+    stats_coord.data = None
+
+    filter_btn_id = registry.async_get_entity_id(
+        "button",
+        DOMAIN,
+        UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON.format(entry.entry_id),
+    )
+    assert filter_btn_id is not None
+    await hass.services.async_call(
+        "button", "press", {"entity_id": filter_btn_id}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    # Baseline is set to 30 (restored total cycles), not corrupted to 0
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 30

@@ -128,6 +128,7 @@ from .helpers import (
     is_dishwasher_digit_or_smooth_interface,
     is_dualtech,
     localized_notification_text,
+    restore_last_known_statistics as _restore_last_known_statistics,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -242,39 +243,6 @@ def _restore_last_known_status(
             return factory()
 
     return None
-
-
-def _restore_last_known_statistics(
-    hass: HomeAssistant,
-    config_entry_id: str,
-    is_dishwasher: bool,
-) -> WashingMachineStatistics | DishwasherStatistics | None:
-    """Read the persisted total-cycles value from HA's state machine.
-
-    Returns a WashingMachineStatistics or DishwasherStatistics populated from the
-    last known sensor state, or None if the entity was never registered or its state
-    is not a valid integer.
-    """
-    registry = er.async_get(hass)
-    unique_id = (
-        UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(config_entry_id)
-        if is_dishwasher
-        else UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
-    )
-    entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-    if entity_id is None:
-        return None
-    state = hass.states.get(entity_id)
-    if state is None or not state.state.isdigit():
-        return None
-    _LOGGER.debug(
-        "Restored total_cycles from HA state machine: %s = %s",
-        entity_id,
-        state.state,
-    )
-    if is_dishwasher:
-        return DishwasherStatistics(total_cycles=int(state.state))
-    return WashingMachineStatistics(total_cycles=int(state.state))
 
 
 def _offline_washing_machine() -> WashingMachineStatus:
@@ -824,7 +792,10 @@ def _register_maintenance_notifications(
 ) -> Callable[[], None]:
     entry_id = config_entry.entry_id
     lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
-    is_dishwasher = bool(config_entry.data.get(CONF_KEY_IS_DISHWASHER, False))
+    is_dishwasher = bool(
+        config_entry.data.get(CONF_KEY_IS_DISHWASHER, False)
+        or (coordinator is not None and isinstance(coordinator.data, DishwasherStatus))
+    )
 
     def _get_limescale_threshold() -> int:
         if is_dishwasher:

@@ -16,7 +16,6 @@ import voluptuous as vol
 
 from .client import is_legacy_dishwasher
 from .client.model import (
-    DishwasherState,
     DishwasherStatistics,
     DishwasherStatus,
     MachineState,
@@ -252,27 +251,15 @@ def _attach_state_trigger(
 
         if isinstance(status, DishwasherStatus):
             if trigger_type == "dishwashing_started":
-                should_fire = (
-                    curr
-                    not in (
-                        DishwasherState.IDLE,
-                        DishwasherState.FINISHED,
-                        DishwasherState.DELAYED_START,
-                    )
-                ) and (
-                    prev
-                    in (
-                        DishwasherState.IDLE,
-                        DishwasherState.FINISHED,
-                        DishwasherState.DELAYED_START,
-                        None,
-                    )
-                )
+                should_fire = curr == MachineState.RUNNING and prev not in {
+                    MachineState.RUNNING,
+                    MachineState.PAUSED,
+                }
             elif trigger_type == "dishwashing_completed":
-                should_fire = (
-                    curr == DishwasherState.FINISHED
-                    and prev != DishwasherState.FINISHED
-                )
+                should_fire = curr in {
+                    MachineState.FINISHED1,
+                    MachineState.FINISHED2,
+                } and prev not in {MachineState.FINISHED1, MachineState.FINISHED2}
             else:  # error_reported
                 should_fire = curr_err not in (None, "0", "E0") and p_err in (
                     None,

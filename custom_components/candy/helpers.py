@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 
 from .client import is_legacy_dishwasher, parse_wash_programs
 from .client.dryer_commands import is_dualtech_dryer_interface
 from .client.model import (
     _PROGRAM_NAMES,
+    DishwasherProgram,
+    DishwasherStatistics,
     DishwasherStatus,
     TumbleDryerStatus,
+    WashingMachineStatistics,
     WashingMachineStatus,
     WashingMachineWashProgram,
 )
@@ -30,6 +35,8 @@ from .const import (
     DEVICE_NAME_WASHER_DRYER,
     DEVICE_NAME_WASHING_MACHINE,
     DISHWASHER_PROGRAM_NAME_KEYS,
+    DISHWASHER_PROGRAM_PANEL,
+    DISHWASHER_PROGRAMS,
     DISHWASHER_TELEMETRY_TO_KEYS,
     DOMAIN,
     DRY_TARGET_TO_VALUE,
@@ -38,8 +45,12 @@ from .const import (
     MODE_FULL_CONTROL,
     SUGGESTED_AREA_BATHROOM,
     SUGGESTED_AREA_KITCHEN,
+    UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
+    UNIQUE_ID_WASH_TOTAL_CYCLES,
     VALUE_TO_DRY_TARGET,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 _NOTIFICATION_STRINGS: dict[str, dict[str, str]] = json.loads(
     (Path(__file__).parent / "client" / "notification_strings.json").read_text(
@@ -420,3 +431,59 @@ def _lookup_translation(
     if "en" in translations:
         return translations["en"]
     return next(iter(translations.values()), None)
+
+
+def find_dishwasher_program(
+    programs: list[DishwasherProgram],
+    program_identifier: str,
+    language: str,
+) -> DishwasherProgram | None:
+    """Find a DishwasherProgram matching an option name, translation key, register code, or cycle id."""
+    if not program_identifier or program_identifier == DISHWASHER_PROGRAM_PANEL:
+        return None
+    for p in programs:
+        if (
+            p.localized_name(language) == program_identifier
+            or p.name == program_identifier
+            or (
+                program_identifier in DISHWASHER_PROGRAMS
+                and f"P{p.cycle_id}" == DISHWASHER_PROGRAMS[program_identifier]
+            )
+            or f"P{p.cycle_id}" == program_identifier
+            or str(p.cycle_id) == program_identifier.lstrip("P").rstrip("+-")
+        ):
+            return p
+    return None
+
+
+def restore_last_known_statistics(
+    hass: HomeAssistant,
+    config_entry_id: str,
+    is_dishwasher: bool,
+) -> WashingMachineStatistics | DishwasherStatistics | None:
+    """Read the persisted total-cycles value from HA's state machine.
+
+    Returns a WashingMachineStatistics or DishwasherStatistics populated from the
+    last known sensor state, or None if the entity was never registered or its state
+    is not a valid integer.
+    """
+    registry = er.async_get(hass)
+    unique_id = (
+        UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(config_entry_id)
+        if is_dishwasher
+        else UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
+    )
+    entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
+    if entity_id is None:
+        return None
+    state = hass.states.get(entity_id)
+    if state is None or not state.state.isdigit():
+        return None
+    _LOGGER.debug(
+        "Restored total_cycles from HA state machine: %s = %s",
+        entity_id,
+        state.state,
+    )
+    if is_dishwasher:
+        return DishwasherStatistics(total_cycles=int(state.state))
+    return WashingMachineStatistics(total_cycles=int(state.state))

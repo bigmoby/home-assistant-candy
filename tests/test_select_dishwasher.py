@@ -121,3 +121,58 @@ async def test_select_unavailable_when_running(
     state = hass.states.get(select_id)
     assert state is not None
     assert state.state == "unavailable"
+
+
+async def test_select_program_resolution_and_selected_program_property(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test selected_program property in both catalog and fallback modes."""
+    # 1. Fallback mode
+    entry_fb = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    select_id_fb = _entity_id(
+        hass, entry_fb, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT
+    )
+    entity_fb = hass.data["entity_components"]["select"].get_entity(select_id_fb)
+    assert entity_fb is not None
+    assert entity_fb.selected_program is None
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select_id_fb, "option": "night_55"},
+        blocking=True,
+    )
+    prog = entity_fb.selected_program
+    assert prog is not None
+    assert prog.cycle_id == 17
+    assert prog.selector_position == 3
+
+    # 2. Catalog mode
+    catalog = _load_dw_catalog()
+    entry_cat = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={
+            CONF_KEY_PROGRAMS: catalog["programs"],
+            CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
+            CONF_KEY_PROGRAM_LANGUAGE: "en",
+        },
+    )
+    select_id_cat = _entity_id(
+        hass, entry_cat, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT
+    )
+    entity_cat = hass.data["entity_components"]["select"].get_entity(select_id_cat)
+    assert entity_cat is not None
+    assert entity_cat.selected_program is None
+
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select_id_cat, "option": "Eco 45°C"},
+        blocking=True,
+    )
+    prog_cat = entity_cat.selected_program
+    assert prog_cat is not None
+    assert prog_cat.cycle_id == 8
+    assert prog_cat.selector_position == 1

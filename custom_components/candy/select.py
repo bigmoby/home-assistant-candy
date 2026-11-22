@@ -37,6 +37,7 @@ from .const import (
     CONF_KEY_PROGRAMS,
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
     DISHWASHER_PROGRAMS,
     DOMAIN,
@@ -78,6 +79,7 @@ from .helpers import (
     dishwasher_device_info,
     dry_target_label_for_interface,
     dryer_device_info,
+    find_dishwasher_program,
     is_dualtech,
     is_washer_dryer,
     remote_control_enabled,
@@ -99,7 +101,11 @@ async def async_setup_entry(
 
     if isinstance(coordinator.data, DishwasherStatus):
         raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
-        dish_programs = parse_dish_programs(raw_programs) if raw_programs else []
+        dish_programs = (
+            parse_dish_programs(raw_programs)
+            if raw_programs
+            else parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
+        )
         prog_select = CandyDishwasherProgramSelect(
             coordinator, config_entry, dish_programs
         )
@@ -1453,7 +1459,8 @@ class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
         self.config_id = config_entry.entry_id
         self._programs = programs
         lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
-        if self._programs:
+        has_catalog = bool(config_entry.data.get(CONF_KEY_PROGRAMS, []))
+        if has_catalog:
             self._attr_options = [DISHWASHER_PROGRAM_PANEL] + [
                 p.localized_name(lang) for p in self._programs
             ]
@@ -1463,6 +1470,12 @@ class CandyDishwasherProgramSelect(CoordinatorEntity, SelectEntity):
                 *DISHWASHER_PROGRAMS.keys(),
             ]
         self._selected_option: str = DISHWASHER_PROGRAM_PANEL
+
+    @property
+    def selected_program(self) -> DishwasherProgram | None:
+        """Return the currently selected DishwasherProgram, or None if panel."""
+        lang = self.config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, "en")
+        return find_dishwasher_program(self._programs, self._selected_option, lang)
 
     @property
     def status(self) -> DishwasherStatus:

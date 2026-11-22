@@ -13,11 +13,13 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, load_f
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import DOMAIN
+from custom_components.candy.client import parse_dish_programs
 from custom_components.candy.client.model import DishwasherProgram, TumbleDryerProgram
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_PROGRAMS,
+    DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
     NOTIF_ID_DISHWASHER_ERROR,
     NOTIF_ID_DISHWASHER_RINSE,
@@ -28,6 +30,7 @@ from custom_components.candy.const import (
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
 )
 from custom_components.candy.helpers import (
+    find_dishwasher_program,
     get_appliance_error_notification_strings,
     get_dishwasher_checkup_result_strings,
     get_dishwasher_error_notification_strings,
@@ -551,3 +554,36 @@ async def test_persistent_notification_dishwasher_checkup_lifecycle(
         assert "Check-up" in kwargs["title"]
         assert "Door lock" in args[1]
         mock_send.assert_awaited_once_with("Write=1&StartStop=0&Program=11")
+
+
+def test_find_dishwasher_program() -> None:
+    """Test find_dishwasher_program resolves by localized name, key, code, and register."""
+    programs = parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
+
+    # Localized name
+    p_eco = find_dishwasher_program(programs, "Eco 45°C", "en")
+    assert p_eco is not None
+    assert p_eco.cycle_id == 8
+
+    # Fallback option key
+    p_key = find_dishwasher_program(programs, "eco_45", "en")
+    assert p_key is not None
+    assert p_key.cycle_id == 8
+
+    p_night = find_dishwasher_program(programs, "night_55", "en")
+    assert p_night is not None
+    assert p_night.selector_position == 3
+
+    # Hardware register
+    p_reg = find_dishwasher_program(programs, "P17", "en")
+    assert p_reg is not None
+    assert p_reg.cycle_id == 17
+
+    p_num = find_dishwasher_program(programs, "17", "en")
+    assert p_num is not None
+    assert p_num.cycle_id == 17
+
+    # Panel or invalid
+    assert find_dishwasher_program(programs, DISHWASHER_PROGRAM_PANEL, "en") is None
+    assert find_dishwasher_program(programs, "", "en") is None
+    assert find_dishwasher_program(programs, "nonexistent", "en") is None

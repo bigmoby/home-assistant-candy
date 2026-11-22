@@ -134,10 +134,12 @@ from .helpers import (
     dishwasher_device_info,
     dry_target_value_for_interface,
     dryer_device_info,
+    find_dishwasher_program,
     is_dualtech,
     is_washer_dryer,
     localized_notification_text,
     remote_control_enabled,
+    restore_last_known_statistics,
     supports_remote_pause,
     wash_device_info,
 )
@@ -926,6 +928,12 @@ class DishwasherMaintResetButton(CoordinatorEntity, ButtonEntity):
             total = cast(
                 DishwasherStatistics, self._stats_coordinator.data
             ).total_cycles
+        else:
+            restored = restore_last_known_statistics(self.hass, self.config_id, True)
+            if restored is not None:
+                total = restored.total_cycles
+            else:
+                total = self.config_entry.data.get(self._conf_key, 0)
         new_data = dict(self.config_entry.data)
         new_data[self._conf_key] = total
         self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
@@ -1618,18 +1626,8 @@ class CandyDishwasherStartButton(CandyDishwasherButtonBase):
         )
         selected_prog: DishwasherProgram | None = None
         if program_option and program_option != DISHWASHER_PROGRAM_PANEL:
-            selected_prog = next(
-                (
-                    p
-                    for p in self._programs
-                    if p.localized_name(lang) == program_option
-                    or p.name == program_option
-                    or (
-                        program_option in DISHWASHER_PROGRAMS
-                        and f"P{p.cycle_id}" == DISHWASHER_PROGRAMS[program_option]
-                    )
-                ),
-                None,
+            selected_prog = find_dishwasher_program(
+                self._programs, program_option, lang
             )
 
         if selected_prog is not None:
@@ -1643,15 +1641,7 @@ class CandyDishwasherStartButton(CandyDishwasherButtonBase):
         else:
             raw_code = self.status.program
             program_code = raw_code
-            matched = next(
-                (
-                    p
-                    for p in self._programs
-                    if f"P{p.cycle_id}" == raw_code
-                    or str(p.cycle_id) == raw_code.lstrip("P").rstrip("+-")
-                ),
-                None,
-            )
+            matched = find_dishwasher_program(self._programs, raw_code, lang)
             if matched is not None:
                 position = matched.selector_position
                 selected_prog = matched

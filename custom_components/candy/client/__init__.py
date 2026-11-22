@@ -368,7 +368,9 @@ class CandyClient:
             )
 
         counters = resp_json["statusCounters"]
-        if any(k.startswith("s") and k[1:].isdigit() for k in counters):
+        if is_modern_dishwasher(self.interface_type) or any(
+            k.startswith("s") and k[1:].isdigit() for k in counters
+        ):
             return DishwasherStatistics.from_json(counters)
         return WashingMachineStatistics.from_json(counters)
 
