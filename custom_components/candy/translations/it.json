@@ -68,7 +68,7 @@
       },
       "dishwasher_settings": {
         "title": "Impostazioni lavastoviglie",
-        "description": "Configura le impostazioni hardware della lavastoviglie. I parametri verranno inviati direttamente alla macchina tramite Wi-Fi locale.",
+        "description": "Configura le impostazioni hardware della lavastoviglie. I parametri verranno inviati direttamente alla macchina tramite Wi-Fi.",
         "data": {
           "water_hardness": "Durezza dell'acqua",
           "dishwasher_buzzer": "Segnale acustico di fine ciclo (buzzer)",
