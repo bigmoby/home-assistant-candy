@@ -106,6 +106,17 @@ Washer-dryers combine standard washing controls with dedicated drying management
 - **Wash Programs:** Select from your machine's full range of localized cycles (e.g. *Eco 45°C*, *Intensive 75°C*, *Universal 60°C*, *Auto Daily*, *Zoom 39'*, *Rapid 24'*, *Prewash*).
 - **Wash Options:** Toggle tailored wash stages including **Eco**, **Half Load**, **Extra Dry**, and **3-in-1** tablet detergent mode.
 - **Motorized Door Opening:** On supported models equipped with motorized latches, enable automatic door opening during drying or tap **Open Door** to release the door immediately from Home Assistant.
+- **Hardware User Settings:** Modern dishwashers persist customizable hardware settings that can be configured directly from Home Assistant without the vendor app:
+  - **Water Hardness:** Set your local water hardness level. This updates the machine's ion-exchange regenerator and dynamically adapts the limescale cleaning reminder.
+    - **LED Displays** (e.g. `AXI_BI_LED`): 6 levels (`0` to `5`, corresponding to 0–90 °fH).
+    - **DIGIT / SMOOTH Displays** (e.g. `BRAVA_BI_DIGIT_OD`, `AXI_FS_SMOOTH`): 8 levels (`0` to `7`, corresponding to 0–90 °fH).
+  - **Acoustic Signal (Buzzer):** Enable or mute the end-of-cycle chime.
+  - **Remember Last Cycle (Program Memo):** Choose whether the dishwasher powers on with the last used program selected.
+  - *How to configure:* These settings are available during initial onboarding and can be modified at any time via **Settings > Devices & Services > Candy > Configure**. Changes are transmitted immediately to the machine over local Wi-Fi.
+- **Live Diagnostic Sensors:** Real-time hardware settings are exposed as diagnostic entities on your device page:
+  - `sensor.<device>_dishwasher_water_hardness`: Current hardware hardness register (`r7`).
+  - `sensor.<device>_dishwasher_buzzer`: End-of-cycle acoustic chime status (`r6`).
+  - `binary_sensor.<device>_dishwasher_remember_last_cycle`: Last cycle memory status (`r8`).
 - **Delay Start:** Program start delays in minutes or hours to run dishes during cheaper off-peak electricity hours.
 - **Door Safety & Interlocks:** Cycles are safely locked out whenever the door is open or the physical knob is turned away from the Wi-Fi position.
 
@@ -134,12 +145,14 @@ Dryers use real-time hardware alerts rather than software cycle counters:
 
 ### Dishwashers
 
-Dishwashers combine real-time consumable monitoring with periodic tub care and diagnostics:
+Dishwashers combine real-time consumable monitoring with periodic tub care, software maintenance counters, and diagnostics:
 
 - **Special Salt Reservoir:** Warns you as soon as the ion-exchange water softener salt is depleted, preventing mineral deposits and water spots on glassware.
 - **Rinse Aid Reservoir:** Warns you when rinse aid needs refilling to maintain optimal drying and sheet-off performance.
-- **Tub Maintenance Clean:** Alerts you when an auto-clean maintenance cycle is recommended to clear grease and food residue.
-- **Electronic Self Check-up:** Tap the **Check-up** button to run an automated hardware diagnostic test verifying inlet valves, heating elements, and wash/drain circulation pumps.
+- **Tub Maintenance Clean:** Alerts you when an auto-clean maintenance cycle is recommended by the machine to clear grease and food residue.
+- **Filter Cleaning Reminder:** Cycle-based countdown reminding you to inspect and clean the debris filter (calibrated to the 30-cycle vendor recommendation).
+- **Limescale Cleaning Reminder:** Descaling reminder scaled dynamically according to your configured water hardness and display family.
+- **Electronic Self Check-up:** Tap the **Check-up** button to run an on-demand hardware diagnostic self-test verifying inlet valves, heating elements, and wash/drain circulation pumps. Unlike washing machines, dishwashers execute checkups on demand and do not have an automated scheduled countdown.
 
 ---
 

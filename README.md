@@ -17,7 +17,7 @@ Fully compliant with strictly-typed Home Assistant (>= 2024.x) development stand
   - 🧺 Washing Machine — with optional **Full Remote Control** (see below)
   - 🔄 Washer Dryer combo — with optional **Full Remote Control** (see below)
   - 🌫️ Tumble Dryer - with optional **Full Remote Control** (see below)
-  - 🔪 Dishwasher — with remote **Full Remote Control** (see below)
+  - 🔪 Dishwasher — with **Full Remote Control** (see below)
   - 🍳 Oven
   - 🍷 Wine Cooler / Cellar
 - **Full Remote Control:** Complete interactive control panel for **washing machines**, **washer-dryer combos**, **tumble dryers** and **dishwashers** (see the [compatibility matrix](#compatibility-note) for supported and tested models). Select localized programs, adjust wash & dry parameters (temp, spin speed, soil level, drying mode), start/pause/stop cycles, and track remote status.
@@ -85,9 +85,9 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 
 | Series / Platform | Interface / Family | Tested | Notes |
 |---|---|---|---|
-| Candy Brava / Hoover H-DISH 300 & 500 | `DW_WIFI_*` | Yes | Reference hardware (`CDIN 1D360PB`, verified with `CDPN 4D620PX` and `HDIN 2L360PB`). |
-| Hoover AXI / H-DISH 700 | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT` | No | Implemented from protocol specifications and APK reverse engineering. |
-| Legacy Touch & Built-in | `DishwasherInterfaceTypeFSTouch`, `DishwasherInterfaceTypeBuiltIn`, `DW_NFC_DIGIT_FS` | No | Implemented from protocol specifications (`CandyDishWasherCommand`). |
+| Candy Brava / Hoover H-DISH 300 & 500 | `DW_WIFI_*`, `BRAVA_*` | Yes | Reference hardware (`CDIN 1D360PB`, verified with `CDPN 4D620PX` and `HDIN 2L360PB`). Supports interactive hardware user settings (8 hardness levels, buzzer, program memo). |
+| Hoover AXI / H-DISH 700 | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT`, `AXI_BI_LED` | Yes | Supports interactive hardware user settings (6 levels for LED, 8 levels for Smooth/Digit, buzzer, program memo). |
+| Legacy Touch & Built-in | `DishwasherInterfaceTypeFSTouch`, `DishwasherInterfaceTypeBuiltIn`, `DW_NFC_DIGIT_FS` | No | Implemented from protocol specifications (`CandyDishWasherCommand`). Hardware settings and diagnostic self-tests unsupported by hardware. |
 
 ---
 

@@ -136,21 +136,32 @@ cards:
       - type: template
         icon: mdi:water-opacity
         content: >-
-          {% set h = states('sensor.<machine_name>_water_hardness') %}
+          {% set h = states('sensor.<machine_name>_dishwasher_water_hardness') %}
+          {% if h in ['unknown', 'unavailable', ''] %}{% set h = states('sensor.<machine_name>_water_hardness') %}{% endif %}
           {% if h not in ['unknown', 'unavailable', ''] %}Hardness: Level {{ h }}{% else %}Hardness: —{% endif %}
         icon_color: teal
         tap_action:
           action: more-info
-          entity: sensor.<machine_name>_water_hardness
+          entity: sensor.<machine_name>_dishwasher_water_hardness
       - type: template
         icon: mdi:volume-high
         content: >-
-          {% set b = states('sensor.<machine_name>_buzzer_volume') %}
-          {% if b not in ['unknown', 'unavailable', ''] %}Buzzer: Level {{ b }}{% else %}Buzzer: —{% endif %}
+          {% set b = states('sensor.<machine_name>_dishwasher_buzzer') %}
+          {% if b in ['unknown', 'unavailable', ''] %}{% set b = states('sensor.<machine_name>_buzzer_volume') %}{% endif %}
+          {% if b in ['on', 'true', 'True', '1', '2', '3'] %}Buzzer: On{% elif b in ['off', 'false', 'False', '0'] %}Buzzer: Muted{% else %}Buzzer: —{% endif %}
         icon_color: grey
         tap_action:
           action: more-info
-          entity: sensor.<machine_name>_buzzer_volume
+          entity: sensor.<machine_name>_dishwasher_buzzer
+      - type: template
+        icon: mdi:history
+        content: >-
+          {% set m = states('binary_sensor.<machine_name>_dishwasher_remember_last_cycle') %}
+          {% if m in ['on', 'true', 'True'] %}Memo: On{% elif m in ['off', 'false', 'False'] %}Memo: Off{% else %}Memo: —{% endif %}
+        icon_color: purple
+        tap_action:
+          action: more-info
+          entity: binary_sensor.<machine_name>_dishwasher_remember_last_cycle
 
   # ------------------------------------------------------------------------------------------------
   # 4. Electronic Diagnostic Self Check-Up
