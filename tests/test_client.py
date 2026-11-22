@@ -791,3 +791,37 @@ async def test_set_water_hardness_routes_to_dishwasher_hl(hass, aioclient_mock):
     assert aioclient_mock.call_count == 1
     for call in aioclient_mock.mock_calls:
         assert "SetHard" not in str(call[1])
+
+
+async def test_client_mutex_and_connection_headers(hass, aioclient_mock):
+    """Test client has mutual exclusion lock and sends Connection: close headers."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        text=load_fixture("washing_machine/idle.json"),
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&HL=2",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    assert hasattr(client, "_lock")
+    assert not client._lock.locked()
+
+    # Test status fetch sends Connection: close
+    await client.status()
+    assert not client._lock.locked()
+
+    # Test send_command sends Connection: close
+    await client.send_command("HL=2")
+    assert not client._lock.locked()
+
+    assert aioclient_mock.call_count == 2
+    for call in aioclient_mock.mock_calls:
+        # call is a tuple of (method, url, data, headers)
+        headers = call[3] if len(call) > 3 else {}
+        assert headers.get("Connection") == "close"

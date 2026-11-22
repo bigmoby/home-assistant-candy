@@ -91,6 +91,7 @@ from custom_components.candy.const import (
     NOTIF_ID_DRYER_FILTER,
     NOTIF_ID_DRYER_WATER_TANK,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION,
     UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
@@ -3113,3 +3114,52 @@ def test_offline_status_factories():
     assert oven.machine_state == OvenState.IDLE
     wc = _offline_wine_cooler()
     assert wc.machine_state == WineCoolerState.OFF
+
+
+async def test_legacy_dishwasher_select_entity_pruned(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Legacy select.dishwasher_program_description entity from earlier builds must be pruned on setup."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-prune-legacy-select",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.50",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_DISHWASHER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    legacy_uid = UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION.format(entry.entry_id)
+    registry.async_get_or_create(
+        "select",
+        DOMAIN,
+        legacy_uid,
+        config_entry=entry,
+    )
+    assert registry.async_get_entity_id("select", DOMAIN, legacy_uid) is not None
+
+    dw_idle = """{
+      "statusDWash": {
+        "StatoWiFi": "1", "StatoDWash": "0", "CodiceErrore": "0", "Program": "P1",
+        "OpzProg": "0", "RemTime": "0", "DelayStart": "0", "OpenDoor": "0",
+        "OpenDoorOpt": "0", "Eco": "0", "MissSalt": "0", "MissRinse": "0"
+      }
+    }"""
+    aioclient_mock.get(
+        "http://192.168.0.50/http-read.json?encrypted=0",
+        text=dw_idle,
+    )
+    aioclient_mock.get(
+        "http://192.168.0.50/http-getStatistics.json?encrypted=0",
+        text='{"statusCounters": {"Program1": "10"}}',
+    )
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # The legacy select entity must have been automatically pruned
+    assert registry.async_get_entity_id("select", DOMAIN, legacy_uid) is None

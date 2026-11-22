@@ -866,18 +866,23 @@ async def test_modern_dishwasher_options_flow_shows_dishwasher_settings(hass):
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "dishwasher_settings"
 
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={
-            CONF_KEY_WATER_HARDNESS: "5",
-            CONF_KEY_DISHWASHER_BUZZER: False,
-            CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
-        },
-    )
+    with patch(
+        "custom_components.candy.config_flow.asyncio.sleep", new_callable=AsyncMock
+    ) as mock_sleep:
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_KEY_WATER_HARDNESS: "5",
+                CONF_KEY_DISHWASHER_BUZZER: False,
+                CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
+            },
+        )
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     mock_client.set_dishwasher_water_hardness.assert_awaited_once_with(5)
     mock_client.set_dishwasher_buzzer.assert_awaited_once_with(False)
     mock_client.set_dishwasher_remember_last_cycle.assert_awaited_once_with(True)
+    assert mock_sleep.await_count >= 1
+    mock_sleep.assert_any_await(5)
     assert entry.data[CONF_KEY_WATER_HARDNESS] == 5
     assert entry.data[CONF_KEY_DISHWASHER_BUZZER] is False
     assert entry.data[CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE] is True
@@ -2976,14 +2981,17 @@ async def test_modern_dishwasher_options_flow_settings_client_exception(hass):
     )
     assert result["step_id"] == "dishwasher_settings"
 
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={
-            CONF_KEY_WATER_HARDNESS: "4",
-            CONF_KEY_DISHWASHER_BUZZER: True,
-            CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
-        },
-    )
+    with patch(
+        "custom_components.candy.config_flow.asyncio.sleep", new_callable=AsyncMock
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_KEY_WATER_HARDNESS: "4",
+                CONF_KEY_DISHWASHER_BUZZER: True,
+                CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
+            },
+        )
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert entry.data[CONF_KEY_WATER_HARDNESS] == 4
     assert entry.data[CONF_KEY_DISHWASHER_BUZZER] is True

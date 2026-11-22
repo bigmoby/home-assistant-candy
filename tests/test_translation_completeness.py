@@ -176,3 +176,23 @@ def test_dishwasher_program_resolution_completeness() -> None:
         )
         assert en_desc, f"Failed resolving EN description for {telem_key}"
         assert it_desc, f"Failed resolving IT description for {telem_key}"
+
+
+def test_italian_translation_key_parity() -> None:
+    """Validate that translations/it.json covers 100% of keys in translations/en.json."""
+    trans_dir = (
+        Path(__file__).parent.parent / "custom_components" / "candy" / "translations"
+    )
+    with open(trans_dir / "en.json", encoding="utf-8") as f:
+        en_data = json.load(f)
+    with open(trans_dir / "it.json", encoding="utf-8") as f:
+        it_data = json.load(f)
+
+    def _assert_subkeys(en_node: dict, it_node: dict, path: str = "") -> None:
+        for k, v in en_node.items():
+            curr_path = f"{path}.{k}" if path else k
+            assert k in it_node, f"Missing key in it.json: {curr_path}"
+            if isinstance(v, dict) and isinstance(it_node[k], dict):
+                _assert_subkeys(v, it_node[k], curr_path)
+
+    _assert_subkeys(en_data, it_data)

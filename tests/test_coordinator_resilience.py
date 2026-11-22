@@ -21,7 +21,7 @@ from custom_components.candy.client.model import (
     OvenState,
     WineCoolerState,
 )
-from custom_components.candy.const import DATA_KEY_COORDINATOR
+from custom_components.candy.const import DATA_KEY_COORDINATOR, DATA_KEY_WRITE_PENDING
 
 from .common import TEST_IP, init_integration
 
@@ -287,3 +287,34 @@ async def test_connection_flapping_jitter_resets_counter(
 
     # After 3 separate single dropouts, machine is still IDLE, not OFF
     assert coordinator.data.machine_state == MachineState.IDLE
+
+
+async def test_coordinator_write_pending_inhibits_polling(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When DATA_KEY_WRITE_PENDING is active, coordinator refresh must skip network calls and retain state."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _STATUS_WASH_IDLE,
+        statistics_response=_STATS_MOCK,
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    assert coordinator.data.machine_state == MachineState.IDLE
+
+    # Set write pending
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 1
+
+    # Clear mock requests; if coordinator tries to hit network, it will fail
+    aioclient_mock.clear_requests()
+
+    # Coordinator refresh should safely return last_known_status without network error
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.last_update_success
+    assert coordinator.data.machine_state == MachineState.IDLE
+    assert aioclient_mock.call_count == 0
+
+    # Clear write pending
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 0

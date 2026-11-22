@@ -136,6 +136,7 @@ class CandyClient:
         self.encryption_key = encryption_key
         self.use_encryption = use_encryption
         self.interface_type: str = ""
+        self._lock = asyncio.Lock()
 
     @backoff.on_exception(
         backoff.expo, aiohttp.ClientError, max_tries=3, logger=__name__
@@ -152,9 +153,12 @@ class CandyClient:
     ):
         return await self.status()
 
-    async def _fetch_and_decode_endpoint(self, url: str) -> dict[str, Any]:
-        """Fetch an endpoint URL, decrypt if needed, and parse JSON payload."""
-        async with _LIMITER, self.session.get(url) as resp:
+    async def _fetch_and_decode_endpoint_unlocked(self, url: str) -> dict[str, Any]:
+        """Fetch an endpoint URL, decrypt if needed, and parse JSON payload (assumes lock held)."""
+        async with (
+            _LIMITER,
+            self.session.get(url, headers={"Connection": "close"}) as resp,
+        ):
             if resp.status != 200:
                 text = await resp.text()
                 raise ValueError(
@@ -176,24 +180,35 @@ class CandyClient:
             text = await resp.text()
             return _parse_json_safe(text)
 
+    async def _fetch_and_decode_endpoint(self, url: str) -> dict[str, Any]:
+        """Fetch an endpoint URL with mutual exclusion serialization."""
+        async with self._lock:
+            return await self._fetch_and_decode_endpoint_unlocked(url)
+
     async def fetch_raw_status(self) -> dict[str, Any]:
         """Fetch raw JSON telemetry payload from /http-read.json."""
         url = _status_url(self.device_ip, self.use_encryption)
         return await self._fetch_and_decode_endpoint(url)
 
     async def fetch_raw_statistics(self) -> dict[str, Any]:
-        """Fetch statistics counters handshake (prepareStatistics -> getStatistics)."""
-        prepare_url = _prepare_statistics_url(self.device_ip, self.use_encryption)
-        try:
-            async with _LIMITER, self.session.get(prepare_url) as resp:
-                await resp.read()
-        except Exception as err:
-            _LOGGER.debug(
-                "prepareStatistics handshake failed or not supported: %s", err
-            )
+        """Fetch statistics counters handshake (prepareStatistics -> getStatistics) atomically."""
+        async with self._lock:
+            prepare_url = _prepare_statistics_url(self.device_ip, self.use_encryption)
+            try:
+                async with (
+                    _LIMITER,
+                    self.session.get(
+                        prepare_url, headers={"Connection": "close"}
+                    ) as resp,
+                ):
+                    await resp.read()
+            except Exception as err:
+                _LOGGER.debug(
+                    "prepareStatistics handshake failed or not supported: %s", err
+                )
 
-        url = _statistics_url(self.device_ip, self.use_encryption)
-        return await self._fetch_and_decode_endpoint(url)
+            url = _statistics_url(self.device_ip, self.use_encryption)
+            return await self._fetch_and_decode_endpoint_unlocked(url)
 
     async def fetch_all_endpoints(self) -> dict[str, Any]:
         """Fetch all supported device endpoints with timeout and error handling."""
@@ -280,9 +295,15 @@ class CandyClient:
         else:
             url = _write_url(self.device_ip, use_encryption=False, data=query_string)
 
-        async with async_timeout.timeout(5), self.session.get(url) as resp:
+        async with (
+            self._lock,
+            _LIMITER,
+            async_timeout.timeout(5),
+            self.session.get(url, headers={"Connection": "close"}) as resp,
+        ):
+            resp_bytes = await resp.read()
             if resp.status != 200:
-                text = await resp.text()
+                text = resp_bytes.decode("utf-8", errors="replace")
                 raise ValueError(
                     f"Write command failed (HTTP {resp.status}): {text[:200]}"
                 )
@@ -395,7 +416,7 @@ async def detect_encryption(
     try:
         _LOGGER.info("Trying to get a response without encryption (encrypted=0)...")
         url = _status_url(device_ip, use_encryption=False)
-        async with _LIMITER, session.get(url) as resp:
+        async with _LIMITER, session.get(url, headers={"Connection": "close"}) as resp:
             text = await resp.text()
             resp_json = _parse_json_safe(text)
             assert resp_json.get("response") != "BAD REQUEST"
@@ -409,7 +430,7 @@ async def detect_encryption(
             "Failed to get a valid response without encryption, let's try with encrypted=1..."
         )
         url = _status_url(device_ip, use_encryption=True)
-        async with _LIMITER, session.get(url) as resp:
+        async with _LIMITER, session.get(url, headers={"Connection": "close"}) as resp:
             resp_hex = await resp.text()  # Response is hex encoded encrypted data
             resp_hex = resp_hex.strip().strip("\x00").strip()
             try:

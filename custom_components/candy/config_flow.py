@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -66,6 +67,7 @@ from .const import (
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
+    DATA_KEY_WRITE_PENDING,
     DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_HARDNESS_THRESHOLDS_LED,
     DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
@@ -500,28 +502,48 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             .get(DATA_KEY_CLIENT)
         )
         if client is not None:
+            commands_to_send: list[tuple[str, Any]] = []
             if status is None or new_hardness != status.water_hardness:
-                try:
-                    await client.set_dishwasher_water_hardness(new_hardness)
-                except Exception as err:
-                    _LOGGER.warning(
-                        "Failed to send water hardness to dishwasher: %s", err
+                commands_to_send.append(
+                    (
+                        "water hardness",
+                        client.set_dishwasher_water_hardness(new_hardness),
                     )
+                )
             if status is None or new_buzzer != status.buzzer:
-                try:
-                    await client.set_dishwasher_buzzer(new_buzzer)
-                except Exception as err:
-                    _LOGGER.warning(
-                        "Failed to send buzzer setting to dishwasher: %s", err
-                    )
+                commands_to_send.append(
+                    ("buzzer", client.set_dishwasher_buzzer(new_buzzer))
+                )
             if status is None or new_memo != status.remember_last_cycle:
-                try:
-                    await client.set_dishwasher_remember_last_cycle(new_memo)
-                except Exception as err:
-                    _LOGGER.warning(
-                        "Failed to send remember last cycle setting to dishwasher: %s",
-                        err,
+                commands_to_send.append(
+                    (
+                        "remember last cycle",
+                        client.set_dishwasher_remember_last_cycle(new_memo),
                     )
+                )
+
+            if commands_to_send:
+                domain_data = self.hass.data.setdefault(DOMAIN, {}).setdefault(
+                    self.config_entry.entry_id, {}
+                )
+                domain_data[DATA_KEY_WRITE_PENDING] = (
+                    domain_data.get(DATA_KEY_WRITE_PENDING, 0) + 1
+                )
+                try:
+                    for idx, (label, cmd_coro) in enumerate(commands_to_send):
+                        if idx > 0:
+                            await asyncio.sleep(5)
+                        try:
+                            await cmd_coro
+                        except Exception as err:
+                            _LOGGER.warning(
+                                "Failed to send %s setting to dishwasher: %s",
+                                label,
+                                err,
+                            )
+                    await asyncio.sleep(5)
+                finally:
+                    domain_data[DATA_KEY_WRITE_PENDING] -= 1
 
         self._pending_data = dict(self.config_entry.data)
         self._pending_data[CONF_KEY_WATER_HARDNESS] = new_hardness
@@ -531,9 +553,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self.hass.config_entries.async_update_entry(
             self.config_entry, data=self._pending_data
         )
-        self.hass.async_create_task(
-            self.hass.config_entries.async_reload(self.config_entry.entry_id)
-        )
+        if coord is not None:
+            res = coord.async_request_refresh()
+            if asyncio.iscoroutine(res):
+                await res
         return self.async_create_entry(data={})
 
     async def async_step_maintenance(

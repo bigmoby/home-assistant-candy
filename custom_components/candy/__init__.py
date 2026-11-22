@@ -89,6 +89,7 @@ from .const import (
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_STATS_REFRESH_UNSUB,
     DATA_KEY_WASH_ERROR_UNSUB,
+    DATA_KEY_WRITE_PENDING,
     DISHWASHER_HARDNESS_THRESHOLDS_LED,
     DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
     DISHWASHER_MAINTENANCE_FILTER_THRESHOLD,
@@ -112,6 +113,7 @@ from .const import (
     NOTIF_ID_WASH_ERROR,
     PLATFORMS,
     UNIQUE_ID_DISHWASHER,
+    UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION,
     UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
@@ -430,6 +432,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     async def update_status():
         nonlocal last_known_status, consecutive_timeouts
+        # Inhibit coordinator poll while write operation or post-command settling delay is active
+        entry_data_dict = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
+        if (
+            entry_data_dict.get(DATA_KEY_WRITE_PENDING, 0) > 0
+            and last_known_status is not None
+        ):
+            _LOGGER.debug(
+                "Skipping coordinator poll for %s: write operation pending", ip_address
+            )
+            return last_known_status
+
         prev_state = getattr(last_known_status, "machine_state", None)
         can_infer_off = (
             prev_state in _OFF_INFERRED_STATES or prev_state == MachineState.OFF
@@ -514,6 +527,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
         async def update_statistics() -> WashingMachineStatistics:
             nonlocal last_known_statistics
+            entry_data_dict = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
+            if (
+                entry_data_dict.get(DATA_KEY_WRITE_PENDING, 0) > 0
+                and last_known_statistics is not None
+            ):
+                _LOGGER.debug("Skipping statistics poll: write operation pending")
+                return last_known_statistics
             if getattr(coordinator.data, "machine_state", None) == MachineState.OFF:
                 if last_known_statistics is not None:
                     return last_known_statistics
@@ -650,6 +670,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
             async def update_dw_statistics() -> DishwasherStatistics:
                 nonlocal last_known_dw_stats
+                entry_data_dict = hass.data.get(DOMAIN, {}).get(
+                    config_entry.entry_id, {}
+                )
+                if (
+                    entry_data_dict.get(DATA_KEY_WRITE_PENDING, 0) > 0
+                    and last_known_dw_stats is not None
+                ):
+                    _LOGGER.debug(
+                        "Skipping dishwasher statistics poll: write operation pending"
+                    )
+                    return last_known_dw_stats
                 if (
                     getattr(coordinator.data, "machine_state", None) == MachineState.OFF
                     or not coordinator.last_update_success
@@ -739,6 +770,23 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_DISHWASHER_CHECKUP_UNSUB] = (
             unsub_dishwasher_checkup
         )
+
+    # Prune legacy orphaned select description entity from earlier dishwasher builds
+    if isinstance(coordinator.data, DishwasherStatus) or config_entry.data.get(
+        CONF_KEY_IS_DISHWASHER
+    ):
+        entity_reg = er.async_get(hass)
+        legacy_select = entity_reg.async_get_entity_id(
+            "select",
+            DOMAIN,
+            UNIQUE_ID_DISHWASHER_PROGRAM_DESCRIPTION.format(config_entry.entry_id),
+        )
+        if legacy_select is not None:
+            _LOGGER.info(
+                "Removing legacy select description entity %s (migrated to sensor)",
+                legacy_select,
+            )
+            entity_reg.async_remove(legacy_select)
 
     # Backfill missing keys for legacy entries
     needs_update = False

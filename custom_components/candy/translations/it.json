@@ -38,6 +38,7 @@
       },
       "cloud": {
         "title": "Account Simply-Fi",
+        "description": "Inserisci le tue credenziali Simply-Fi / hOn.\n\nLe credenziali vengono usate solo per scaricare le impostazioni della macchina e poi scartate. La tua macchina deve essere già registrata con il servizio Candy Simply-Fi.",
         "data": {
           "email": "Email",
           "password": "Password"
@@ -48,6 +49,68 @@
         "description": "Scegli la lingua per i nomi dei programmi e i messaggi dell'elettrodomestico (promemoria, errori e risultati del check-up). Può essere diversa dalla lingua di Home Assistant.",
         "data": {
           "program_language": "Lingua"
+        }
+      },
+      "maintenance": {
+        "title": "Contatori di manutenzione",
+        "description": "L'integrazione può monitorare quando la macchina richiede la pulizia anticalcare e del filtro — in base ai cicli totali di lavaggio, proprio come l'app Simply-Fi.",
+        "data": {
+          "maintenance_enabled": "Abilita contatori di manutenzione"
+        }
+      },
+      "maintenance_types": {
+        "title": "Selezione contatori",
+        "description": "I cicli di autodiagnosi vengono sempre monitorati. Scegli quali contatori aggiuntivi abilitare.",
+        "data": {
+          "maintenance_limescale_enabled": "Pulizia anticalcare",
+          "maintenance_filter_enabled": "Pulizia filtro"
+        }
+      },
+      "dishwasher_settings": {
+        "title": "Impostazioni lavastoviglie",
+        "description": "Configura le impostazioni hardware della lavastoviglie. I parametri verranno inviati direttamente alla macchina tramite Wi-Fi locale.",
+        "data": {
+          "water_hardness": "Durezza dell'acqua",
+          "dishwasher_buzzer": "Segnale acustico di fine ciclo (buzzer)",
+          "dishwasher_remember_last_cycle": "Memorizza ultimo programma utilizzato"
+        }
+      },
+      "hardness": {
+        "title": "Durezza dell'acqua",
+        "description": "Seleziona la durezza dell'acqua della tua zona. Questo determina la frequenza dell'avviso di decalcificazione.",
+        "data": {
+          "water_hardness": "Durezza dell'acqua"
+        }
+      },
+      "maintenance_baselines": {
+        "title": "Valori attuali contatori",
+        "description": "Inserisci i cicli rimanenti mostrati nell'app Simply-Fi per ciascun promemoria. Lascia il valore predefinito per avviare un nuovo ciclo completo da adesso.",
+        "data": {
+          "maintenance_last_full_checkup": "Check-up completo: cicli rimanenti",
+          "maintenance_last_limescale": "Pulizia anticalcare: cicli rimanenti",
+          "maintenance_last_filter": "Pulizia filtro: cicli rimanenti"
+        }
+      },
+      "checkup": {
+        "title": "Autodiagnosi automatica",
+        "description": "L'integrazione può avviare l'autodiagnosi elettronica integrata nella macchina al termine di ogni ciclo. Il risultato sarà disponibile come sensore in Home Assistant.",
+        "data": {
+          "checkup_enabled": "Abilita autodiagnosi automatica"
+        }
+      },
+      "checkup_schedule": {
+        "title": "Frequenza autodiagnosi",
+        "description": "Con quale frequenza deve essere eseguita l'autodiagnosi?",
+        "data": {
+          "checkup_schedule": "Frequenza"
+        }
+      },
+      "reconfigure": {
+        "title": "Passa a Controllo completo",
+        "description": "Inserisci le tue credenziali Simply-Fi / hOn.\n\nLe credenziali vengono usate solo per scaricare le impostazioni della macchina e poi scartate. La tua macchina deve essere già registrata con il servizio Candy Simply-Fi.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
         }
       }
     }
@@ -176,6 +239,94 @@
       },
       "dishwasher_error_code": {
         "name": "Codice errore"
+      },
+      "dishwasher_maint_filter": {
+        "name": "Cicli pulizia filtro"
+      },
+      "dishwasher_maint_full_checkup": {
+        "name": "Cicli check-up completo"
+      },
+      "dishwasher_maint_limescale": {
+        "name": "Cicli pulizia anticalcare"
+      },
+      "dishwasher_total_cycles": {
+        "name": "Cicli totali"
+      },
+      "tumble_checkup_state": {
+        "name": "Stato check-up asciugatrice"
+      },
+      "tumble_delay": {
+        "name": "Ritardo partenza asciugatrice"
+      },
+      "tumble_dry_level": {
+        "name": "Livello asciugatura",
+        "state": {
+          "iron_dry": "Pronto stiro",
+          "hang_dry": "Pronto stampella",
+          "store_dry": "Pronto armadio",
+          "bone_dry": "Extra asciutto"
+        }
+      },
+      "tumble_error": {
+        "name": "Codice errore asciugatrice"
+      },
+      "wash_checkup_result": {
+        "name": "Risultato check-up",
+        "state": {
+          "not_run": "Non ancora eseguito",
+          "ok": "OK",
+          "problem": "Problema rilevato"
+        }
+      },
+      "wash_cycle_capacity": {
+        "name": "Capacità carico ciclo"
+      },
+      "wash_detergent_cycles": {
+        "name": "Cicli detersivo rimanenti"
+      },
+      "wash_estimated_duration": {
+        "name": "Durata stimata lavaggio"
+      },
+      "wash_last_checkup": {
+        "name": "Ultimo check-up"
+      },
+      "wash_liquid_detergent": {
+        "name": "Detersivo liquido"
+      },
+      "wash_maint_filter": {
+        "name": "Cicli pulizia filtro"
+      },
+      "wash_maint_full_checkup": {
+        "name": "Cicli check-up completo"
+      },
+      "wash_maint_limescale": {
+        "name": "Cicli pulizia anticalcare"
+      },
+      "wash_maintenance": {
+        "name": "Manutenzione lavatrice"
+      },
+      "wash_powder_detergent": {
+        "name": "Detersivo in polvere"
+      },
+      "wash_purchase_date": {
+        "name": "Data acquisto"
+      },
+      "wash_softener_cycles": {
+        "name": "Cicli ammorbidente rimanenti"
+      },
+      "wash_soil_level": {
+        "name": "Livello di sporco",
+        "state": {
+          "low": "Basso",
+          "normal": "Normale",
+          "high": "Alto"
+        }
+      },
+      "wash_total_cycles": {
+        "name": "Cicli totali"
+      },
+      "washer_dryer": {
+        "name": "Lavasciuga"
       }
     },
     "select": {
@@ -197,7 +348,12 @@
         "name": "Velocità centrifuga"
       },
       "wash_soil_select": {
-        "name": "Livello di sporco"
+        "name": "Livello di sporco",
+        "state": {
+          "low": "Basso",
+          "normal": "Normale",
+          "high": "Alto"
+        }
       },
       "wash_dry_select": {
         "name": "Impostazione asciugatura",
@@ -226,6 +382,46 @@
           "rapid_24": "Rapido 24' 50°C",
           "prewash": "Ammollo"
         }
+      },
+      "dryer_level_select": {
+        "name": "Dry level",
+        "state": {
+          "iron_dry": "Iron dry",
+          "hang_dry": "Hang dry",
+          "store_dry": "Store dry",
+          "bone_dry": "Bone dry"
+        }
+      },
+      "dryer_program_select": {
+        "name": "Dryer program"
+      },
+      "dryer_rapid_select": {
+        "name": "Rapid dry",
+        "state": {
+          "off": "Off",
+          "30": "30 minutes",
+          "45": "45 minutes",
+          "59": "59 minutes"
+        }
+      },
+      "dryer_time_select": {
+        "name": "Timed drying",
+        "state": {
+          "off": "Off",
+          "30": "30 minutes",
+          "45": "45 minutes",
+          "60": "60 minutes",
+          "90": "90 minutes",
+          "120": "120 minutes"
+        }
+      },
+      "wash_water_hardness": {
+        "name": "Water hardness",
+        "state": {
+          "soft": "Soft",
+          "medium": "Medium",
+          "hard": "Hard"
+        }
       }
     },
     "number": {
@@ -234,6 +430,9 @@
       },
       "dishwasher_delay_number": {
         "name": "Partenza ritardata"
+      },
+      "dryer_delay_number": {
+        "name": "Partenza ritardata asciugatrice"
       }
     },
     "button": {
@@ -266,6 +465,54 @@
       },
       "dishwasher_checkup_button": {
         "name": "Diagnosi"
+      },
+      "dishwasher_maint_filter_reset": {
+        "name": "Ripristina manutenzione filtro"
+      },
+      "dishwasher_maint_full_checkup_reset": {
+        "name": "Ripristina manutenzione check-up"
+      },
+      "dishwasher_maint_limescale_reset": {
+        "name": "Ripristina manutenzione anticalcare"
+      },
+      "dryer_anti_crease_cancel_button": {
+        "name": "Annulla antipiega"
+      },
+      "dryer_checkup_button": {
+        "name": "Check-up asciugatrice"
+      },
+      "dryer_pause_button": {
+        "name": "Pausa asciugatura"
+      },
+      "dryer_reset_warnings_button": {
+        "name": "Ripristina avvisi"
+      },
+      "dryer_resume_button": {
+        "name": "Riprendi asciugatura"
+      },
+      "dryer_start_button": {
+        "name": "Avvia asciugatura"
+      },
+      "dryer_stop_button": {
+        "name": "Ferma asciugatura"
+      },
+      "wash_full_checkup": {
+        "name": "Check-up completo"
+      },
+      "wash_limescale_clean": {
+        "name": "Lavaggio anticalcare"
+      },
+      "wash_maint_filter_reset": {
+        "name": "Ripristina manutenzione filtro"
+      },
+      "wash_maint_full_checkup_reset": {
+        "name": "Ripristina manutenzione check-up"
+      },
+      "wash_maint_limescale_reset": {
+        "name": "Ripristina manutenzione anticalcare"
+      },
+      "wash_resume_good_night": {
+        "name": "Riprendi Good Night"
       }
     },
     "light": {
@@ -288,6 +535,45 @@
       },
       "dishwasher_auto_door_switch": {
         "name": "Apertura automatica sportello"
+      },
+      "wash_detergent_autodose": {
+        "name": "Dosaggio automatico detersivo"
+      },
+      "wash_extra_dose": {
+        "name": "Dose extra"
+      },
+      "wash_nfc_switch": {
+        "name": "Impostazione programma NFC"
+      },
+      "wash_option_acquaplus": {
+        "name": "Acquaplus"
+      },
+      "wash_option_anticrease": {
+        "name": "Stiro facile"
+      },
+      "wash_option_goodnight": {
+        "name": "Good Night"
+      },
+      "wash_option_hygiene": {
+        "name": "Igiene"
+      },
+      "wash_option_prewash": {
+        "name": "Prelavaggio"
+      },
+      "wash_option_rinse_1": {
+        "name": "Extra risciacquo +1"
+      },
+      "wash_option_rinse_2": {
+        "name": "Extra risciacquo +2"
+      },
+      "wash_option_rinse_3": {
+        "name": "Extra risciacquo +3"
+      },
+      "wash_softener_autodose": {
+        "name": "Dosaggio automatico ammorbidente"
+      },
+      "wash_steam_switch": {
+        "name": "Vapore"
       }
     },
     "binary_sensor": {
@@ -305,8 +591,185 @@
       },
       "remote_control": {
         "name": "Controllo remoto"
+      },
+      "clean_filter": {
+        "name": "Filtro da pulire"
+      },
+      "dishwasher_remember_last_cycle": {
+        "name": "Memorizza ultimo programma"
+      },
+      "door": {
+        "name": "Sportello"
+      },
+      "wash_detergent_empty": {
+        "name": "Detersivo esaurito"
+      },
+      "wash_detergent_reserve": {
+        "name": "Detersivo in esaurimento"
+      },
+      "wash_softener_empty": {
+        "name": "Ammorbidente esaurito"
+      },
+      "wash_softener_reserve": {
+        "name": "Ammorbidente in esaurimento"
+      },
+      "water_tank_full": {
+        "name": "Vaschetta acqua piena"
       }
     }
   },
-  "title": "Candy"
+  "title": "Candy",
+  "options": {
+    "step": {
+      "init": {
+        "title": "Impostazioni integrazione",
+        "description": "Scegli un'azione.",
+        "data": {
+          "next_step": "Azione"
+        }
+      },
+      "update_cloud_data": {
+        "title": "Account Simply-Fi",
+        "description": "Inserisci le tue credenziali Simply-Fi / hOn.\n\nLe credenziali vengono usate solo per scaricare le impostazioni della macchina e poi scartate. La tua macchina deve essere già registrata con il servizio Candy Simply-Fi.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "switch_to_read_only": {
+        "title": "Passa a Sola lettura",
+        "description": "Questo rimuoverà tutti i controlli di scrittura (selezione programma, avvio/arresto, vapore, ritardo). L'integrazione continuerà a monitorare il dispositivo.\n\nFai clic su Invia per confermare."
+      },
+      "language": {
+        "title": "Lingua dell'elettrodomestico",
+        "description": "Scegli la lingua per i nomi dei programmi e i messaggi dell'elettrodomestico (promemoria, errori e risultati del check-up). Può essere diversa dalla lingua di Home Assistant.",
+        "data": {
+          "program_language": "Lingua"
+        }
+      },
+      "maintenance": {
+        "title": "Contatori di manutenzione",
+        "description": "L'integrazione può monitorare quando la macchina richiede la pulizia anticalcare e del filtro — in base ai cicli totali di lavaggio, proprio come l'app Simply-Fi.",
+        "data": {
+          "maintenance_enabled": "Abilita contatori di manutenzione"
+        }
+      },
+      "maintenance_types": {
+        "title": "Selezione contatori",
+        "description": "I cicli di autodiagnosi vengono sempre monitorati. Scegli quali contatori aggiuntivi abilitare.",
+        "data": {
+          "maintenance_limescale_enabled": "Pulizia anticalcare",
+          "maintenance_filter_enabled": "Pulizia filtro"
+        }
+      },
+      "dishwasher_settings": {
+        "title": "Impostazioni lavastoviglie",
+        "description": "Configura le impostazioni hardware della lavastoviglie. I parametri verranno inviati direttamente alla macchina tramite Wi-Fi locale.",
+        "data": {
+          "water_hardness": "Durezza dell'acqua",
+          "dishwasher_buzzer": "Segnale acustico di fine ciclo (buzzer)",
+          "dishwasher_remember_last_cycle": "Memorizza ultimo programma utilizzato"
+        }
+      },
+      "hardness": {
+        "title": "Durezza dell'acqua",
+        "description": "Seleziona la durezza dell'acqua della tua zona. Questo determina la frequenza dell'avviso di decalcificazione.",
+        "data": {
+          "water_hardness": "Durezza dell'acqua"
+        }
+      },
+      "maintenance_baselines": {
+        "title": "Valori attuali contatori",
+        "description": "Inserisci i cicli rimanenti mostrati nell'app Simply-Fi per ciascun promemoria. Lascia il valore predefinito per avviare un nuovo ciclo completo da adesso.",
+        "data": {
+          "maintenance_last_full_checkup": "Check-up completo: cicli rimanenti",
+          "maintenance_last_limescale": "Pulizia anticalcare: cicli rimanenti",
+          "maintenance_last_filter": "Pulizia filtro: cicli rimanenti"
+        }
+      },
+      "checkup": {
+        "title": "Autodiagnosi automatica",
+        "description": "L'integrazione può avviare l'autodiagnosi elettronica integrata nella macchina al termine di ogni ciclo. Il risultato sarà disponibile come sensore in Home Assistant.",
+        "data": {
+          "checkup_enabled": "Abilita autodiagnosi automatica"
+        }
+      },
+      "checkup_schedule": {
+        "title": "Frequenza autodiagnosi",
+        "description": "Con quale frequenza deve essere eseguita l'autodiagnosi?",
+        "data": {
+          "checkup_schedule": "Frequenza"
+        }
+      }
+    },
+    "error": {
+      "cloud_auth": "Impossibile connettersi al cloud Simply-Fi. Controlla le credenziali e riprova."
+    }
+  },
+  "selector": {
+    "next_step": {
+      "options": {
+        "update_cloud_data": "Aggiorna dati Simply-Fi Cloud",
+        "switch_to_read_only": "Passa alla modalità sola lettura",
+        "dishwasher_settings": "Impostazioni hardware lavastoviglie",
+        "maintenance_settings": "Impostazioni contatori di manutenzione",
+        "checkup_settings": "Impostazioni autodiagnosi"
+      }
+    },
+    "water_hardness": {
+      "options": {
+        "0": "Dolcissima (0–3 °fH / 0–4 °dH)",
+        "1": "Dolce (4–6 °fH / 4–8 °dH)",
+        "2": "Media (7–11 °fH / 8–12 °dH)",
+        "3": "Moderatamente dura (12–16 °fH / 12–18 °dH)",
+        "4": "Dura (17–22 °fH / 18–30 °dH)",
+        "5": "Molto dura (23–27 °fH / >30 °dH)"
+      }
+    },
+    "dishwasher_water_hardness_led": {
+      "options": {
+        "0": "Dolcissima (0–5 °fH / 0–3 °dH, Nessun sale)",
+        "1": "Dolce (6–15 °fH / 4–9 °dH)",
+        "2": "Mediamente dura (16–30 °fH / 10–16 °dH)",
+        "3": "Discretamente dura (31–45 °fH / 17–25 °dH)",
+        "4": "Dura (46–60 °fH / 26–33 °dH)",
+        "5": "Molto dura (61–90 °fH / 34–50 °dH)"
+      }
+    },
+    "dishwasher_water_hardness_digit": {
+      "options": {
+        "0": "Estremamente dolce (0–5 °fH / 0–3 °dH, Nessun sale)",
+        "1": "Dolcissima (6–10 °fH / 4–6 °dH)",
+        "2": "Dolce (11–20 °fH / 7–11 °dH)",
+        "3": "Mediamente dura (21–30 °fH / 12–16 °dH)",
+        "4": "Discretamente dura (31–40 °fH / 17–22 °dH)",
+        "5": "Dura (41–50 °fH / 23–27 °dH)",
+        "6": "Molto dura (51–60 °fH / 28–33 °dH)",
+        "7": "Estremamente dura (61–90 °fH / 34–50 °dH)"
+      }
+    },
+    "checkup_schedule": {
+      "options": {
+        "0": "Ad ogni ciclo",
+        "1": "Settimanale",
+        "2": "Mensile"
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "washing_started": "Lavaggio avviato",
+      "washing_completed": "Lavaggio completato",
+      "drying_started": "Asciugatura avviata",
+      "drying_completed": "Asciugatura completata",
+      "dishwashing_started": "Lavaggio lavastoviglie avviato",
+      "dishwashing_completed": "Lavaggio lavastoviglie completato",
+      "clean_filter_needed": "Promemoria pulizia filtro",
+      "water_tank_full": "Promemoria vaschetta acqua piena",
+      "error_reported": "Errore segnalato",
+      "maintenance_full_checkup_due": "Promemoria check-up completo",
+      "maintenance_limescale_due": "Promemoria pulizia anticalcare",
+      "maintenance_filter_due": "Promemoria pulizia filtro"
+    }
+  }
 }
