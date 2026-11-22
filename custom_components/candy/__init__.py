@@ -407,6 +407,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     session = async_get_clientsession(hass)
     client = CandyClient(session, ip_address, encryption_key, use_encryption)
+    client.interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
 
     @callback
     def _migrate_unique_ids(entry: er.RegistryEntry) -> dict[str, Any] | None:

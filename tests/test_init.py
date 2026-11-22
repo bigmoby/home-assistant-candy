@@ -3163,3 +3163,38 @@ async def test_legacy_dishwasher_select_entity_pruned(
 
     # The legacy select entity must have been automatically pruned
     assert registry.async_get_entity_id("select", DOMAIN, legacy_uid) is None
+
+
+async def test_client_interface_type_populated_on_setup(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify CandyClient.interface_type is set from config entry interface_type."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="dw-interface-type-test",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.51",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    dw_idle = """{
+      "statusDWash": {
+        "StatoWiFi": "1", "StatoDWash": "0", "CodiceErrore": "0", "Program": "P1",
+        "OpzProg": "0", "RemTime": "0", "DelayStart": "0", "OpenDoor": "0",
+        "OpenDoorOpt": "0", "Eco": "0", "MissSalt": "0", "MissRinse": "0"
+      }
+    }"""
+    aioclient_mock.get(
+        "http://192.168.0.51/http-read.json?encrypted=0",
+        text=dw_idle,
+    )
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = hass.data[DOMAIN][entry.entry_id]["client"]
+    assert client.interface_type == "BRAVA_BI_DIGIT_OD"

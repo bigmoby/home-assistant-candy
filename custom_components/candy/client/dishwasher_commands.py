@@ -27,6 +27,8 @@ def is_modern_dishwasher(interface_type: str | None) -> bool:
     if not interface_type or is_legacy_dishwasher(interface_type):
         return False
     up = interface_type.upper()
+    if "_AD" in up or "RED_DEVIL" in up:
+        return False
     return any(term in up for term in ("BRAVA", "DW_WIFI", "AXI", "SMOOTH"))
 
 

@@ -210,7 +210,6 @@ async def async_setup_entry(
                     stats_coordinator,
                     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
                     UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON,
-                    "Check-up maintenance reset",
                     "dishwasher_maint_full_checkup_reset",
                     "mdi:dishwasher-alert",
                 )
@@ -223,7 +222,6 @@ async def async_setup_entry(
                         stats_coordinator,
                         CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
                         UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE_BUTTON,
-                        "Limescale maintenance reset",
                         "dishwasher_maint_limescale_reset",
                         "mdi:water-remove",
                     )
@@ -236,7 +234,6 @@ async def async_setup_entry(
                         stats_coordinator,
                         CONF_KEY_MAINTENANCE_LAST_FILTER,
                         UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON,
-                        "Filter maintenance reset",
                         "dishwasher_maint_filter_reset",
                         "mdi:filter-remove",
                     )
@@ -899,7 +896,6 @@ class DishwasherMaintResetButton(CoordinatorEntity, ButtonEntity):
         stats_coordinator: DataUpdateCoordinator,
         conf_key: str,
         unique_id_template: str,
-        name: str,
         translation_key: str,
         icon: str,
     ) -> None:
@@ -909,7 +905,6 @@ class DishwasherMaintResetButton(CoordinatorEntity, ButtonEntity):
         self._stats_coordinator = stats_coordinator
         self._conf_key = conf_key
         self._unique_id_template = unique_id_template
-        self._attr_name = name
         self._attr_translation_key = translation_key
         self._attr_icon = icon
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Coroutine
 import logging
 from typing import Any
 
@@ -502,23 +503,25 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             .get(DATA_KEY_CLIENT)
         )
         if client is not None:
-            commands_to_send: list[tuple[str, Any]] = []
+            commands_to_send: list[
+                tuple[str, Callable[[], Coroutine[Any, Any, None]]]
+            ] = []
             if status is None or new_hardness != status.water_hardness:
                 commands_to_send.append(
                     (
                         "water hardness",
-                        client.set_dishwasher_water_hardness(new_hardness),
+                        lambda: client.set_dishwasher_water_hardness(new_hardness),
                     )
                 )
             if status is None or new_buzzer != status.buzzer:
                 commands_to_send.append(
-                    ("buzzer", client.set_dishwasher_buzzer(new_buzzer))
+                    ("buzzer", lambda: client.set_dishwasher_buzzer(new_buzzer))
                 )
             if status is None or new_memo != status.remember_last_cycle:
                 commands_to_send.append(
                     (
                         "remember last cycle",
-                        client.set_dishwasher_remember_last_cycle(new_memo),
+                        lambda: client.set_dishwasher_remember_last_cycle(new_memo),
                     )
                 )
 
@@ -530,11 +533,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     domain_data.get(DATA_KEY_WRITE_PENDING, 0) + 1
                 )
                 try:
-                    for idx, (label, cmd_coro) in enumerate(commands_to_send):
+                    for idx, (label, cmd_fn) in enumerate(commands_to_send):
                         if idx > 0:
                             await asyncio.sleep(5)
                         try:
-                            await cmd_coro
+                            await cmd_fn()
                         except Exception as err:
                             _LOGGER.warning(
                                 "Failed to send %s setting to dishwasher: %s",
@@ -1440,12 +1443,46 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                         CONF_KEY_USE_ENCRYPTION, False
                     ),
                 )
+                client.interface_type = self._config_data.get(
+                    CONF_KEY_INTERFACE_TYPE, ""
+                )
+                commands_to_send: list[
+                    tuple[str, Callable[[], Coroutine[Any, Any, None]]]
+                ] = []
                 if new_hardness != self._dishwasher_status.water_hardness:
-                    await client.set_dishwasher_water_hardness(new_hardness)
+                    commands_to_send.append(
+                        (
+                            "water hardness",
+                            lambda: client.set_dishwasher_water_hardness(new_hardness),
+                        )
+                    )
                 if new_buzzer != self._dishwasher_status.buzzer:
-                    await client.set_dishwasher_buzzer(new_buzzer)
+                    commands_to_send.append(
+                        (
+                            "buzzer",
+                            lambda: client.set_dishwasher_buzzer(new_buzzer),
+                        )
+                    )
                 if new_memo != self._dishwasher_status.remember_last_cycle:
-                    await client.set_dishwasher_remember_last_cycle(new_memo)
+                    commands_to_send.append(
+                        (
+                            "remember last cycle",
+                            lambda: client.set_dishwasher_remember_last_cycle(new_memo),
+                        )
+                    )
+                for idx, (label, cmd_fn) in enumerate(commands_to_send):
+                    if idx > 0:
+                        await asyncio.sleep(5)
+                    try:
+                        await cmd_fn()
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to dispatch initial %s setting to dishwasher: %s",
+                            label,
+                            err,
+                        )
+                if commands_to_send:
+                    await asyncio.sleep(5)
             except Exception as err:
                 _LOGGER.warning(
                     "Failed to dispatch initial dishwasher settings to appliance: %s",

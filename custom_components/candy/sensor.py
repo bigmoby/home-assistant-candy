@@ -35,6 +35,7 @@ from .client import (
     TumbleDryerProgram,
     WashingMachineStatus,
     WashingMachineWashProgram,
+    is_legacy_dishwasher,
     load_downloadable_programs,
     parse_dryer_programs,
     parse_wash_programs,
@@ -307,6 +308,16 @@ async def async_setup_entry(
             ]
         )
     elif isinstance(coordinator.data, DishwasherStatus):
+        registry = er.async_get(hass)
+
+        def _was_dw_registered(unique_id_template: str) -> bool:
+            return (
+                registry.async_get_entity_id(
+                    "sensor", DOMAIN, unique_id_template.format(config_id)
+                )
+                is not None
+            )
+
         dw_entities: list[CandyBaseSensor] = [
             CandyDishwasherSensor(coordinator, config_entry),
             CandyDishwasherProgramSensor(coordinator, config_entry),
@@ -316,9 +327,17 @@ async def async_setup_entry(
             CandyDishwasherCycleStatusSensor(coordinator, config_entry),
             CandyDishwasherWaterHardnessSensor(coordinator, config_entry),
             CandyDishwasherBuzzerSensor(coordinator, config_entry),
-            CandyDishwasherLifetimeCyclesSensor(coordinator, config_entry),
         ]
         stats_coordinator = hass.data[DOMAIN][config_id].get(DATA_KEY_STATS_COORDINATOR)
+        interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        if (
+            stats_coordinator is None
+            or is_legacy_dishwasher(interface_type)
+            or _was_dw_registered(UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES)
+        ):
+            dw_entities.append(
+                CandyDishwasherLifetimeCyclesSensor(coordinator, config_entry)
+            )
         if stats_coordinator is not None:
             dw_entities.append(
                 CandyDishwasherTotalCyclesSensor(stats_coordinator, config_entry)
@@ -2637,7 +2656,6 @@ class CandyDishwasherTotalCyclesSensor(CandyBaseSensor, RestoreSensor):
 
     _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_total_cycles"
-    _attr_name = "Dishwasher total cycles"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _restored_cycles: int | None = None
 
@@ -2681,7 +2699,6 @@ class CandyDishwasherMaintFullCheckupSensor(CandyBaseSensor, RestoreSensor):
 
     _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_maint_full_checkup"
-    _attr_name = "Full Check-up maintenance remaining cycles"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _restored_value: int | None = None
 
@@ -2727,7 +2744,6 @@ class CandyDishwasherMaintLimescaleSensor(CandyBaseSensor, RestoreSensor):
 
     _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_maint_limescale"
-    _attr_name = "Limescale maintenance remaining cycles"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _restored_value: int | None = None
 
@@ -2794,7 +2810,6 @@ class CandyDishwasherMaintFilterSensor(CandyBaseSensor, RestoreSensor):
 
     _attr_has_entity_name = True
     _attr_translation_key = "dishwasher_maint_filter"
-    _attr_name = "Filter maintenance remaining cycles"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _restored_value: int | None = None
 

@@ -2936,6 +2936,49 @@ async def test_modern_dishwasher_config_flow_full_control_maintenance_disabled(h
     assert flow._config_data[CONF_KEY_MAINTENANCE_ENABLED] is False
 
 
+async def test_modern_dishwasher_config_flow_settings_pacing(hass):
+    """Config flow paces initial hardware settings over LAN with settling delay."""
+    flow = ConfigFlow()
+    flow.hass = hass
+    flow._ip_address = "192.168.0.78"
+    flow._is_dishwasher = True
+    dw_status = copy.copy(_IDLE_DISHWASHER)
+    dw_status.water_hardness = 1
+    dw_status.buzzer_level = 0
+    dw_status.remember_last_cycle = False
+    flow._dishwasher_status = dw_status
+    flow._config_data = {
+        CONF_IP_ADDRESS: "192.168.0.78",
+        CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+        CONF_KEY_MODE: MODE_FULL_CONTROL,
+    }
+
+    with (
+        patch("custom_components.candy.config_flow.CandyClient") as mock_client_cls,
+        patch(
+            "custom_components.candy.config_flow.asyncio.sleep",
+            new_callable=AsyncMock,
+        ) as mock_sleep,
+    ):
+        mock_client = AsyncMock()
+        mock_client_cls.return_value = mock_client
+
+        res = await flow.async_step_dishwasher_settings(
+            user_input={
+                CONF_KEY_WATER_HARDNESS: "4",
+                CONF_KEY_DISHWASHER_BUZZER: True,
+                CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
+            }
+        )
+        assert res["step_id"] == "maintenance"
+        assert mock_client.interface_type == "BRAVA_BI_DIGIT_OD"
+        mock_client.set_dishwasher_water_hardness.assert_awaited_once_with(4)
+        mock_client.set_dishwasher_buzzer.assert_awaited_once_with(True)
+        mock_client.set_dishwasher_remember_last_cycle.assert_awaited_once_with(True)
+        assert mock_sleep.call_count == 3
+        mock_sleep.assert_called_with(5)
+
+
 async def test_modern_dishwasher_options_flow_settings_client_exception(hass):
     """Options flow logs warning and completes when LAN command fails during settings update."""
     entry = MockConfigEntry(
