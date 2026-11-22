@@ -28,7 +28,7 @@ You can install it via [HACS](https://hacs.xyz/):
      - [`dishwasher.yaml`](dishwasher.yaml): Operational panel for dishwashers with cycle selection, wash options (Eco, Half Load, Extra Dry, 3-in-1, Auto Open Door), delay start, progress telemetry, and start/pause/resume/stop/open door controls.
    - **Companion Maintenance Cards:**
      - [`maintenance.yaml`](maintenance.yaml): Companion card for **Washing Machines** and **Washer-Dryer combos** (tracks cycle-based maintenance countdowns for Full Check-up, Limescale Autoclean, Debris Filter and provides one-click cleaning triggers).
-     - [`dishwasher-maintenance.yaml`](dishwasher-maintenance.yaml): Companion card for **Dishwashers** (monitors salt and rinse aid reservoirs, tub auto-clean warnings, lifetime cycles, water hardness, and provides electronic diagnostic self-tests).
+     - [`dishwasher-maintenance.yaml`](dishwasher-maintenance.yaml): Companion card for **Dishwashers** (monitors salt and rinse aid reservoirs, tub auto-clean warnings, cycle-based maintenance counters for filter, limescale, and check-up, total cycles, water hardness, buzzer volume, and provides electronic diagnostic self-tests and counter resets).
 
    > [!NOTE]
    > **When are maintenance cards needed?**

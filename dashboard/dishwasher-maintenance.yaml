@@ -11,8 +11,9 @@
 #
 # Note:
 #   This companion card monitors dishwasher consumables (salt and rinse aid containers),
-#   auto-clean maintenance alerts, hardware cycle totals, water hardness, and provides
-#   one-tap triggering for electronic diagnostic self-tests.
+#   auto-clean maintenance alerts, cycle-based maintenance counters (Filter, Limescale, Check-up),
+#   hardware settings (water hardness, buzzer, program memo), and provides one-tap triggering
+#   for electronic diagnostic self-tests and maintenance counter resets.
 # --------------------------------------------------------------------------------------------------
 type: vertical-stack
 cards:
@@ -25,11 +26,17 @@ cards:
       {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
       {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
       {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
       {% set err = states('sensor.<machine_name>_error_code') %}
       {% set issues = [] %}
       {% if salt %}{% set issues = issues + ['Refill Salt'] %}{% endif %}
       {% if rinse %}{% set issues = issues + ['Refill Rinse Aid'] %}{% endif %}
       {% if clean %}{% set issues = issues + ['Tub Clean Due'] %}{% endif %}
+      {% if fl == 0 %}{% set issues = issues + ['Filter Due'] %}{% endif %}
+      {% if ls == 0 %}{% set issues = issues + ['Limescale Due'] %}{% endif %}
+      {% if sc == 0 %}{% set issues = issues + ['Check-up Due'] %}{% endif %}
       {% if err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}{% set issues = issues + ['Fault ' ~ err] %}{% endif %}
       {% if issues | length > 0 %}
         Action needed: {{ issues | join(' · ') }}
@@ -41,8 +48,11 @@ cards:
       {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
       {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
       {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
       {% set err = states('sensor.<machine_name>_error_code') %}
-      {% if salt or rinse or clean or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+      {% if salt or rinse or clean or fl == 0 or ls == 0 or sc == 0 or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
         mdi:alert-circle
       {% else %}
         mdi:check-circle
@@ -51,8 +61,13 @@ cards:
       {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
       {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
       {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
       {% set err = states('sensor.<machine_name>_error_code') %}
-      {% if salt or rinse or clean or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+      {% if err not in ['0', 'E0', 'unknown', 'unavailable', ''] or fl == 0 or ls == 0 or sc == 0 %}
+        red
+      {% elif salt or rinse or clean %}
         amber
       {% else %}
         green
@@ -61,8 +76,13 @@ cards:
       {% set salt = is_state('binary_sensor.<machine_name>_salt_empty', 'on') %}
       {% set rinse = is_state('binary_sensor.<machine_name>_rinse_aid_empty', 'on') %}
       {% set clean = is_state('binary_sensor.<machine_name>_maintenance_clean_warning', 'on') %}
+      {% set fl = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+      {% set ls = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+      {% set sc = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
       {% set err = states('sensor.<machine_name>_error_code') %}
-      {% if salt or rinse or clean or err not in ['0', 'E0', 'unknown', 'unavailable', ''] %}
+      {% if err not in ['0', 'E0', 'unknown', 'unavailable', ''] or fl == 0 or ls == 0 or sc == 0 %}
+        red
+      {% elif salt or rinse or clean %}
         amber
       {% else %}
         green
@@ -120,51 +140,170 @@ cards:
       action: more-info
 
   # ------------------------------------------------------------------------------------------------
-  # 3. Usage Statistics & Hardware Settings
+  # 3. Cycle-Based Preventive Maintenance Counters & Resets
+  # ------------------------------------------------------------------------------------------------
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>_filter_maintenance_remaining_cycles
+        state_not: unavailable
+    card:
+      type: custom:mushroom-template-card
+      primary: Filter Clean
+      secondary: >-
+        {% set v = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %}Due now · Clean coarse and micro-filter
+        {% elif v > 0 %}{{ v }} cycles remaining
+        {% else %}—{% endif %}
+      icon: mdi:filter-outline
+      icon_color: >-
+        {% set v = states('sensor.<machine_name>_filter_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %} red {% elif v <= 5 %} orange {% else %} green {% endif %}
+      entity: sensor.<machine_name>_filter_maintenance_remaining_cycles
+      tap_action:
+        action: more-info
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
+        state_not: unavailable
+    card:
+      type: custom:mushroom-template-card
+      primary: Limescale Descaling
+      secondary: >-
+        {% set v = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %}Due now · Run descaler or high-temp cycle
+        {% elif v > 0 %}{{ v }} cycles remaining
+        {% else %}—{% endif %}
+      icon: mdi:water-opacity
+      icon_color: >-
+        {% set v = states('sensor.<machine_name>_limescale_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green {% endif %}
+      entity: sensor.<machine_name>_limescale_maintenance_remaining_cycles
+      tap_action:
+        action: more-info
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
+        state_not: unavailable
+    card:
+      type: custom:mushroom-template-card
+      primary: Full Diagnostic Check-up
+      secondary: >-
+        {% set v = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %}Due now · Run electronic self-test
+        {% elif v > 0 %}{{ v }} cycles remaining
+        {% else %}—{% endif %}
+      icon: mdi:stethoscope
+      icon_color: >-
+        {% set v = states('sensor.<machine_name>_check_up_maintenance_remaining_cycles') | int(-1) %}
+        {% if v == 0 %} red {% elif v <= 10 %} orange {% else %} green {% endif %}
+      entity: sensor.<machine_name>_check_up_maintenance_remaining_cycles
+      tap_action:
+        action: more-info
+
+  - type: horizontal-stack
+    cards:
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_filter_maintenance_reset
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          primary: Reset Filter
+          icon: mdi:restore
+          icon_color: grey
+          layout: vertical
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.<machine_name>_filter_maintenance_reset
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_limescale_maintenance_reset
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          primary: Reset Limescale
+          icon: mdi:restore
+          icon_color: grey
+          layout: vertical
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.<machine_name>_limescale_maintenance_reset
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: button.<machine_name>_check_up_maintenance_reset
+            state_not: unavailable
+        card:
+          type: custom:mushroom-template-card
+          primary: Reset Check-up
+          icon: mdi:restore
+          icon_color: grey
+          layout: vertical
+          tap_action:
+            action: perform-action
+            perform_action: button.press
+            target:
+              entity_id: button.<machine_name>_check_up_maintenance_reset
+
+  # ------------------------------------------------------------------------------------------------
+  # 4. Usage Statistics & Hardware Settings
   # ------------------------------------------------------------------------------------------------
   - type: custom:mushroom-chips-card
     chips:
       - type: template
         icon: mdi:counter
         content: >-
-          {% set v = states('sensor.<machine_name>_completed_cycles') | int(-1) %}
-          {% if v >= 0 %}{{ v }} completed cycles{% else %}Cycles: —{% endif %}
+          {% set v = states('sensor.<machine_name>_total_cycles') | int(-1) %}
+          {% if v < 0 %}{% set v = states('sensor.<machine_name>_completed_cycles') | int(-1) %}{% endif %}
+          {% if v >= 0 %}{{ v }} total cycles{% else %}Cycles: —{% endif %}
         icon_color: blue
         tap_action:
           action: more-info
-          entity: sensor.<machine_name>_completed_cycles
+          entity: sensor.<machine_name>_total_cycles
       - type: template
         icon: mdi:water-opacity
         content: >-
-          {% set h = states('sensor.<machine_name>_dishwasher_water_hardness') %}
-          {% if h in ['unknown', 'unavailable', ''] %}{% set h = states('sensor.<machine_name>_water_hardness') %}{% endif %}
+          {% set h = states('sensor.<machine_name>_water_hardness') %}
+          {% if h in ['unknown', 'unavailable', ''] %}{% set h = states('sensor.<machine_name>_dishwasher_water_hardness') %}{% endif %}
           {% if h not in ['unknown', 'unavailable', ''] %}Hardness: Level {{ h }}{% else %}Hardness: —{% endif %}
         icon_color: teal
         tap_action:
           action: more-info
-          entity: sensor.<machine_name>_dishwasher_water_hardness
+          entity: sensor.<machine_name>_water_hardness
       - type: template
         icon: mdi:volume-high
         content: >-
-          {% set b = states('sensor.<machine_name>_dishwasher_buzzer') %}
-          {% if b in ['unknown', 'unavailable', ''] %}{% set b = states('sensor.<machine_name>_buzzer_volume') %}{% endif %}
+          {% set b = states('sensor.<machine_name>_buzzer_volume') %}
+          {% if b in ['unknown', 'unavailable', ''] %}{% set b = states('sensor.<machine_name>_dishwasher_buzzer') %}{% endif %}
           {% if b in ['on', 'true', 'True', '1', '2', '3'] %}Buzzer: On{% elif b in ['off', 'false', 'False', '0'] %}Buzzer: Muted{% else %}Buzzer: —{% endif %}
         icon_color: grey
         tap_action:
           action: more-info
-          entity: sensor.<machine_name>_dishwasher_buzzer
+          entity: sensor.<machine_name>_buzzer_volume
       - type: template
         icon: mdi:history
         content: >-
-          {% set m = states('binary_sensor.<machine_name>_dishwasher_remember_last_cycle') %}
+          {% set m = states('binary_sensor.<machine_name>_remember_last_cycle') %}
+          {% if m in ['unknown', 'unavailable', ''] %}{% set m = states('binary_sensor.<machine_name>_dishwasher_remember_last_cycle') %}{% endif %}
           {% if m in ['on', 'true', 'True'] %}Memo: On{% elif m in ['off', 'false', 'False'] %}Memo: Off{% else %}Memo: —{% endif %}
         icon_color: purple
         tap_action:
           action: more-info
-          entity: binary_sensor.<machine_name>_dishwasher_remember_last_cycle
+          entity: binary_sensor.<machine_name>_remember_last_cycle
 
   # ------------------------------------------------------------------------------------------------
-  # 4. Electronic Diagnostic Self Check-Up
+  # 5. Electronic Diagnostic Self Check-Up
   # ------------------------------------------------------------------------------------------------
   - type: conditional
     conditions:

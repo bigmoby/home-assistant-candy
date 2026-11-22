@@ -182,7 +182,7 @@ Pre-configured Lovelace dashboard cards using [Mushroom Cards](https://github.co
 - **[Tumble Dryer Card](../dashboard/tumble-dryer.yaml):** Complete dryer panel with dry level selectors, timed drying controls, filter and water alerts, and anti-crease management.
 - **[Dishwasher Card](../dashboard/dishwasher.yaml):** Operational control panel for dishwashers with program selection, wash options (Eco, Half Load, Extra Dry, 3-in-1, Auto Open Door), delay start, progress telemetry, and start/pause/resume/stop/open door controls.
 - **[Maintenance Card](../dashboard/maintenance.yaml):** Companion card strictly for **washing machines** and **washer-dryers** (tracks cycle-based countdowns for Full Check-up, Limescale cleaning, and Filter care). Not needed for tumble dryers, which already include live hardware alerts directly on their card.
-- **[Dishwasher Maintenance Card](../dashboard/dishwasher-maintenance.yaml):** Dedicated companion card for **dishwashers** (monitors salt and rinse aid reservoir levels, tub maintenance clean warning, lifetime completed cycles, water hardness, and provides electronic diagnostic self-tests).
+- **[Dishwasher Maintenance Card](../dashboard/dishwasher-maintenance.yaml):** Dedicated companion card for **dishwashers** (monitors salt and rinse aid reservoir levels, tub maintenance clean warning, cycle-based counters for filter, limescale, and check-up, total cycles, water hardness, buzzer volume, program memo, and provides electronic diagnostic self-tests and counter resets).
 
 #### Requirements & Setup
 
