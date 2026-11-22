@@ -22,6 +22,14 @@ def is_legacy_dishwasher(interface_type: str | None) -> bool:
     )
 
 
+def is_modern_dishwasher(interface_type: str | None) -> bool:
+    """Return True if the interface_type belongs to Family 2 (Brava) or Family 3 (AXI)."""
+    if not interface_type or is_legacy_dishwasher(interface_type):
+        return False
+    up = interface_type.upper()
+    return any(term in up for term in ("BRAVA", "DW_WIFI", "AXI", "SMOOTH"))
+
+
 class DishwasherCommandBuilder(ABC):
     """Abstract interface for dishwasher write command builders."""
 

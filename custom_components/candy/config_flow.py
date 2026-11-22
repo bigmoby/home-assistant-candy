@@ -41,6 +41,8 @@ from .const import (
     CONF_KEY_CHECKUP_ENABLED,
     CONF_KEY_CHECKUP_SCHEDULE,
     CONF_KEY_DEVICE_MODEL,
+    CONF_KEY_DISHWASHER_BUZZER,
+    CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE,
     CONF_KEY_DOWNLOADABLE_PROGRAMS,
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_IS_DISHWASHER,
@@ -61,9 +63,13 @@ from .const import (
     CONF_KEY_SERIAL_NUMBER,
     CONF_KEY_USE_ENCRYPTION,
     CONF_KEY_WATER_HARDNESS,
+    DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
     DEFAULT_DISHWASHER_PROGRAMS,
+    DISHWASHER_HARDNESS_THRESHOLDS_LED,
+    DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
+    DISHWASHER_MAINTENANCE_FILTER_THRESHOLD,
     DOMAIN,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
@@ -84,6 +90,7 @@ from .const import (
 )
 from .helpers import (
     cycles_remaining,
+    is_dishwasher_digit_or_smooth_interface,
     is_dualtech,
     is_dualtech_dryer,
     is_washer_dryer,
@@ -145,19 +152,48 @@ CHECKUP_SCHEDULE_SCHEMA = vol.Schema(
     }
 )
 
-HARDNESS_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_KEY_WATER_HARDNESS, default=2): SelectSelector(
-            SelectSelectorConfig(
-                options=[
-                    SelectOptionDict(value=str(i), label=label)
-                    for i, label in enumerate(MAINTENANCE_HARDNESS_LABELS)
-                ],
-                mode=SelectSelectorMode.DROPDOWN,
-                translation_key="water_hardness",
-            )
-        ),
-    }
+
+def _hardness_schema(
+    current: int,
+    is_dishwasher: bool,
+    interface_type: str | None,
+) -> vol.Schema:
+    """Build schema for water hardness selection, interface-aware for dishwashers."""
+    if is_dishwasher:
+        if is_dishwasher_digit_or_smooth_interface(interface_type):
+            levels_count = 8
+            trans_key = "dishwasher_water_hardness_digit"
+        else:
+            levels_count = 6
+            trans_key = "dishwasher_water_hardness_led"
+        bounded = min(max(current, 0), levels_count - 1)
+        options = [
+            SelectOptionDict(value=str(i), label=str(i)) for i in range(levels_count)
+        ]
+    else:
+        trans_key = "water_hardness"
+        bounded = min(max(current, 0), len(MAINTENANCE_HARDNESS_LABELS) - 1)
+        options = [
+            SelectOptionDict(value=str(i), label=label)
+            for i, label in enumerate(MAINTENANCE_HARDNESS_LABELS)
+        ]
+    return vol.Schema(
+        {
+            vol.Required(CONF_KEY_WATER_HARDNESS, default=str(bounded)): SelectSelector(
+                SelectSelectorConfig(
+                    options=options,
+                    mode=SelectSelectorMode.DROPDOWN,
+                    translation_key=trans_key,
+                )
+            ),
+        }
+    )
+
+
+HARDNESS_SCHEMA = _hardness_schema(
+    current=2,
+    is_dishwasher=False,
+    interface_type=None,
 )
 
 
@@ -196,13 +232,13 @@ def _current_remaining_cycles(
 
 
 def _baselines_schema(
-    hardness_index: int,
     total_cycles: int,
     limescale_enabled: bool,
     filter_enabled: bool,
+    limescale_threshold: int,
+    filter_threshold: int,
 ) -> vol.Schema:
     """Build schema for remaining-cycles fields with current remaining as defaults."""
-    limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness_index]
     fields: dict[vol.Required, type] = {
         vol.Required(
             CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
@@ -222,10 +258,45 @@ def _baselines_schema(
         fields[
             vol.Required(
                 CONF_KEY_MAINTENANCE_LAST_FILTER,
-                default=cycles_remaining(total_cycles, 0, MAINTENANCE_FILTER_THRESHOLD),
+                default=cycles_remaining(total_cycles, 0, filter_threshold),
             )
         ] = int
     return vol.Schema(fields)
+
+
+def _dishwasher_settings_schema(
+    interface_type: str | None,
+    default_hardness: int = 2,
+    default_buzzer: bool = True,
+    default_remember_last_cycle: bool = True,
+) -> vol.Schema:
+    """Build schema for dishwasher hardware settings."""
+    is_digit = is_dishwasher_digit_or_smooth_interface(interface_type)
+    num_levels = 8 if is_digit else 6
+    trans_key = (
+        "dishwasher_water_hardness_digit"
+        if is_digit
+        else "dishwasher_water_hardness_led"
+    )
+    safe_hardness = min(max(default_hardness, 0), num_levels - 1)
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_KEY_WATER_HARDNESS, default=str(safe_hardness)
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=[str(i) for i in range(num_levels)],
+                    mode=SelectSelectorMode.DROPDOWN,
+                    translation_key=trans_key,
+                )
+            ),
+            vol.Required(CONF_KEY_DISHWASHER_BUZZER, default=default_buzzer): bool,
+            vol.Required(
+                CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE,
+                default=default_remember_last_cycle,
+            ): bool,
+        }
+    )
 
 
 def _language_schema(default_lang: str) -> vol.Schema:
@@ -337,6 +408,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             if user_input["next_step"] == "switch_to_read_only":
                 return await self.async_step_switch_to_read_only()
+            if user_input["next_step"] == "dishwasher_settings":
+                return await self.async_step_dishwasher_settings()
             if user_input["next_step"] == "maintenance_settings":
                 return await self.async_step_maintenance()
             if user_input["next_step"] == "checkup_settings":
@@ -346,9 +419,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if mode == MODE_FULL_CONTROL:
             options = ["update_cloud_data", "switch_to_read_only"]
             interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-            if is_washing_machine or (
-                is_dishwasher and not is_legacy_dishwasher(interface_type)
-            ):
+            if is_dishwasher and not is_legacy_dishwasher(interface_type):
+                options.append("dishwasher_settings")
+                options.append("maintenance_settings")
+            elif is_washing_machine:
                 options.append("maintenance_settings")
             if supports_scheduled_checkup(interface_type, is_dryer):
                 options.append("checkup_settings")
@@ -373,6 +447,94 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(data={})
 
         return await self.async_step_maintenance()
+
+    async def async_step_dishwasher_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure dishwasher hardware settings and dispatch changes over LAN."""
+        interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        coord = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self.config_entry.entry_id, {})
+            .get(DATA_KEY_COORDINATOR)
+        )
+        status: DishwasherStatus | None = (
+            coord.data if coord and isinstance(coord.data, DishwasherStatus) else None
+        )
+
+        if user_input is None:
+            cur_hardness = (
+                status.water_hardness
+                if status and status.water_hardness is not None
+                else self.config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+            )
+            cur_buzzer = (
+                status.buzzer
+                if status and status.buzzer is not None
+                else self.config_entry.data.get(CONF_KEY_DISHWASHER_BUZZER, True)
+            )
+            cur_memo = (
+                status.remember_last_cycle
+                if status and status.remember_last_cycle is not None
+                else self.config_entry.data.get(
+                    CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE, True
+                )
+            )
+            return self.async_show_form(
+                step_id="dishwasher_settings",
+                data_schema=_dishwasher_settings_schema(
+                    interface_type=interface_type,
+                    default_hardness=cur_hardness,
+                    default_buzzer=cur_buzzer,
+                    default_remember_last_cycle=cur_memo,
+                ),
+            )
+
+        new_hardness = int(user_input[CONF_KEY_WATER_HARDNESS])
+        new_buzzer = bool(user_input[CONF_KEY_DISHWASHER_BUZZER])
+        new_memo = bool(user_input[CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE])
+
+        client: CandyClient | None = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self.config_entry.entry_id, {})
+            .get(DATA_KEY_CLIENT)
+        )
+        if client is not None:
+            if status is None or new_hardness != status.water_hardness:
+                try:
+                    await client.set_dishwasher_water_hardness(new_hardness)
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to send water hardness to dishwasher: %s", err
+                    )
+            if status is None or new_buzzer != status.buzzer:
+                try:
+                    await client.set_dishwasher_buzzer(new_buzzer)
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to send buzzer setting to dishwasher: %s", err
+                    )
+            if status is None or new_memo != status.remember_last_cycle:
+                try:
+                    await client.set_dishwasher_remember_last_cycle(new_memo)
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to send remember last cycle setting to dishwasher: %s",
+                        err,
+                    )
+
+        self._pending_data = dict(self.config_entry.data)
+        self._pending_data[CONF_KEY_WATER_HARDNESS] = new_hardness
+        self._pending_data[CONF_KEY_DISHWASHER_BUZZER] = new_buzzer
+        self._pending_data[CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE] = new_memo
+
+        self.hass.config_entries.async_update_entry(
+            self.config_entry, data=self._pending_data
+        )
+        self.hass.async_create_task(
+            self.hass.config_entries.async_reload(self.config_entry.entry_id)
+        )
+        return self.async_create_entry(data={})
 
     async def async_step_maintenance(
         self, user_input: dict[str, Any] | None = None
@@ -447,6 +609,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._pending_data[CONF_KEY_MAINTENANCE_FILTER_ENABLED] = user_input[
             CONF_KEY_MAINTENANCE_FILTER_ENABLED
         ]
+        if self._is_dishwasher():
+            if (
+                CONF_KEY_WATER_HARDNESS not in self._pending_data
+                and user_input[CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED]
+            ):
+                return await self.async_step_hardness()
+            return await self.async_step_maintenance_baselines()
         if user_input[CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED]:
             return await self.async_step_hardness()
         return await self.async_step_maintenance_baselines()
@@ -457,27 +626,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Ask for water hardness level."""
         if user_input is None:
             current = self.config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
-            return self.async_show_form(
-                step_id="hardness",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required(
-                            CONF_KEY_WATER_HARDNESS, default=str(current)
-                        ): SelectSelector(
-                            SelectSelectorConfig(
-                                options=[
-                                    SelectOptionDict(value=str(i), label=label)
-                                    for i, label in enumerate(
-                                        MAINTENANCE_HARDNESS_LABELS
-                                    )
-                                ],
-                                mode=SelectSelectorMode.DROPDOWN,
-                                translation_key="water_hardness",
-                            )
-                        ),
-                    }
-                ),
+            interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+            schema = _hardness_schema(
+                current=current,
+                is_dishwasher=self._is_dishwasher(),
+                interface_type=interface_type,
             )
+            return self.async_show_form(step_id="hardness", data_schema=schema)
         self._pending_data[CONF_KEY_WATER_HARDNESS] = int(
             user_input[CONF_KEY_WATER_HARDNESS]
         )
@@ -488,13 +643,26 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> ConfigFlowResult:
         """Ask for remaining cycles (what the app shows) for each enabled maintenance item."""
         hardness_index = self._pending_data.get(CONF_KEY_WATER_HARDNESS, 2)
-        limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness_index]
         limescale_enabled = self._pending_data.get(
             CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True
         )
         filter_enabled = self._pending_data.get(
             CONF_KEY_MAINTENANCE_FILTER_ENABLED, True
         )
+
+        if self._is_dishwasher():
+            interface_type = self._pending_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            thresholds = (
+                DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH
+                if is_dishwasher_digit_or_smooth_interface(interface_type)
+                else DISHWASHER_HARDNESS_THRESHOLDS_LED
+            )
+            idx = min(hardness_index, len(thresholds) - 1)
+            limescale_threshold = thresholds[idx]
+            filter_threshold = DISHWASHER_MAINTENANCE_FILTER_THRESHOLD
+        else:
+            limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness_index]
+            filter_threshold = MAINTENANCE_FILTER_THRESHOLD
 
         # Read current total_cycles from the live stats coordinator if available
         total_cycles: int = 0
@@ -520,9 +688,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ls_default = cycles_remaining(
                     total_cycles, last_ls, limescale_threshold
                 )
-                ft_default = cycles_remaining(
-                    total_cycles, last_ft, MAINTENANCE_FILTER_THRESHOLD
-                )
+                ft_default = cycles_remaining(total_cycles, last_ft, filter_threshold)
             else:
                 if self._is_dishwasher():
                     uid_sc = UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP
@@ -543,11 +709,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ls_default = (
                     current_ls if current_ls is not None else limescale_threshold
                 )
-                ft_default = (
-                    current_ft
-                    if current_ft is not None
-                    else MAINTENANCE_FILTER_THRESHOLD
-                )
+                ft_default = current_ft if current_ft is not None else filter_threshold
             fields: dict[vol.Required, type] = {
                 vol.Required(
                     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, default=sc_default
@@ -587,7 +749,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 _remaining_to_last_reset(
                     user_input[CONF_KEY_MAINTENANCE_LAST_FILTER],
                     total_cycles,
-                    MAINTENANCE_FILTER_THRESHOLD,
+                    filter_threshold,
                 )
             )
         interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
@@ -825,6 +987,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._is_washing_machine: bool = False
         self._is_tumble_dryer: bool = False
         self._is_dishwasher: bool = False
+        self._dishwasher_status: DishwasherStatus | None = None
         self._total_cycles: int = (
             0  # fetched once after device probe; used for baselines
         )
@@ -971,7 +1134,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 status = await client.status()
             self._is_washing_machine = isinstance(status, WashingMachineStatus)
             self._is_tumble_dryer = isinstance(status, TumbleDryerStatus)
-            self._is_dishwasher = isinstance(status, DishwasherStatus)
+            if isinstance(status, DishwasherStatus):
+                self._is_dishwasher = True
+                self._dishwasher_status = status
+            else:
+                self._is_dishwasher = False
             if self._is_washing_machine:
                 try:
                     async with async_timeout.timeout(20):
@@ -1175,7 +1342,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         if self._is_dishwasher:
             interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
             if not is_legacy_dishwasher(interface_type):
-                return await self.async_step_maintenance()
+                return await self.async_step_dishwasher_settings()
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
             )
@@ -1188,6 +1355,80 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
             return self.async_create_entry(
                 title=CONF_INTEGRATION_TITLE, data=self._config_data
             )
+        return await self.async_step_maintenance()
+
+    async def async_step_dishwasher_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for dishwasher hardware settings during onboarding."""
+        interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+        if user_input is None:
+            cur_hardness = (
+                self._dishwasher_status.water_hardness
+                if self._dishwasher_status
+                and self._dishwasher_status.water_hardness is not None
+                else 2
+            )
+            cur_buzzer = (
+                self._dishwasher_status.buzzer
+                if self._dishwasher_status
+                and self._dishwasher_status.buzzer is not None
+                else True
+            )
+            cur_memo = (
+                self._dishwasher_status.remember_last_cycle
+                if self._dishwasher_status
+                and self._dishwasher_status.remember_last_cycle is not None
+                else True
+            )
+            return self.async_show_form(
+                step_id="dishwasher_settings",
+                data_schema=_dishwasher_settings_schema(
+                    interface_type=interface_type,
+                    default_hardness=cur_hardness,
+                    default_buzzer=cur_buzzer,
+                    default_remember_last_cycle=cur_memo,
+                ),
+            )
+
+        new_hardness = int(user_input[CONF_KEY_WATER_HARDNESS])
+        new_buzzer = bool(user_input[CONF_KEY_DISHWASHER_BUZZER])
+        new_memo = bool(user_input[CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE])
+
+        self._config_data[CONF_KEY_WATER_HARDNESS] = new_hardness
+        self._config_data[CONF_KEY_DISHWASHER_BUZZER] = new_buzzer
+        self._config_data[CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE] = new_memo
+
+        if (
+            self._dishwasher_status is not None
+            and self._config_data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
+            and (
+                new_hardness != self._dishwasher_status.water_hardness
+                or new_buzzer != self._dishwasher_status.buzzer
+                or new_memo != self._dishwasher_status.remember_last_cycle
+            )
+        ):
+            try:
+                client = CandyClient(
+                    session=async_get_clientsession(self.hass),
+                    device_ip=self._ip_address,
+                    encryption_key=self._config_data.get(CONF_PASSWORD, "") or "",
+                    use_encryption=self._config_data.get(
+                        CONF_KEY_USE_ENCRYPTION, False
+                    ),
+                )
+                if new_hardness != self._dishwasher_status.water_hardness:
+                    await client.set_dishwasher_water_hardness(new_hardness)
+                if new_buzzer != self._dishwasher_status.buzzer:
+                    await client.set_dishwasher_buzzer(new_buzzer)
+                if new_memo != self._dishwasher_status.remember_last_cycle:
+                    await client.set_dishwasher_remember_last_cycle(new_memo)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to dispatch initial dishwasher settings to appliance: %s",
+                    err,
+                )
+
         return await self.async_step_maintenance()
 
     async def async_step_maintenance(
@@ -1245,6 +1486,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         self._config_data[CONF_KEY_MAINTENANCE_FILTER_ENABLED] = user_input[
             CONF_KEY_MAINTENANCE_FILTER_ENABLED
         ]
+        if self._is_dishwasher:
+            if (
+                CONF_KEY_WATER_HARDNESS not in self._config_data
+                and user_input[CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED]
+            ):
+                return await self.async_step_hardness()
+            return await self.async_step_maintenance_baselines()
         if user_input[CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED]:
             return await self.async_step_hardness()
         return await self.async_step_maintenance_baselines()
@@ -1254,7 +1502,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
     ) -> ConfigFlowResult:
         """Ask for water hardness level."""
         if user_input is None:
-            return self.async_show_form(step_id="hardness", data_schema=HARDNESS_SCHEMA)
+            current = self._config_data.get(CONF_KEY_WATER_HARDNESS, 2)
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            schema = _hardness_schema(
+                current=current,
+                is_dishwasher=self._is_dishwasher,
+                interface_type=interface_type,
+            )
+            return self.async_show_form(step_id="hardness", data_schema=schema)
         self._config_data[CONF_KEY_WATER_HARDNESS] = int(
             user_input[CONF_KEY_WATER_HARDNESS]
         )
@@ -1271,17 +1526,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         filter_enabled = self._config_data.get(
             CONF_KEY_MAINTENANCE_FILTER_ENABLED, True
         )
+
+        if self._is_dishwasher:
+            interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+            thresholds = (
+                DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH
+                if is_dishwasher_digit_or_smooth_interface(interface_type)
+                else DISHWASHER_HARDNESS_THRESHOLDS_LED
+            )
+            idx = min(hardness_index, len(thresholds) - 1)
+            limescale_threshold = thresholds[idx]
+            filter_threshold = DISHWASHER_MAINTENANCE_FILTER_THRESHOLD
+        else:
+            limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness_index]
+            filter_threshold = MAINTENANCE_FILTER_THRESHOLD
+
         if user_input is None:
             return self.async_show_form(
                 step_id="maintenance_baselines",
                 data_schema=_baselines_schema(
-                    hardness_index,
-                    self._total_cycles,
-                    limescale_enabled,
-                    filter_enabled,
+                    total_cycles=self._total_cycles,
+                    limescale_enabled=limescale_enabled,
+                    filter_enabled=filter_enabled,
+                    limescale_threshold=limescale_threshold,
+                    filter_threshold=filter_threshold,
                 ),
             )
-        limescale_threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness_index]
         self._config_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = (
             _remaining_to_last_reset(
                 user_input[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP],
@@ -1302,7 +1572,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 _remaining_to_last_reset(
                     user_input[CONF_KEY_MAINTENANCE_LAST_FILTER],
                     self._total_cycles,
-                    MAINTENANCE_FILTER_THRESHOLD,
+                    filter_threshold,
                 )
             )
         if self._config_data.get(

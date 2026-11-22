@@ -57,6 +57,15 @@
           "maintenance_filter_enabled": "Filter cleaning"
         }
       },
+      "dishwasher_settings": {
+        "title": "Dishwasher settings",
+        "description": "Configure dishwasher hardware settings. These parameters will be sent directly to the machine over local Wi-Fi.",
+        "data": {
+          "water_hardness": "Water hardness",
+          "dishwasher_buzzer": "End-of-cycle acoustic signal (buzzer)",
+          "dishwasher_remember_last_cycle": "Remember last used program"
+        }
+      },
       "hardness": {
         "title": "Water hardness",
         "description": "Select your local water hardness. This determines how often the descale reminder fires.",
@@ -93,6 +102,15 @@
         "data": {
           "email": "Email",
           "password": "Password"
+        }
+      },
+      "dishwasher_settings": {
+        "title": "Dishwasher settings",
+        "description": "Configure dishwasher hardware settings. These parameters will be sent directly to the machine over local Wi-Fi.",
+        "data": {
+          "water_hardness": "Water hardness",
+          "dishwasher_buzzer": "End-of-cycle acoustic signal (buzzer)",
+          "dishwasher_remember_last_cycle": "Remember last used program"
         }
       }
     },
@@ -178,6 +196,15 @@
           "maintenance_limescale_enabled": "Limescale cleaning",
           "maintenance_filter_enabled": "Filter cleaning"
         }
+      },
+      "dishwasher_settings": {
+        "title": "Dishwasher settings",
+        "description": "Configure dishwasher hardware settings. These parameters will be sent directly to the machine over local Wi-Fi.",
+        "data": {
+          "water_hardness": "Water hardness",
+          "dishwasher_buzzer": "End-of-cycle acoustic signal (buzzer)",
+          "dishwasher_remember_last_cycle": "Remember last used program"
+        }
       }
     },
     "error": {
@@ -221,6 +248,9 @@
       },
       "dishwasher_maint_clean": {
         "name": "Maintenance clean warning"
+      },
+      "dishwasher_remember_last_cycle": {
+        "name": "Remember last cycle"
       }
     },
     "sensor": {
@@ -689,6 +719,7 @@
       "options": {
         "update_cloud_data": "Update cloud data",
         "switch_to_read_only": "Switch to Read-Only",
+        "dishwasher_settings": "Dishwasher hardware settings",
         "maintenance_settings": "Maintenance counter settings",
         "checkup_settings": "Self check-up settings"
       }
@@ -701,6 +732,28 @@
         "3": "Moderately hard (12–16 °fH / 12–18 °dH)",
         "4": "Hard (17–22 °fH / 18–30 °dH)",
         "5": "Very hard (23–27 °fH / >30 °dH)"
+      }
+    },
+    "dishwasher_water_hardness_led": {
+      "options": {
+        "0": "Very soft (0–5 °fH / 0–3 °dH, No salt)",
+        "1": "Soft (6–15 °fH / 4–9 °dH)",
+        "2": "Medium hard (16–30 °fH / 10–16 °dH)",
+        "3": "Discreetly hard (31–45 °fH / 17–25 °dH)",
+        "4": "Hard (46–60 °fH / 26–33 °dH)",
+        "5": "Very hard (61–90 °fH / 34–50 °dH)"
+      }
+    },
+    "dishwasher_water_hardness_digit": {
+      "options": {
+        "0": "Extremely soft (0–5 °fH / 0–3 °dH, No salt)",
+        "1": "Very soft (6–10 °fH / 4–6 °dH)",
+        "2": "Soft (11–20 °fH / 7–11 °dH)",
+        "3": "Medium hard (21–30 °fH / 12–16 °dH)",
+        "4": "Discreetly hard (31–40 °fH / 17–22 °dH)",
+        "5": "Hard (41–50 °fH / 23–27 °dH)",
+        "6": "Very hard (51–60 °fH / 28–33 °dH)",
+        "7": "Extremely hard (61–90 °fH / 34–50 °dH)"
       }
     },
     "checkup_schedule": {

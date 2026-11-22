@@ -89,6 +89,9 @@ from .const import (
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_STATS_REFRESH_UNSUB,
     DATA_KEY_WASH_ERROR_UNSUB,
+    DISHWASHER_HARDNESS_THRESHOLDS_LED,
+    DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
+    DISHWASHER_MAINTENANCE_FILTER_THRESHOLD,
     DOMAIN,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
@@ -120,6 +123,7 @@ from .coordinator import CandyDataUpdateCoordinator
 from .helpers import (
     cycles_remaining,
     get_appliance_error_notification_strings,
+    is_dishwasher_digit_or_smooth_interface,
     is_dualtech,
     localized_notification_text,
 )
@@ -356,6 +360,7 @@ def _offline_dishwasher() -> DishwasherStatus:
         buzzer_level=None,
         water_hardness=None,
         last_cycle_counter=None,
+        remember_last_cycle=None,
         auto_clean_warning=False,
         checkup_state=None,
         checkup_result=None,
@@ -770,20 +775,36 @@ def _register_maintenance_notifications(
 ) -> Callable[[], None]:
     entry_id = config_entry.entry_id
     lang = config_entry.data.get(CONF_KEY_PROGRAM_LANGUAGE, hass.config.language)
+    is_dishwasher = bool(config_entry.data.get(CONF_KEY_IS_DISHWASHER, False))
 
     def _get_limescale_threshold() -> int:
+        if is_dishwasher:
+            interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+            thresholds = (
+                DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH
+                if is_dishwasher_digit_or_smooth_interface(interface_type)
+                else DISHWASHER_HARDNESS_THRESHOLDS_LED
+            )
+        else:
+            thresholds = MAINTENANCE_HARDNESS_THRESHOLDS
+
         if coordinator is not None:
             status = coordinator.data
             hardness = getattr(status, "water_hardness", None)
-            if (
-                hardness is None
-                or hardness < 0
-                or hardness >= len(MAINTENANCE_HARDNESS_THRESHOLDS)
-            ):
+            if hardness is None or hardness < 0 or hardness >= len(thresholds):
                 hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
-            return MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
-        hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
-        return MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
+        else:
+            hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+
+        if hardness >= len(thresholds):
+            hardness = len(thresholds) - 1
+        return thresholds[hardness]
+
+    filter_threshold = (
+        DISHWASHER_MAINTENANCE_FILTER_THRESHOLD
+        if is_dishwasher
+        else MAINTENANCE_FILTER_THRESHOLD
+    )
 
     _MAINTENANCE_ITEMS = [
         (
@@ -808,7 +829,7 @@ def _register_maintenance_notifications(
         _MAINTENANCE_ITEMS.append(
             (
                 CONF_KEY_MAINTENANCE_LAST_FILTER,
-                MAINTENANCE_FILTER_THRESHOLD,
+                filter_threshold,
                 NOTIF_ID_MAINT_FILTER.format(entry_id),
                 localized_notification_text("filter_title", lang),
                 localized_notification_text("filter_due_message", lang),

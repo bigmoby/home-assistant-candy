@@ -22,6 +22,7 @@ from .const import (
     DOMAIN,
     UNIQUE_ID_DISHWASHER_DOOR,
     UNIQUE_ID_DISHWASHER_MAINT_CLEAN,
+    UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE,
     UNIQUE_ID_DISHWASHER_REMOTE_CONTROL,
     UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY,
     UNIQUE_ID_DISHWASHER_SALT_EMPTY,
@@ -59,6 +60,7 @@ async def async_setup_entry(
                 DishwasherDoorBinarySensor(coordinator, config_entry),
                 DishwasherRemoteControlBinarySensor(coordinator, config_entry),
                 DishwasherAutoCleanBinarySensor(coordinator, config_entry),
+                DishwasherRememberLastCycleBinarySensor(coordinator, config_entry),
             ]
         )
         return
@@ -423,3 +425,19 @@ class DishwasherAutoCleanBinarySensor(_CandyDishwasherBinarySensorBase):
         if not isinstance(self.coordinator.data, DishwasherStatus):
             return None
         return self.status.auto_clean_warning
+
+
+class DishwasherRememberLastCycleBinarySensor(_CandyDishwasherBinarySensorBase):
+    _attr_translation_key = "dishwasher_remember_last_cycle"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:history"
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE.format(self.config_id)
+
+    @property
+    def is_on(self) -> bool | None:
+        if not isinstance(self.coordinator.data, DishwasherStatus):
+            return None
+        return self.status.remember_last_cycle

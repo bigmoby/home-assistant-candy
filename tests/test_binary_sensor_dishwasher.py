@@ -15,6 +15,7 @@ from custom_components.candy import DOMAIN
 from custom_components.candy.const import (
     UNIQUE_ID_DISHWASHER_DOOR,
     UNIQUE_ID_DISHWASHER_MAINT_CLEAN,
+    UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE,
     UNIQUE_ID_DISHWASHER_REMOTE_CONTROL,
     UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY,
     UNIQUE_ID_DISHWASHER_SALT_EMPTY,
@@ -58,12 +59,16 @@ async def test_dishwasher_binary_sensors_normal(
     clean_id = _entity_id(
         hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN
     )
+    memo_id = _entity_id(
+        hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE
+    )
 
     salt_state = hass.states.get(salt_id)
     rinse_state = hass.states.get(rinse_id)
     door_state = hass.states.get(door_id)
     remote_state = hass.states.get(remote_id)
     clean_state = hass.states.get(clean_id)
+    memo_state = hass.states.get(memo_id)
 
     assert salt_state.state == "off"
     assert salt_state.attributes["device_class"] == BinarySensorDeviceClass.PROBLEM
@@ -79,6 +84,8 @@ async def test_dishwasher_binary_sensors_normal(
     assert clean_state.state == "off"
     assert clean_state.attributes["device_class"] == BinarySensorDeviceClass.PROBLEM
 
+    assert memo_state.state == "off"
+
 
 async def test_dishwasher_binary_sensors_alerts(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
@@ -90,6 +97,7 @@ async def test_dishwasher_binary_sensors_alerts(
         MissRinse="1",
         OpenDoor="1",
         StatoWiFi="0",
+        r8="1",
         r9="H_CLEAN_REQUIRED",
     )
     entry = await init_integration(hass, aioclient_mock, payload)
@@ -105,12 +113,16 @@ async def test_dishwasher_binary_sensors_alerts(
     clean_id = _entity_id(
         hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN
     )
+    memo_id = _entity_id(
+        hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE
+    )
 
     assert hass.states.get(salt_id).state == "on"
     assert hass.states.get(rinse_id).state == "on"
     assert hass.states.get(door_id).state == "on"
     assert hass.states.get(remote_id).state == "off"
     assert hass.states.get(clean_id).state == "on"
+    assert hass.states.get(memo_id).state == "on"
 
 
 async def test_dishwasher_binary_sensors_diagnostic_category(
@@ -130,8 +142,12 @@ async def test_dishwasher_binary_sensors_diagnostic_category(
     clean_id = _entity_id(
         hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN
     )
+    memo_id = _entity_id(
+        hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE
+    )
 
     assert registry.async_get(salt_id).entity_category == EntityCategory.DIAGNOSTIC
     assert registry.async_get(rinse_id).entity_category == EntityCategory.DIAGNOSTIC
     assert registry.async_get(remote_id).entity_category == EntityCategory.DIAGNOSTIC
     assert registry.async_get(clean_id).entity_category == EntityCategory.DIAGNOSTIC
+    assert registry.async_get(memo_id).entity_category == EntityCategory.DIAGNOSTIC

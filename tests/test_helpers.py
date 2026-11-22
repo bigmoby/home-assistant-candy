@@ -305,6 +305,9 @@ def test_supports_remote_pause(interface_type: str | None, expected: bool) -> No
         ("BIANCA_TOUCH", False, True),
         ("3D_DUAL", False, True),
         (None, False, True),
+        ("BRAVA_BI_DIGIT_OD", False, False),
+        ("AXI_BI_LED", False, False),
+        ("DishwasherInterfaceTypeBuiltIn", False, False),
     ],
 )
 def test_supports_scheduled_checkup(

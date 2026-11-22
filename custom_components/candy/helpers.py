@@ -82,6 +82,14 @@ def is_modern_dishwasher(interface_type: str | None) -> bool:
     return any(term in up for term in ("BRAVA", "DW_WIFI", "AXI", "SMOOTH"))
 
 
+def is_dishwasher_digit_or_smooth_interface(interface_type: str | None) -> bool:
+    """Return True if the dishwasher interface uses the 8-level scale (0..7)."""
+    if not interface_type:
+        return False
+    up = interface_type.upper()
+    return "SMOOTH" in up or "DIGIT" in up
+
+
 def dry_target_value_for_interface(target_name: str, interface_type: str | None) -> int:
     """Return numeric wire parameter value for drying target and interface type."""
     if is_dualtech(interface_type):
@@ -126,7 +134,11 @@ def supports_scheduled_checkup(
     is_tumble_dryer: bool,
 ) -> bool:
     """Return True if the appliance supports running automatic background check-up during cycles."""
-    return not is_tumble_dryer
+    return not (
+        is_tumble_dryer
+        or is_modern_dishwasher(interface_type)
+        or is_legacy_dishwasher(interface_type)
+    )
 
 
 def cycles_remaining(total: int, last_reset: int, threshold: int) -> int:

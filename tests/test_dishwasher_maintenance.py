@@ -96,15 +96,15 @@ async def test_modern_dishwasher_statistics_and_sensors(
     )
     assert checkup == "70"
 
-    # Filter: 100 - (30 - 0) = 70
+    # Filter: 30 - (30 - 0) = 0
     filt = _get_entity_state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_MAINT_FILTER)
-    assert filt == "70"
+    assert filt == "0"
 
-    # Limescale: r7 is 3 -> threshold 95. 95 - (30 - 0) = 65
+    # Limescale: r7 is 3 -> threshold 100 (SMOOTH scale). 100 - (30 - 0) = 70
     limescale = _get_entity_state(
         hass, entry, "sensor", UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE
     )
-    assert limescale == "65"
+    assert limescale == "70"
 
 
 async def test_legacy_dishwasher_skips_statistics_and_maintenance(
@@ -193,7 +193,7 @@ async def test_modern_dishwasher_maintenance_reset_buttons(
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 30
     assert (
         _get_entity_state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_MAINT_FILTER)
-        == "100"
+        == "30"
     )
 
     # Reset Limescale
@@ -211,7 +211,7 @@ async def test_modern_dishwasher_maintenance_reset_buttons(
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 30
     assert (
         _get_entity_state(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE)
-        == "95"
+        == "100"
     )
 
     # Reset Check-up

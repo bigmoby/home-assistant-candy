@@ -370,11 +370,19 @@ class DishwasherStatus:
     buzzer_level: int | None
     water_hardness: int | None
     last_cycle_counter: int | None
+    remember_last_cycle: bool | None
     auto_clean_warning: bool
     checkup_state: CheckUpState | None
     checkup_result: CheckUpResult | None
     r15: int
     selector_position: int | None
+
+    @property
+    def buzzer(self) -> bool | None:
+        """Return True if buzzer is enabled (level > 0)."""
+        if self.buzzer_level is None:
+            return None
+        return self.buzzer_level > 0
 
     @property
     def delayed_start_hours(self) -> int | None:
@@ -464,11 +472,14 @@ class DishwasherStatus:
                 water_hardness = None
 
         last_cycle_counter: int | None = None
+        remember_last_cycle: bool | None = None
         if "r8" in json:
             try:
                 last_cycle_counter = int(json["r8"])
+                remember_last_cycle = str(json["r8"]).strip() == "1"
             except (ValueError, TypeError):
                 last_cycle_counter = None
+                remember_last_cycle = None
 
         r9_val = str(json.get("r9", ""))
         auto_clean_warning = bool(r9_val and r9_val.startswith("H_"))
@@ -514,6 +525,7 @@ class DishwasherStatus:
             buzzer_level=buzzer_level,
             water_hardness=water_hardness,
             last_cycle_counter=last_cycle_counter,
+            remember_last_cycle=remember_last_cycle,
             auto_clean_warning=auto_clean_warning,
             checkup_state=checkup_state,
             checkup_result=checkup_result,

@@ -700,3 +700,94 @@ async def test_fetch_all_endpoints_modern_vs_legacy_dishwasher(hass, aioclient_m
         "not supported for legacy"
         in endpoints_legacy["http-getStatistics.json"]["status"]
     )
+
+
+async def test_set_dishwasher_water_hardness(hass, aioclient_mock):
+    """Test set_dishwasher_water_hardness sends HL command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&HL=3",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    await client.set_dishwasher_water_hardness(3)
+    assert aioclient_mock.call_count == 1
+
+
+async def test_set_dishwasher_water_hardness_invalid(hass):
+    """Test set_dishwasher_water_hardness validates range 0..7."""
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    with pytest.raises(ValueError, match="Invalid dishwasher water hardness"):
+        await client.set_dishwasher_water_hardness(-1)
+    with pytest.raises(ValueError, match="Invalid dishwasher water hardness"):
+        await client.set_dishwasher_water_hardness(8)
+
+
+async def test_set_dishwasher_buzzer(hass, aioclient_mock):
+    """Test set_dishwasher_buzzer sends BM command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&BM=1",
+        text='{"response":"OK"}',
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&BM=0",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    await client.set_dishwasher_buzzer(True)
+    await client.set_dishwasher_buzzer(False)
+    assert aioclient_mock.call_count == 2
+
+
+async def test_set_dishwasher_remember_last_cycle(hass, aioclient_mock):
+    """Test set_dishwasher_remember_last_cycle sends LC command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&LC=1",
+        text='{"response":"OK"}',
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&LC=0",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    await client.set_dishwasher_remember_last_cycle(True)
+    await client.set_dishwasher_remember_last_cycle(False)
+    assert aioclient_mock.call_count == 2
+
+
+async def test_set_water_hardness_routes_to_dishwasher_hl(hass, aioclient_mock):
+    """Test set_water_hardness sends HL rather than SetHard for modern dishwashers."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&HL=2",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    client.interface_type = "AXI_BI_LED"
+    await client.set_water_hardness(2)
+    assert aioclient_mock.call_count == 1
+    for call in aioclient_mock.mock_calls:
+        assert "SetHard" not in str(call[1])

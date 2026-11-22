@@ -78,6 +78,9 @@ from .const import (
     DEVICE_NAME_OVEN,
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WINE_COOLER,
+    DISHWASHER_HARDNESS_THRESHOLDS_LED,
+    DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
+    DISHWASHER_MAINTENANCE_FILTER_THRESHOLD,
     DISHWASHER_PROGRAM_PANEL,
     DOMAIN,
     DRY_LEVEL_FROM_VALUE,
@@ -169,6 +172,7 @@ from .helpers import (
     dry_target_label_for_interface,
     get_dishwasher_error_notification_strings,
     get_dryer_error_notification_strings,
+    is_dishwasher_digit_or_smooth_interface,
     is_washer_dryer,
     resolve_dishwasher_program_description,
     resolve_dishwasher_program_name,
@@ -2767,13 +2771,16 @@ class CandyDishwasherMaintLimescaleSensor(CandyBaseSensor, RestoreSensor):
             last = self.config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_LIMESCALE, 0)
             status = self._device_coordinator.data
             hardness = getattr(status, "water_hardness", None)
-            if (
-                hardness is None
-                or hardness < 0
-                or hardness >= len(MAINTENANCE_HARDNESS_THRESHOLDS)
-            ):
+            interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+            if is_dishwasher_digit_or_smooth_interface(interface_type):
+                thresholds = DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH
+            else:
+                thresholds = DISHWASHER_HARDNESS_THRESHOLDS_LED
+            if hardness is None or hardness < 0 or hardness >= len(thresholds):
                 hardness = self.config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
-            threshold = MAINTENANCE_HARDNESS_THRESHOLDS[hardness]
+            if hardness >= len(thresholds):
+                hardness = len(thresholds) - 1
+            threshold = thresholds[hardness]
             return cycles_remaining(total, last, threshold)
         return self._restored_value
 
@@ -2820,7 +2827,9 @@ class CandyDishwasherMaintFilterSensor(CandyBaseSensor, RestoreSensor):
         if self.coordinator.data is not None:
             total = cast(DishwasherStatistics, self.coordinator.data).total_cycles
             last = self.config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_FILTER, 0)
-            return cycles_remaining(total, last, MAINTENANCE_FILTER_THRESHOLD)
+            return cycles_remaining(
+                total, last, DISHWASHER_MAINTENANCE_FILTER_THRESHOLD
+            )
         return self._restored_value
 
     @property

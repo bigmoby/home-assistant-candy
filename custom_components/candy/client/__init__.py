@@ -18,6 +18,7 @@ from .dishwasher_commands import (
     ModernDishwasherCommandBuilder as ModernDishwasherCommandBuilder,
     get_dishwasher_command_builder as get_dishwasher_command_builder,
     is_legacy_dishwasher as is_legacy_dishwasher,
+    is_modern_dishwasher as is_modern_dishwasher,
     is_open_door_supported as is_open_door_supported,
 )
 from .dryer_commands import (
@@ -294,11 +295,30 @@ class CandyClient:
 
     async def set_water_hardness(self, hardness: int) -> None:
         """Send command to configure water hardness level (1..3)."""
+        if is_modern_dishwasher(self.interface_type):
+            await self.set_dishwasher_water_hardness(hardness)
+            return
         if hardness not in (1, 2, 3):
             raise ValueError(
                 f"Invalid water hardness level: {hardness}. Must be 1 (Soft), 2 (Medium), or 3 (Hard)."
             )
         await self.send_command(f"SetHard={hardness}")
+
+    async def set_dishwasher_water_hardness(self, hardness: int) -> None:
+        """Send command to configure dishwasher water hardness (0..5 or 0..7)."""
+        if hardness < 0 or hardness > 7:
+            raise ValueError(f"Invalid dishwasher water hardness: {hardness}")
+        await self.send_command(f"HL={hardness}")
+
+    async def set_dishwasher_buzzer(self, enabled: bool) -> None:
+        """Send command to configure dishwasher acoustic buzzer."""
+        val = 1 if enabled else 0
+        await self.send_command(f"BM={val}")
+
+    async def set_dishwasher_remember_last_cycle(self, enabled: bool) -> None:
+        """Send command to configure dishwasher last cycle memo."""
+        val = 1 if enabled else 0
+        await self.send_command(f"LC={val}")
 
     async def resume_good_night(self) -> None:
         """Send command to release Good Night rinse hold and finish with spin."""
