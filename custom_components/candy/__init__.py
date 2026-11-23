@@ -102,6 +102,7 @@ from .helpers import (
     get_appliance_error_notification_strings,
     is_dualtech,
     localized_notification_text,
+    restore_last_known_wash_statistics,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -219,29 +220,7 @@ def _restore_last_known_status(
     return None
 
 
-def _restore_last_known_statistics(
-    hass: HomeAssistant,
-    config_entry_id: str,
-) -> WashingMachineStatistics | None:
-    """Read the persisted total-cycles value from HA's state machine.
-
-    Returns a WashingMachineStatistics populated from the last known sensor state,
-    or None if the entity was never registered or its state is not a valid integer.
-    """
-    registry = er.async_get(hass)
-    unique_id = UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
-    entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-    if entity_id is None:
-        return None
-    state = hass.states.get(entity_id)
-    if state is None or not state.state.isdigit():
-        return None
-    _LOGGER.debug(
-        "Restored total_cycles from HA state machine: %s = %s",
-        entity_id,
-        state.state,
-    )
-    return WashingMachineStatistics(total_cycles=int(state.state))
+_restore_last_known_statistics = restore_last_known_wash_statistics
 
 
 def _offline_washing_machine() -> WashingMachineStatus:
