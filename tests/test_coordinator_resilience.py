@@ -21,7 +21,12 @@ from custom_components.candy.client.model import (
     OvenState,
     WineCoolerState,
 )
-from custom_components.candy.const import DATA_KEY_COORDINATOR, DATA_KEY_WRITE_PENDING
+from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_MAINTENANCE_ENABLED,
+    DATA_KEY_COORDINATOR,
+    DATA_KEY_WRITE_PENDING,
+)
 
 from .common import TEST_IP, init_integration
 
@@ -318,3 +323,51 @@ async def test_coordinator_write_pending_inhibits_polling(
 
     # Clear write pending
     hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 0
+
+
+async def test_dishwasher_statistics_write_pending_inhibit(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify that update_dw_statistics sets DATA_KEY_WRITE_PENDING during the fetch."""
+    dw_status = """{
+      "statusDWash": {
+        "StatoWiFi": "1", "StatoDWash": "3", "CodiceErrore": "0", "Program": "P8",
+        "OpzProg": "0", "RemTime": "60", "DelayStart": "0", "OpenDoor": "0",
+        "OpenDoorOpt": "0", "Eco": "0", "MissSalt": "0", "MissRinse": "0", "r2": "2"
+      }
+    }"""
+    stats_payload = """{"statusCounters": {"s1": 5, "s2": 10}}"""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        dw_status,
+        statistics_response=stats_payload,
+        extra_config_data={
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+        },
+    )
+
+    observed_pending: list[int] = []
+    real_statistics_retry = hass.data[DOMAIN][entry.entry_id][
+        "client"
+    ].statistics_with_retry
+
+    async def _inspect_pending():
+        observed_pending.append(
+            hass.data[DOMAIN][entry.entry_id].get(DATA_KEY_WRITE_PENDING, 0)
+        )
+        return await real_statistics_retry()
+
+    with patch.object(
+        hass.data[DOMAIN][entry.entry_id]["client"],
+        "statistics_with_retry",
+        side_effect=_inspect_pending,
+    ):
+        dw_stats_coordinator = hass.data[DOMAIN][entry.entry_id]["stats_coordinator"]
+        await dw_stats_coordinator.async_refresh()
+
+    assert len(observed_pending) == 1
+    assert observed_pending[0] == 1
+    # After completion, DATA_KEY_WRITE_PENDING must be 0
+    assert hass.data[DOMAIN][entry.entry_id].get(DATA_KEY_WRITE_PENDING, 0) == 0

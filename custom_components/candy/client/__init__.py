@@ -112,6 +112,13 @@ def resolve_downloadable_programs(
 # https://github.com/ofalvai/home-assistant-candy/issues/61
 _LIMITER = AsyncLimiter(max_rate=1, time_period=3)
 
+# Timeout for local appliance HTTP communications (Espressif lwIP socket safety)
+DEFAULT_CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=5.0, connect=2.0, sock_read=3.0)
+
+# Mandatory settling delay between http-prepareStatistics.json and http-getStatistics.json
+# Confirmed via it.candyhoover.core.dishwasher.nautilus.manager.StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15
+STATISTICS_PREPARATION_DELAY = 15.0
+
 
 def _parse_json_safe(text: str | bytes) -> dict[str, Any]:
     """Safely decode and parse JSON, stripping leading/trailing whitespace and null bytes."""
@@ -157,7 +164,11 @@ class CandyClient:
         """Fetch an endpoint URL, decrypt if needed, and parse JSON payload (assumes lock held)."""
         async with (
             _LIMITER,
-            self.session.get(url, headers={"Connection": "close"}) as resp,
+            self.session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
         ):
             if resp.status != 200:
                 text = await resp.text()
@@ -198,7 +209,9 @@ class CandyClient:
                 async with (
                     _LIMITER,
                     self.session.get(
-                        prepare_url, headers={"Connection": "close"}
+                        prepare_url,
+                        headers={"Connection": "close"},
+                        timeout=DEFAULT_CLIENT_TIMEOUT,
                     ) as resp,
                 ):
                     await resp.read()
@@ -206,6 +219,9 @@ class CandyClient:
                 _LOGGER.debug(
                     "prepareStatistics handshake failed or not supported: %s", err
                 )
+
+            if STATISTICS_PREPARATION_DELAY > 0:
+                await asyncio.sleep(STATISTICS_PREPARATION_DELAY)
 
             url = _statistics_url(self.device_ip, self.use_encryption)
             return await self._fetch_and_decode_endpoint_unlocked(url)
@@ -299,7 +315,11 @@ class CandyClient:
             self._lock,
             _LIMITER,
             async_timeout.timeout(5),
-            self.session.get(url, headers={"Connection": "close"}) as resp,
+            self.session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
         ):
             resp_bytes = await resp.read()
             if resp.status != 200:
@@ -397,7 +417,14 @@ class CandyClient:
         else:
             url = f"http://{self.device_ip}/http-write.json?encrypted=0&{encoded_query}"
 
-        async with _LIMITER, self.session.get(url) as resp:
+        async with (
+            _LIMITER,
+            self.session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             resp.raise_for_status()
 
 
@@ -418,7 +445,14 @@ async def detect_encryption(
     try:
         _LOGGER.info("Trying to get a response without encryption (encrypted=0)...")
         url = _status_url(device_ip, use_encryption=False)
-        async with _LIMITER, session.get(url, headers={"Connection": "close"}) as resp:
+        async with (
+            _LIMITER,
+            session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             text = await resp.text()
             resp_json = _parse_json_safe(text)
             assert resp_json.get("response") != "BAD REQUEST"
@@ -432,7 +466,14 @@ async def detect_encryption(
             "Failed to get a valid response without encryption, let's try with encrypted=1..."
         )
         url = _status_url(device_ip, use_encryption=True)
-        async with _LIMITER, session.get(url, headers={"Connection": "close"}) as resp:
+        async with (
+            _LIMITER,
+            session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             resp_hex = await resp.text()  # Response is hex encoded encrypted data
             resp_hex = resp_hex.strip().strip("\x00").strip()
             try:

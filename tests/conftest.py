@@ -61,3 +61,10 @@ def fast_button_sleep() -> Generator[None]:
     """Mock button settling delay so tests run quickly."""
     with patch("custom_components.candy.button.asyncio.sleep"):
         yield
+
+
+@pytest.fixture(name="fast_client_statistics_delay", autouse=True)
+def fast_client_statistics_delay() -> Generator[None]:
+    """Mock statistics preparation settling delay so tests run quickly."""
+    with patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 0.0):
+        yield

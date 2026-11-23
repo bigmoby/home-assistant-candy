@@ -507,6 +507,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 if last_known_statistics is not None:
                     return last_known_statistics
                 raise UpdateFailed("Machine is OFF; statistics unavailable.")
+
+            domain_data = hass.data.setdefault(DOMAIN, {}).setdefault(
+                config_entry.entry_id, {}
+            )
+            domain_data[DATA_KEY_WRITE_PENDING] = (
+                domain_data.get(DATA_KEY_WRITE_PENDING, 0) + 1
+            )
             try:
                 async with async_timeout.timeout(40):
                     stats = cast(
@@ -523,6 +530,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                     )
                     return last_known_statistics
                 raise UpdateFailed(f"Error fetching statistics: {err!r}") from err
+            finally:
+                domain_data[DATA_KEY_WRITE_PENDING] -= 1
 
         stats_coordinator = DataUpdateCoordinator(
             hass,
@@ -657,6 +666,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                     if last_known_dw_stats is not None:
                         return last_known_dw_stats
                     raise UpdateFailed("Dishwasher is offline; statistics unavailable.")
+
+                domain_data = hass.data.setdefault(DOMAIN, {}).setdefault(
+                    config_entry.entry_id, {}
+                )
+                domain_data[DATA_KEY_WRITE_PENDING] = (
+                    domain_data.get(DATA_KEY_WRITE_PENDING, 0) + 1
+                )
                 try:
                     async with async_timeout.timeout(40):
                         stats = cast(
@@ -683,6 +699,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                         )
                         return last_known_dw_stats
                     raise UpdateFailed(f"Error fetching statistics: {err!r}") from err
+                finally:
+                    domain_data[DATA_KEY_WRITE_PENDING] -= 1
 
             dw_stats_coordinator = DataUpdateCoordinator(
                 hass,

@@ -1,8 +1,11 @@
+from unittest.mock import patch
+
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
 from pytest_homeassistant_custom_component.common import load_fixture
 
 from custom_components.candy.client import (
+    DEFAULT_CLIENT_TIMEOUT,
     CandyClient,
     Encryption,
     _xor_encrypt,
@@ -847,3 +850,36 @@ async def test_client_mutex_and_connection_headers(hass, aioclient_mock):
         # call is a tuple of (method, url, data, headers)
         headers = call[3] if len(call) > 3 else {}
         assert headers.get("Connection") == "close"
+
+
+async def test_client_statistics_settling_delay(hass, aioclient_mock):
+    """Test fetch_raw_statistics enforces 15-second settling delay between prepare and get."""
+    stats_payload = {"statusCounters": {"Program1": "10"}}
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json=stats_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    with (
+        patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 15.0),
+        patch("custom_components.candy.client.asyncio.sleep") as mock_sleep,
+    ):
+        data = await client.fetch_raw_statistics()
+        assert data == stats_payload
+        assert mock_sleep.call_count == 1
+        mock_sleep.assert_called_once_with(15.0)
+
+
+async def test_client_default_timeout_constants():
+    """Verify DEFAULT_CLIENT_TIMEOUT parameters for Espressif socket safety."""
+    assert DEFAULT_CLIENT_TIMEOUT.total == 5.0
+    assert DEFAULT_CLIENT_TIMEOUT.connect == 2.0
+    assert DEFAULT_CLIENT_TIMEOUT.sock_read == 3.0
