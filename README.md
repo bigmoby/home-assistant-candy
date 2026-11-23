@@ -5,7 +5,7 @@
 
 [![Donate](https://img.shields.io/badge/donate-BuyMeCoffee-yellow.svg)](https://www.buymeacoffee.com/bigmoby)
 
-A highly optimized custom component for [Home Assistant](https://homeassistant.io) that effortlessly integrates Candy, Haier, and Simply-Fi connected home appliances.
+A highly optimized custom component for [Home Assistant](https://homeassistant.io) that effortlessly integrates Candy, Haier and Hoover home appliances that use the Simply-Fi protocol (Candy Simply-Fi, Hoover Wizard).
 
 Fully compliant with strictly-typed Home Assistant (>= 2024.x) development standards, it features **Zero-Configuration Automatic Decryption**—making setup purely plug-and-play.
 
