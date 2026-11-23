@@ -2,7 +2,7 @@
 """
 Candy Simply-Fi Diagnostic & Telemetry Dissection Tool
 
-Version: 2.0.0
+Version: 2.1.0
 Original concept & XOR decryption by Melvin Groenendaal (Python Port)
 Overhauled and expanded for the Home Assistant Candy Integration Team (@bigmoby and @auanasgheps).
 """
@@ -15,7 +15,7 @@ import sys
 import time
 from typing import Any
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 # Mandatory settling delay between http-prepareStatistics.json and http-getStatistics.json
 # Grounded in APK StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15
