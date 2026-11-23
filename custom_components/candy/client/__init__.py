@@ -253,7 +253,7 @@ class CandyClient:
         ) or (is_dw and not is_legacy_dw)
         if has_stats_support:
             try:
-                async with async_timeout.timeout(7):
+                async with async_timeout.timeout(30):
                     stats_data = await self.fetch_raw_statistics()
                     endpoints["http-getStatistics.json"] = stats_data
             except Exception as err:

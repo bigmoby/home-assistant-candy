@@ -883,3 +883,33 @@ async def test_client_default_timeout_constants():
     assert DEFAULT_CLIENT_TIMEOUT.total == 5.0
     assert DEFAULT_CLIENT_TIMEOUT.connect == 2.0
     assert DEFAULT_CLIENT_TIMEOUT.sock_read == 3.0
+
+
+async def test_fetch_all_endpoints_statistics_with_settling_delay(hass, aioclient_mock):
+    """Test fetch_all_endpoints succeeds when statistics settling delay is active."""
+    telemetry = {"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}}
+    stats_payload = {"statusCounters": {"s1": 5}}
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json=stats_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    client.interface_type = "BRAVA_BI_DIGIT_OD"
+    with (
+        patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 15.0),
+        patch("custom_components.candy.client.asyncio.sleep") as mock_sleep,
+    ):
+        endpoints = await client.fetch_all_endpoints()
+        assert endpoints["http-read.json"] == telemetry
+        assert endpoints["http-getStatistics.json"] == stats_payload
+        assert mock_sleep.call_count == 1
+        mock_sleep.assert_called_once_with(15.0)
