@@ -15,7 +15,12 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.candy import DOMAIN, SCAN_INTERVAL_ACTIVE, SCAN_INTERVAL_RESTING
+from custom_components.candy import (
+    DOMAIN,
+    SCAN_INTERVAL_ACTIVE,
+    SCAN_INTERVAL_RESTING,
+    SCAN_INTERVAL_RESTING_DISHWASHER,
+)
 from custom_components.candy.client.model import (
     MachineState,
     OvenState,
@@ -146,7 +151,17 @@ async def test_dishwasher_3_strike_timeout(
 
     assert coordinator.data.machine_state == MachineState.OFF
     assert coordinator.data.remaining_minutes == 0
-    assert coordinator.update_interval == SCAN_INTERVAL_RESTING
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING_DISHWASHER
+
+    # 4th timeout while already in OFF retains SCAN_INTERVAL_RESTING_DISHWASHER
+    with patch(
+        "custom_components.candy.client.CandyClient.status", side_effect=TimeoutError
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert coordinator.data.machine_state == MachineState.OFF
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING_DISHWASHER
 
 
 # ---------------------------------------------------------------------------

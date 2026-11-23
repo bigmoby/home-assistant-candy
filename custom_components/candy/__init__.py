@@ -148,6 +148,7 @@ _OFF_INFERRED_STATES = {
 # 60 s while the machine is reachable and running any cycle.
 SCAN_INTERVAL_ACTIVE = timedelta(seconds=60)
 SCAN_INTERVAL_RESTING = timedelta(seconds=20)
+SCAN_INTERVAL_RESTING_DISHWASHER = timedelta(seconds=60)
 MAX_CONSECUTIVE_TIMEOUTS = 3
 
 
@@ -435,8 +436,16 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 return status
         except (TimeoutError, aiohttp.ClientError) as err:
             consecutive_timeouts += 1
+            is_dw = bool(
+                config_entry.data.get(CONF_KEY_IS_DISHWASHER)
+                or isinstance(last_known_status, DishwasherStatus)
+                or isinstance(getattr(coordinator, "data", None), DishwasherStatus)
+            )
+            resting_interval = (
+                SCAN_INTERVAL_RESTING_DISHWASHER if is_dw else SCAN_INTERVAL_RESTING
+            )
             if prev_state == MachineState.OFF:
-                coordinator.update_interval = SCAN_INTERVAL_RESTING
+                coordinator.update_interval = resting_interval
                 last_known_status = _make_off_status(last_known_status)
                 return last_known_status
 
@@ -452,9 +461,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                         consecutive_timeouts,
                         MAX_CONSECUTIVE_TIMEOUTS,
                         prev_state,
-                        SCAN_INTERVAL_RESTING,
+                        resting_interval,
                     )
-                    coordinator.update_interval = SCAN_INTERVAL_RESTING
+                    coordinator.update_interval = resting_interval
                     return last_known_status
 
                 _LOGGER.debug(
@@ -464,7 +473,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                     consecutive_timeouts,
                     prev_state,
                 )
-                coordinator.update_interval = SCAN_INTERVAL_RESTING
+                coordinator.update_interval = resting_interval
                 last_known_status = _make_off_status(last_known_status)
                 return last_known_status
             raise UpdateFailed(f"Error communicating with API: {err!r}") from err
