@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -19,6 +20,7 @@ from custom_components.candy.const import (
     DISHWASHER_PROGRAMS,
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
 )
+from custom_components.candy.select import CandyDishwasherProgramSelect
 
 from .common import init_integration
 
@@ -176,3 +178,20 @@ async def test_select_program_resolution_and_selected_program_property(
     assert prog_cat is not None
     assert prog_cat.cycle_id == 8
     assert prog_cat.selector_position == 1
+
+
+def test_dishwasher_program_select_available_guards() -> None:
+    """Verify DishwasherProgramSelect.available returns False when coordinator data is None or unavailable."""
+    coord = MagicMock()
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="test_select_avail")
+    select = CandyDishwasherProgramSelect(coord, entry, [])
+
+    # 1. super().available is False
+    coord.last_update_success = False
+    coord.data = None
+    assert select.available is False
+
+    # 2. super().available is True but data is None
+    coord.last_update_success = True
+    coord.data = None
+    assert select.available is False

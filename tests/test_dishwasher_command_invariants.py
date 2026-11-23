@@ -286,9 +286,53 @@ def test_command_builder_invariants() -> None:
 
     # Checkup commands
     assert modern.build_checkup() == {"StartCheckUp": 1}
+    assert legacy.build_checkup() == {"StartCheckUp": 1}
     assert modern.build_checkup_reset() == {"Write": 1, "StartStop": 0, "Program": 11}
     assert legacy.build_checkup_reset() == {"Write": 1, "StartStop": 0, "Program": 11}
 
     # Open door command sends OpenDoorOpt=7
     assert modern.build_open_door() == {"OpenDoorOpt": 7}
     assert legacy.build_open_door() == {"OpenDoorOpt": 7}
+
+
+def test_legacy_dishwasher_build_start_options() -> None:
+    """Test LegacyTouchDishwasherCommandBuilder build_start variations."""
+    legacy = LegacyTouchDishwasherCommandBuilder(open_door_supported=True)
+
+    # 1. Program ending in minus '-' sets OpzProg='m'
+    params_m = legacy.build_start(
+        program_code="P2-",
+        position=2,
+        delay_minutes=60,
+        r15=0,
+        three_in_one=True,
+        eco=False,
+        half_load=True,
+        extra_dry=False,
+        open_door=True,
+    )
+    assert params_m["OpzProg"] == "m"
+    assert params_m["Program"] == "P2"
+    assert params_m["DelayStart"] == 1  # 60 // 60
+    assert params_m["OpenDoorOpt"] == 1
+    assert params_m["TreinUno"] == 1
+    assert params_m["MetaCarico"] == 1
+
+    # 2. r15 > 0 preserves delay in minutes
+    params_mins = legacy.build_start(
+        program_code="P3",
+        position=3,
+        delay_minutes=45,
+        r15=1,
+        three_in_one=False,
+        eco=True,
+        half_load=False,
+        extra_dry=True,
+        open_door=False,
+    )
+    assert params_mins["DelayStart"] == 45
+    assert params_mins["Program"] == "P3"
+    assert params_mins["OpzProg"] == "0"
+    assert params_mins["ExtraDry"] == 1
+    assert params_mins["Eco"] == 1
+    assert params_mins["OpenDoorOpt"] == 0

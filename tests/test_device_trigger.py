@@ -706,6 +706,33 @@ async def test_state_trigger_dishwashing_completed(hass):
         assert mock_job.call_count == 1
 
 
+async def test_state_trigger_dishwasher_error_reported(hass):
+    """error_reported fires on dishwasher error transition from 0/None/E0 to an active error."""
+    coordinator, on_update = await _attach_dw_state_cb(
+        hass, "error_reported", MachineState.IDLE
+    )
+
+    with patch.object(hass, "async_run_hass_job") as mock_job:
+        # Error reports E3 -> fires
+        coordinator.data = _make_dw_status(MachineState.IDLE, error_code="E3")
+        on_update()
+        assert mock_job.call_count == 1
+
+        # Still E3 -> does not fire again
+        on_update()
+        assert mock_job.call_count == 1
+
+        # Clears to E0 -> does not fire
+        coordinator.data = _make_dw_status(MachineState.IDLE, error_code="E0")
+        on_update()
+        assert mock_job.call_count == 1
+
+        # Transitions to E18 -> fires
+        coordinator.data = _make_dw_status(MachineState.IDLE, error_code="E18")
+        on_update()
+        assert mock_job.call_count == 2
+
+
 async def test_dryer_warning_trigger_clean_filter_needed(hass):
     """clean_filter_needed fires when need_clean_filter transitions from False to True."""
 

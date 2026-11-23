@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.helpers import device_registry as dr
@@ -20,6 +20,7 @@ from custom_components.candy.const import (
     MODE_FULL_CONTROL,
 )
 from custom_components.candy.helpers import (
+    _lookup_translation,
     command_settling_delay,
     cycles_remaining,
     dry_target_label_for_interface,
@@ -29,8 +30,10 @@ from custom_components.candy.helpers import (
     get_dryer_error_notification_strings,
     get_wash_error_notification_strings,
     is_dualtech,
+    is_modern_dishwasher,
     is_washer_dryer,
     remote_control_enabled,
+    resolve_dishwasher_program_description,
     supports_autodose,
     supports_remote_pause,
     supports_scheduled_checkup,
@@ -439,3 +442,34 @@ def test_dry_target_label_for_interface(
     code: int, interface_type: str | None, expected: str
 ) -> None:
     assert dry_target_label_for_interface(code, interface_type) == expected
+
+
+def test_is_modern_dishwasher_exclusions() -> None:
+    """Verify is_modern_dishwasher correctly rejects _AD and RED_DEVIL models."""
+    assert is_modern_dishwasher("DW_BRAVA_AD_16") is False
+    assert is_modern_dishwasher("DW_RED_DEVIL_WIFI") is False
+    assert is_modern_dishwasher("BRAVA_BI_DIGIT_OD") is True
+    assert is_modern_dishwasher(None) is False
+    assert is_modern_dishwasher("DishwasherInterfaceTypeFSTouch") is False
+
+
+def test_dishwasher_program_description_resolution_fallbacks() -> None:
+    """Verify program description resolution and translation lookups."""
+    # Direct language match
+    assert _lookup_translation({"it": "Testo", "en": "Text"}, "it") == "Testo"
+    # Fallback to English when requested language is unavailable
+    assert _lookup_translation({"it": "Testo", "en": "Text"}, "de") == "Text"
+    # Fallback to first available value when English is not present
+    assert _lookup_translation({"fr": "Texte"}, "de") == "Texte"
+    # Empty translations dictionary returns None
+    assert _lookup_translation({}, "it") is None
+
+    # Resolution by candidate key
+    with patch(
+        "custom_components.candy.helpers._PROGRAM_NAMES",
+        {"DW_TEST_PROG_DESCRIPTION": {"en": "Test description"}},
+    ):
+        assert (
+            resolve_dishwasher_program_description("TEST_PROG", "en")
+            == "Test description"
+        )

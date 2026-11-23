@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -11,6 +12,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.candy import DOMAIN
 from custom_components.candy.const import UNIQUE_ID_DISHWASHER_DELAY_NUMBER
+from custom_components.candy.number import CandyDishwasherDelayNumber
 
 from .common import init_integration
 
@@ -74,3 +76,20 @@ async def test_delay_number_step_adapts_to_r15_zero(
     entry = await init_integration(hass, aioclient_mock, json.dumps(raw))
     delay_id = _entity_id(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)
     assert hass.states.get(delay_id).attributes["step"] == 60
+
+
+def test_delay_number_available_guards() -> None:
+    """Verify available property returns False when coordinator data is None or coordinator is unavailable."""
+    coord = MagicMock()
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="test_delay_avail")
+    number = CandyDishwasherDelayNumber(coord, entry, MagicMock())
+
+    # 1. super().available is False (coordinator update failed)
+    coord.last_update_success = False
+    coord.data = None
+    assert number.available is False
+
+    # 2. super().available is True but data is None
+    coord.last_update_success = True
+    coord.data = None
+    assert number.available is False

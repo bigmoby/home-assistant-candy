@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.const import EntityCategory
@@ -12,6 +13,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, load_f
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import DOMAIN
+from custom_components.candy.binary_sensor import (
+    DishwasherAutoCleanBinarySensor,
+    DishwasherDoorBinarySensor,
+    DishwasherRememberLastCycleBinarySensor,
+    DishwasherRemoteControlBinarySensor,
+    DishwasherRinseAidEmptyBinarySensor,
+    DishwasherSaltEmptyBinarySensor,
+)
 from custom_components.candy.const import (
     UNIQUE_ID_DISHWASHER_DOOR,
     UNIQUE_ID_DISHWASHER_MAINT_CLEAN,
@@ -151,3 +160,20 @@ async def test_dishwasher_binary_sensors_diagnostic_category(
     assert registry.async_get(remote_id).entity_category == EntityCategory.DIAGNOSTIC
     assert registry.async_get(clean_id).entity_category == EntityCategory.DIAGNOSTIC
     assert registry.async_get(memo_id).entity_category == EntityCategory.DIAGNOSTIC
+
+
+def test_dishwasher_binary_sensors_none_data() -> None:
+    """Verify dishwasher binary sensors return None when coordinator data is None."""
+    coord = MagicMock()
+    coord.data = None
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="test_dw_none")
+    sensors = [
+        DishwasherSaltEmptyBinarySensor(coord, entry),
+        DishwasherRinseAidEmptyBinarySensor(coord, entry),
+        DishwasherDoorBinarySensor(coord, entry),
+        DishwasherRemoteControlBinarySensor(coord, entry),
+        DishwasherAutoCleanBinarySensor(coord, entry),
+        DishwasherRememberLastCycleBinarySensor(coord, entry),
+    ]
+    for sensor in sensors:
+        assert sensor.is_on is None

@@ -27,6 +27,7 @@ from custom_components.candy.config_flow import (
     MANUAL_IP_OPTION,
     ConfigFlow,
     _current_remaining_cycles,
+    _hardness_schema,
     _remaining_to_last_reset,
 )
 from custom_components.candy.const import (
@@ -59,7 +60,9 @@ from custom_components.candy.const import (
     DATA_KEY_STATS_COORDINATOR,
     MODE_FULL_CONTROL,
     MODE_READ_ONLY,
+    UNIQUE_ID_TUMBLE_DRYER,
     UNIQUE_ID_WASH_MAINT_FULL_CHECKUP,
+    UNIQUE_ID_WASHING_MACHINE,
 )
 
 _IDLE_WASHING_MACHINE = WashingMachineStatus(
@@ -3218,3 +3221,634 @@ async def test_reconfigure_flow_dishwasher_detected_from_registry(
     updated = hass.config_entries.async_get_entry(entry.entry_id)
     assert updated.data[CONF_KEY_IS_DISHWASHER] is True
     assert updated.data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+
+
+def test_hardness_schema_scales() -> None:
+    """Test _hardness_schema adapts between dishwasher digit, LED, and washer scales."""
+    # Dishwasher digit scale: 8 levels (0..7)
+    schema_digit = _hardness_schema(2, True, "BRAVA_BI_DIGIT_OD")
+    assert schema_digit is not None
+
+    # Dishwasher LED scale: 6 levels (0..5)
+    schema_led = _hardness_schema(2, True, "DishwasherInterfaceTypeFSLED")
+    assert schema_led is not None
+
+    # Washing machine scale
+    schema_wm = _hardness_schema(2, False, None)
+    assert schema_wm is not None
+
+
+async def test_options_flow_entity_registry_appliance_inference(hass) -> None:
+    """Test options flow infers appliance types from registry when config flags are absent."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="test_infer_entry",
+        data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
+    entry.add_to_hass(hass)
+
+    registry = er.async_get(hass)
+    # Register washing machine entity
+    wm_entity = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASHING_MACHINE.format(entry.entry_id),
+        config_entry=entry,
+    )
+    res_wm = await hass.config_entries.options.async_init(entry.entry_id)
+    assert res_wm["step_id"] == "init"
+    schema_wm = res_wm["data_schema"].schema["next_step"]
+    assert "maintenance_settings" in schema_wm.config["options"]
+
+    # Remove and register tumble dryer entity
+    registry.async_remove(wm_entity.entity_id)
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_TUMBLE_DRYER.format(entry.entry_id),
+        config_entry=entry,
+    )
+    res_td = await hass.config_entries.options.async_init(entry.entry_id)
+    assert res_td["step_id"] == "init"
+    schema_td = res_td["data_schema"].schema["next_step"]
+    assert "maintenance_settings" not in schema_td.config["options"]
+
+
+async def test_options_flow_user_reconfigure_refreshes_coroutine(hass) -> None:
+    """Test dishwasher_settings in options flow cleanly awaits coroutine from async_request_refresh."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="modern-dw-coro",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.66",
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+            CONF_KEY_WATER_HARDNESS: 2,
+            CONF_KEY_DISHWASHER_BUZZER: True,
+            CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: False,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    refresh_called = False
+
+    async def fake_refresh() -> None:
+        nonlocal refresh_called
+        refresh_called = True
+
+    mock_coord = MagicMock()
+    mock_coord.async_request_refresh = fake_refresh
+    mock_client = MagicMock()
+    mock_client.set_dishwasher_water_hardness = AsyncMock()
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        DATA_KEY_COORDINATOR: mock_coord,
+        DATA_KEY_CLIENT: mock_client,
+    }
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "dishwasher_settings"}
+    )
+    assert result["step_id"] == "dishwasher_settings"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_KEY_WATER_HARDNESS: "3",
+            CONF_KEY_DISHWASHER_BUZZER: True,
+            CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
+        },
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert refresh_called is True
+
+
+async def test_config_flow_probe_detects_dishwasher_local(
+    hass, no_discovery, detect_no_encryption
+) -> None:
+    """Test local setup probe detects a dishwasher from client status."""
+    mock_client = MagicMock()
+    mock_client.status = AsyncMock(return_value=_IDLE_DISHWASHER)
+    with patch(
+        "custom_components.candy.config_flow.CandyClient",
+        return_value=mock_client,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.50"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "mode"
+
+
+async def test_config_flow_legacy_dishwasher_skips_settings(
+    hass, no_discovery, detect_no_encryption
+) -> None:
+    """Legacy dishwashers without settings advance straight from language to entry creation."""
+    appliance = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:FF",
+        encryption_key="testkey",
+        appliance_model="CDI 2012",
+        serial_number="1234567890123456",
+        purchase_date="2021-05-10",
+        interface_type="DishwasherInterfaceTypeFSTouch",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="dishwasher",
+    )
+    mock_client = MagicMock()
+    mock_client.status = AsyncMock(return_value=_IDLE_DISHWASHER)
+
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=appliance,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.50"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "secretpassword"},
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_config_flow_dishwasher_settings_dispatch_outer_exception_warning(
+    hass,
+) -> None:
+    """Test outer exception during initial dishwasher settings dispatch is caught and logged."""
+    flow = ConfigFlow()
+    flow.hass = hass
+    flow._ip_address = "192.168.0.50"
+    flow._config_data = {
+        CONF_IP_ADDRESS: "192.168.0.50",
+        CONF_KEY_USE_ENCRYPTION: False,
+        CONF_PASSWORD: "",
+        CONF_KEY_MODE: MODE_FULL_CONTROL,
+        CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+    }
+    flow._dishwasher_status = _IDLE_DISHWASHER
+    mock_client = MagicMock()
+    mock_client.set_dishwasher_water_hardness = AsyncMock()
+
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient",
+            return_value=mock_client,
+        ),
+        patch("asyncio.sleep", side_effect=RuntimeError("Interrupted sleep")),
+        patch("custom_components.candy.config_flow._LOGGER.warning") as mock_warn,
+    ):
+        result = await flow.async_step_dishwasher_settings(
+            user_input={
+                CONF_KEY_WATER_HARDNESS: "3",
+                CONF_KEY_DISHWASHER_BUZZER: "2",
+                CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: False,
+            }
+        )
+        assert result["step_id"] == "maintenance"
+        assert mock_warn.called
+        assert (
+            "Failed to dispatch initial dishwasher settings"
+            in mock_warn.call_args[0][0]
+        )
+
+
+async def test_options_flow_is_controllable(hass) -> None:
+    """Verify _is_controllable correctly identifies controllable appliances."""
+    entry_dw = MockConfigEntry(
+        domain=DOMAIN, entry_id="test_dw", data={CONF_KEY_IS_DISHWASHER: True}
+    )
+    entry_dw.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry_dw.entry_id)
+    flow = hass.config_entries.options._progress[result["flow_id"]]
+    assert flow._is_controllable() is True
+
+    entry_wm = MockConfigEntry(
+        domain=DOMAIN, entry_id="test_wm", data={CONF_KEY_IS_WASHING_MACHINE: True}
+    )
+    entry_wm.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry_wm.entry_id)
+    flow = hass.config_entries.options._progress[result["flow_id"]]
+    assert flow._is_controllable() is True
+
+    entry_td = MockConfigEntry(
+        domain=DOMAIN, entry_id="test_td", data={CONF_KEY_IS_TUMBLE_DRYER: True}
+    )
+    entry_td.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry_td.entry_id)
+    flow = hass.config_entries.options._progress[result["flow_id"]]
+    assert flow._is_controllable() is True
+
+    entry_none = MockConfigEntry(
+        domain=DOMAIN, entry_id="test_none", data={CONF_KEY_MODE: MODE_READ_ONLY}
+    )
+    entry_none.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry_none.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+
+async def test_options_flow_dishwasher_maintenance_prompts_hardness_if_missing(
+    hass,
+) -> None:
+    """Verify dishwasher maintenance without saved hardness branches to hardness step if limescale is enabled."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="test_maint_dw_no_hardness",
+        data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+        },
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"next_step": "maintenance_settings"},
+    )
+    assert result["step_id"] == "maintenance"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={CONF_KEY_MAINTENANCE_ENABLED: True},
+    )
+    assert result["step_id"] == "maintenance_types"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED: True,
+            CONF_KEY_MAINTENANCE_FILTER_ENABLED: True,
+        },
+    )
+    assert result["step_id"] == "hardness"
+
+
+async def test_reconfigure_flow_washing_machine_and_encryption_key(hass) -> None:
+    """Reconfigure flow upgrades washing machine to Full Control and populates encryption key."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="reconf-wm-entry",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.88",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_WASHING_MACHINE: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:88",
+        encryption_key="cloud_key_wm",
+        appliance_model="WM_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=cloud_data,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["step_id"] == "language"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"},
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.ABORT
+        assert result["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+    assert updated.data[CONF_KEY_IS_WASHING_MACHINE] is True
+    assert updated.data[CONF_KEY_USE_ENCRYPTION] is True
+    assert updated.data[CONF_PASSWORD] == "cloud_key_wm"
+
+
+async def test_reconfigure_flow_tumble_dryer(hass) -> None:
+    """Reconfigure flow upgrades tumble dryer to Full Control."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="reconf-td-entry",
+        data={
+            CONF_IP_ADDRESS: "192.168.0.89",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+            CONF_KEY_IS_TUMBLE_DRYER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:89",
+        encryption_key="",
+        appliance_model="TD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="TD_DIGIT_3D",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=cloud_data,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["step_id"] == "language"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={CONF_KEY_PROGRAM_LANGUAGE: "en"},
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.ABORT
+        assert result["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated.data[CONF_KEY_MODE] == MODE_FULL_CONTROL
+    assert updated.data[CONF_KEY_IS_TUMBLE_DRYER] is True
+
+
+async def test_options_flow_update_cloud_data_dryer_and_encryption_and_malformed_programs(
+    hass,
+) -> None:
+    """Verify update cloud data handles tumble dryers, missing encryption keys, and malformed programs."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_TUMBLE_DRYER: True,
+            CONF_IP_ADDRESS: "192.168.0.50",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:11",
+        encryption_key="cloudencryptionkey",
+        appliance_model="TD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="TD_DIGIT_3D",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "update_cloud_data"}
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=cloud_data,
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "language"
+
+
+async def test_options_flow_update_cloud_data_dishwasher_default_programs_fallback(
+    hass,
+) -> None:
+    """Verify update cloud data sets DEFAULT_DISHWASHER_PROGRAMS when cloud returns empty programs."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_IP_ADDRESS: "192.168.0.51",
+            CONF_KEY_USE_ENCRYPTION: False,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:22",
+        encryption_key=None,
+        appliance_model="DW_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="BRAVA_BI_DIGIT_OD",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "update_cloud_data"}
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=cloud_data,
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "language"
+
+
+async def test_options_flow_update_cloud_data_malformed_programs_parse_error(
+    hass,
+) -> None:
+    """Verify update cloud data gracefully ignores parse errors on malformed program dicts."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_IS_WASHING_MACHINE: True,
+            CONF_IP_ADDRESS: "192.168.0.52",
+            CONF_KEY_USE_ENCRYPTION: False,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:33",
+        encryption_key=None,
+        appliance_model="WM_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[{"not_a_valid_program": True}],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step": "update_cloud_data"}
+    )
+    with patch(
+        "custom_components.candy.config_flow.fetch_appliance_data",
+        new_callable=AsyncMock,
+        return_value=cloud_data,
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "language"
+
+
+async def test_config_flow_cloud_step_tumble_dryer_and_encryption_key(
+    hass, no_discovery, detect_no_encryption
+) -> None:
+    """Test cloud step for tumble dryer records is_tumble_dryer and updates encryption key."""
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:44",
+        encryption_key="found_key_123",
+        appliance_model="TD_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="TD_DIGIT_3D",
+        programs=[],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient.status",
+            new_callable=AsyncMock,
+            return_value=_IDLE_TUMBLE_DRYER,
+        ),
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=cloud_data,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.70"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        assert result["step_id"] == "cloud"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["step_id"] == "language"
+
+
+async def test_config_flow_cloud_step_washing_machine_with_encryption_and_malformed_programs(
+    hass, no_discovery, detect_no_encryption
+) -> None:
+    """Test cloud step for washing machine sets is_washing_machine, encryption, and handles parse error."""
+    cloud_data = CloudApplianceData(
+        mac_address="AA:BB:CC:DD:EE:55",
+        encryption_key="found_wm_key",
+        appliance_model="WM_MODEL",
+        serial_number="1234567890123456",
+        purchase_date="2022-01-01",
+        interface_type="RAPIDO",
+        programs=[{"corrupt_key": 999}],
+        downloadable_programs=[],
+        brand="candy",
+        appliance_type="",
+    )
+
+    with (
+        patch(
+            "custom_components.candy.config_flow.CandyClient.status",
+            new_callable=AsyncMock,
+            return_value=_IDLE_WASHING_MACHINE,
+        ),
+        patch(
+            "custom_components.candy.config_flow.fetch_appliance_data",
+            new_callable=AsyncMock,
+            return_value=cloud_data,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_IP_ADDRESS: "192.168.0.71"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={CONF_KEY_MODE: MODE_FULL_CONTROL}
+        )
+        assert result["step_id"] == "cloud"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={"email": "user@example.com", "password": "pass"},
+        )
+        assert result["step_id"] == "language"

@@ -12,6 +12,7 @@ from custom_components.candy.client.cloud import (
     SimplyFiCloudError,
     _authenticate,
     _fetch_appliances,
+    _fetch_dishwasher_downloadable_programs,
     _fetch_downloadable_programs,
     _generate_pkce_pair,
     _match_appliance,
@@ -299,6 +300,35 @@ async def test_fetch_downloadable_programs_non_200():
     session = _make_session(get_resps=[_make_resp(403, text="Forbidden")])
     with pytest.raises(SimplyFiCloudError, match="downloadable programs fetch failed"):
         await _fetch_downloadable_programs(session, _TOKENS)
+
+
+async def test_fetch_dw_downloadable_programs_dict_and_list_format():
+    dict_payload = {
+        "dw_nfc_download_programs": [
+            {
+                "dw_nfc_download_program": {
+                    "id": "dw-prog-1",
+                    "name": "DW_DL_SANITIZE",
+                }
+            }
+        ]
+    }
+    session_dict = _make_session(get_resps=[_make_resp(200, dict_payload)])
+    res_dict = await _fetch_dishwasher_downloadable_programs(session_dict, _TOKENS)
+    assert res_dict == [{"id": "dw-prog-1", "name": "DW_DL_SANITIZE"}]
+
+    list_payload = [{"id": "dw-prog-2", "name": "DW_DL_CRYSTAL"}]
+    session_list = _make_session(get_resps=[_make_resp(200, list_payload)])
+    res_list = await _fetch_dishwasher_downloadable_programs(session_list, _TOKENS)
+    assert res_list == [{"id": "dw-prog-2", "name": "DW_DL_CRYSTAL"}]
+
+
+async def test_fetch_dw_downloadable_programs_errors():
+    session_404 = _make_session(get_resps=[_make_resp(404, text="Not Found")])
+    assert await _fetch_dishwasher_downloadable_programs(session_404, _TOKENS) == []
+
+    session_err = _make_session(get_resps=[_make_resp(200, text="not-valid-json")])
+    assert await _fetch_dishwasher_downloadable_programs(session_err, _TOKENS) == []
 
 
 # ---------------------------------------------------------------------------

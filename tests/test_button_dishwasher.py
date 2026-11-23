@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 from homeassistant.const import EntityCategory
@@ -15,6 +15,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, load_f
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.candy import DOMAIN
+from custom_components.candy.button import DishwasherMaintResetButton
 from custom_components.candy.client import (
     LegacyTouchDishwasherCommandBuilder,
     ModernDishwasherCommandBuilder,
@@ -743,3 +744,114 @@ async def test_start_with_fallback_program_resolves_selector_position(
     assert "Program=P17" in qs
     assert "w1=3" in qs
     assert "w1=17" not in qs
+
+
+async def test_dishwasher_reset_maintenance_counter_fallback_to_config_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Verify reset maintenance button falls back to config_entry data when stats are absent."""
+    coord = MagicMock()
+    stats_coord = MagicMock()
+    stats_coord.data = None
+    conf_key = "maint_last_full_checkup"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="test_reset_btn_entry",
+        data={conf_key: 120},
+    )
+    entry.add_to_hass(hass)
+
+    btn = DishwasherMaintResetButton(
+        coord,
+        entry,
+        stats_coord,
+        conf_key,
+        "candy_{}_maint_reset_checkup",
+        "dishwasher_maint_reset_checkup",
+        "mdi:history",
+    )
+    btn.hass = hass
+
+    with patch(
+        "custom_components.candy.button.restore_last_known_statistics",
+        return_value=None,
+    ):
+        await btn.async_press()
+
+    assert entry.data[conf_key] == 120
+    stats_coord.async_update_listeners.assert_called_once()
+
+
+async def test_dishwasher_start_wash_button_corrupt_number_and_unknown_switches(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify start wash button handles corrupted delay number and unknown switch states."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    delay_id = _entity_id(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)
+    eco_id = _entity_id(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH)
+
+    # Set delay state to a non-numeric string to trigger ValueError/TypeError fallback
+    hass.states.async_set(delay_id, "corrupt_number")
+    # Set eco switch state to 'unknown' to trigger default fallback
+    hass.states.async_set(eco_id, "unknown")
+
+    qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+    assert "DelayStart=0" in qs
+    assert "Eco=0" in qs
+
+
+async def test_dishwasher_start_wash_button_missing_registry_entities(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify start wash button handles missing select and number entity registrations."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    registry = er.async_get(hass)
+    select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
+    number_id = _entity_id(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)
+    registry.async_remove(select_id)
+    registry.async_remove(number_id)
+
+    qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+    assert "DelayStart=0" in qs
+    assert "StartStop=1" in qs
+
+
+async def test_dishwasher_start_wash_button_direct_dishwasher_programs_fallback(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify start button resolves program code from DISHWASHER_PROGRAMS when not in parsed list."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
+    hass.states.async_set(select_id, "intensive_75")
+
+    with patch(
+        "custom_components.candy.button.find_dishwasher_program",
+        return_value=None,
+    ):
+        qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+
+    assert "Program=P2" in qs
+    assert "w1=2" in qs
+
+
+async def test_dishwasher_start_wash_button_status_program_parse_fallback(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify start button parses status.program when selector_position is None and no program matches."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, Program="P5", PrCode="P5"),
+    )
+    coord = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    status = coord.data
+    status.selector_position = None
+
+    with patch(
+        "custom_components.candy.button.find_dishwasher_program",
+        return_value=None,
+    ):
+        qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
+
+    assert "Program=P5" in qs
+    assert "w1=5" in qs

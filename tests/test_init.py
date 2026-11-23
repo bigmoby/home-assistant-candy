@@ -87,6 +87,7 @@ from custom_components.candy.const import (
     DATA_KEY_DRYER_WARNING_UNSUB,
     DATA_KEY_STATS_COORDINATOR,
     DATA_KEY_WASH_ERROR_UNSUB,
+    DATA_KEY_WRITE_PENDING,
     MODE_FULL_CONTROL,
     MODE_READ_ONLY,
     NOTIF_ID_DRYER_FILTER,
@@ -1505,6 +1506,16 @@ async def test_update_statistics_machine_off_with_cached_stats(
     res = await stats_coordinator._async_update_data()
     assert res.total_cycles == 50
 
+    # Write pending skips statistics poll and returns cached data
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 1
+    with patch("custom_components.candy._LOGGER.debug") as mock_debug:
+        skipped = await stats_coordinator._async_update_data()
+        assert skipped.total_cycles == 50
+        mock_debug.assert_called_with(
+            "Skipping statistics poll: write operation pending"
+        )
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 0
+
 
 async def test_update_statistics_machine_off_without_cached_stats(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
@@ -1638,6 +1649,16 @@ async def test_dw_update_statistics_offline_and_error_paths(
     main_coordinator.last_update_success = False
     cached = await dw_stats_coordinator._async_update_data()
     assert cached.total_cycles == 42
+
+    # Dishwasher write pending skips poll and returns cached data
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 1
+    with patch("custom_components.candy._LOGGER.debug") as mock_debug:
+        skipped_dw = await dw_stats_coordinator._async_update_data()
+        assert skipped_dw.total_cycles == 42
+        mock_debug.assert_called_with(
+            "Skipping dishwasher statistics poll: write operation pending"
+        )
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 0
 
     main_coordinator.last_update_success = True
     main_coordinator.data.machine_state = MachineState.OFF
@@ -1904,6 +1925,20 @@ async def test_maintenance_notification_hardness_fallback_and_options(
     # 5. coordinator is None
     _register_maintenance_notifications(
         hass, entry_limescale, stats_coordinator, coordinator=None
+    )
+
+    # 6. config_entry water_hardness >= len(thresholds) clamped to len - 1
+    entry_clamped = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-maint-clamped",
+        data={
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+            CONF_KEY_WATER_HARDNESS: 99,
+            CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED: True,
+        },
+    )
+    _register_maintenance_notifications(
+        hass, entry_clamped, stats_coordinator, coordinator=None
     )
 
 

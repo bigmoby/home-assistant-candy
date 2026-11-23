@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_fixture
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
@@ -22,6 +24,7 @@ from custom_components.candy.const import (
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
     UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH,
 )
+from custom_components.candy.switch import _CandyDishwasherSwitchBase
 
 from .common import init_integration
 
@@ -179,3 +182,27 @@ async def test_switch_availability_gated_by_program_options(
         blocking=True,
     )
     assert hass.states.get(half_load_id).state != "unavailable"
+
+
+def test_dishwasher_switch_base_guards() -> None:
+    """Test _CandyDishwasherSwitchBase available and is_on guards and abstract _panel_value."""
+    coord = MagicMock()
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="test_sw_base")
+    sw = _CandyDishwasherSwitchBase(coord, entry, 0, [])
+
+    # 1. available returns False when super().available is False
+    coord.last_update_success = False
+    coord.data = None
+    assert sw.available is False
+
+    # 2. available returns False when coordinator.data is not DishwasherStatus
+    coord.last_update_success = True
+    coord.data = None
+    assert sw.available is False
+
+    # 3. is_on returns False when data is None and _user_value is None
+    assert sw.is_on is False
+
+    # 4. _panel_value raises NotImplementedError
+    with pytest.raises(NotImplementedError):
+        sw._panel_value()

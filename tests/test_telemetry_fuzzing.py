@@ -20,6 +20,8 @@ from custom_components.candy import DOMAIN
 from custom_components.candy.client.model import (
     CheckUpResult,
     CheckUpState,
+    DishwasherProgram,
+    DishwasherProgramPhase,
     DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
@@ -389,6 +391,65 @@ def test_dishwasher_telemetry_fuzzing_all_registers() -> None:
     assert status_valid.door_open_allowed is True
     assert status_valid.delayed_start_minutes == 45
     assert status_valid.remaining_minutes == 90
+
+
+def test_dishwasher_status_legacy_machine_state_and_phase() -> None:
+    """Test legacy dishwashers lacking register r2 for state and phase deduction."""
+    legacy_finished = {"StatoDWash": "5", "Reset": "0"}
+    assert (
+        DishwasherStatus.parse_machine_state(legacy_finished) == MachineState.FINISHED1
+    )
+
+    legacy_error = {"StatoDWash": "6", "Reset": "0"}
+    assert DishwasherStatus.parse_machine_state(legacy_error) == MachineState.ERROR
+
+    legacy_unknown = {"StatoDWash": "99", "Reset": "0"}
+    assert DishwasherStatus.parse_machine_state(legacy_unknown) == MachineState.IDLE
+
+    # Phase deduction without r2
+    assert DishwasherStatus.parse_program_phase({"StatoDWash": "0"}) is None
+    assert (
+        DishwasherStatus.parse_program_phase({"StatoDWash": "2"})
+        == DishwasherProgramPhase.WASH
+    )
+    # Phase deduction with r2 but invalid value
+    assert DishwasherStatus.parse_program_phase({"r2": "99"}) is None
+
+
+def test_dishwasher_program_from_dict_and_display_name() -> None:
+    """Test DishwasherProgram.from_dict parameter variants and display_name."""
+    # 1. command_parameters as dict
+    raw_dict = {
+        "position": "2",
+        "name": "DW_ECO",
+        "command_parameters": {
+            "cycle_name": "5",
+            "temp": "55",
+            "available_options": "3",
+        },
+    }
+    prog_dict = DishwasherProgram.from_dict(raw_dict)
+    assert prog_dict.cycle_id == 5
+    assert prog_dict.temperature == 55
+    assert prog_dict.available_options == 3
+    assert prog_dict.display_name is not None
+
+    # 2. command_parameters as list with nested command_parameter dict
+    raw_list = {
+        "position": "3",
+        "name": "DW_RAPID",
+        "command_parameters": [
+            {
+                "command_parameter": {
+                    "name": "cycle_name",
+                    "validation": 20,
+                }
+            }
+        ],
+    }
+    prog_list = DishwasherProgram.from_dict(raw_list)
+    assert prog_list.cycle_id == 20
+    assert prog_list.display_name is not None
 
 
 def test_oven_parser_resilience() -> None:
