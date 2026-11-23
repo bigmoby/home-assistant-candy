@@ -17,6 +17,10 @@ from typing import Any
 
 VERSION = "2.0.0"
 
+# Mandatory settling delay between http-prepareStatistics.json and http-getStatistics.json
+# Grounded in APK StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15
+STATISTICS_PREPARATION_DELAY: float = 15.0
+
 # ---------------------------------------------------------------------------
 # Cryptographic Signatures (Known-Plaintexts)
 # Covering all Simply-Fi & Hoover appliance families (classes4.dex ground truth)
@@ -455,6 +459,10 @@ def fetch_statistics_json(
     except Exception:
         # DualTech and older appliances do not support prepareStatistics; proceed to getStatistics
         pass
+    else:
+        # Mandatory 15s settling window while MCU compiles EEPROM counters into RAM
+        # Grounded in APK StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15
+        time.sleep(STATISTICS_PREPARATION_DELAY)
 
     # Step 2: Fetch populated statistics counters
     raw_bytes = fetch_endpoint_payload(device_ip, port, "getStatistics", query, timeout_sec)
@@ -1239,9 +1247,36 @@ def run_stats(device_ip: str, port: int, key: str, timeout_sec: int) -> None:
     print_header(sys.stdout)
     _, resolved_key, use_enc = fetch_or_discover_telemetry(device_ip, port, key, timeout_sec)
     time.sleep(1.0)
-    print("Executing statistics handshake (prepareStatistics -> getStatistics)...")
+    print("Executing statistics handshake (prepareStatistics -> 15s settling delay -> getStatistics)...")
     stats = fetch_statistics_json(device_ip, port, resolved_key, use_enc, timeout_sec)
     print(json.dumps(stats, indent=2))
+
+    if "statusCounters" in stats:
+        counters = stats["statusCounters"]
+        print("-" * 78)
+        if not counters:
+            print("Summary: statusCounters dictionary is empty (unit has 0 completed cycles or counters not accumulated).")
+        else:
+            s_counters = {
+                k: int(v)
+                for k, v in counters.items()
+                if k.startswith("s") and k[1:].isdigit() and str(v).isdigit()
+            }
+            if s_counters:
+                prog_total = sum(v for k, v in s_counters.items() if 1 <= int(k[1:]) <= 21)
+                temp_total = sum(v for k, v in s_counters.items() if k in ("s22", "s23", "s24"))
+                print(f"Summary: Dishwasher Program Cycles: {prog_total} total (Program buckets: s1..s21)")
+                if temp_total:
+                    print(
+                        f"         Temperature Buckets: {temp_total} total "
+                        f"(s22=0-30°C: {s_counters.get('s22', 0)}, "
+                        f"s23=40°C: {s_counters.get('s23', 0)}, "
+                        f"s24=60-90°C: {s_counters.get('s24', 0)})"
+                    )
+            else:
+                prog_total = sum(int(v) for v in counters.values() if str(v).isdigit())
+                print(f"Summary: Total Program Cycles: {prog_total}")
+        print("-" * 78)
 
 
 def run_config(device_ip: str, port: int, key: str, timeout_sec: int) -> None:
@@ -1272,10 +1307,10 @@ def run_diagnose(device_ip: str, port: int, key: str, sanitize: bool, timeout_se
     # Step 2: Statistics (Only if supported by family)
     stats_dict: dict[str, Any] = {}
     if family_key_supports_statistics(root_key):
-        print("[2/3] Probing cycle statistics...")
+        print("[2/3] Probing cycle statistics (with 15s preparation settling delay)...")
         time.sleep(1.0)
         try:
-            stats_dict = fetch_statistics_json(device_ip, port, resolved_key, use_enc, 3)
+            stats_dict = fetch_statistics_json(device_ip, port, resolved_key, use_enc, 5)
         except Exception:
             stats_dict = {"status": "Statistics counters not available or not supported on this model"}
     else:

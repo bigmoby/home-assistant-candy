@@ -190,3 +190,46 @@ def test_main_legacy_diagnose_raw() -> None:
         mock_diagnose.assert_called_once_with(
             "192.168.1.50", 80, "legacy_key", False, 10
         )
+
+
+def test_fetch_statistics_json_settling_delay() -> None:
+    """Ensure fetch_statistics_json enforces 15-second settling delay after prepareStatistics."""
+    with (
+        patch(
+            "simplyfi.fetch_endpoint_payload",
+            side_effect=[b"OK", b'{"statusCounters":{"s1":"3"}}'],
+        ),
+        patch("simplyfi.time.sleep") as mock_sleep,
+    ):
+        result = simplyfi.fetch_statistics_json("192.168.1.50", 80, "", False, 5)
+
+    assert result == {"statusCounters": {"s1": "3"}}
+    mock_sleep.assert_called_once_with(15.0)
+
+
+def test_run_stats_dishwasher_counter_summary() -> None:
+    """Ensure run_stats outputs decoded dishwasher cycle summary."""
+    stdout_buf = io.StringIO()
+    mock_stats = {
+        "statusCounters": {
+            "s1": "5",
+            "s2": "10",
+            "s22": "3",
+            "s23": "7",
+            "s24": "5",
+        }
+    }
+    with (
+        patch(
+            "simplyfi.fetch_or_discover_telemetry",
+            return_value=({"statusDWash": {"StatoDWash": "2"}}, "test_key", True),
+        ),
+        patch("simplyfi.fetch_statistics_json", return_value=mock_stats),
+        patch("simplyfi.time.sleep"),
+        contextlib.redirect_stdout(stdout_buf),
+    ):
+        simplyfi.run_stats("192.168.1.50", 80, "test_key", 5)
+
+    captured = stdout_buf.getvalue()
+    assert "Dishwasher Program Cycles: 15 total (Program buckets: s1..s21)" in captured
+    assert "Temperature Buckets: 15 total" in captured
