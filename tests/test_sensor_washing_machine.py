@@ -24,7 +24,11 @@ from custom_components.candy import (
     SCAN_INTERVAL_ACTIVE,
     SCAN_INTERVAL_RESTING,
 )
-from custom_components.candy.client.model import DownloadableProgram, MachineState
+from custom_components.candy.client.model import (
+    DownloadableProgram,
+    MachineState,
+    WashingMachineStatistics,
+)
 from custom_components.candy.const import (
     CONF_KEY_BRAND,
     CONF_KEY_CHECKUP_LAST_RESULT,
@@ -48,6 +52,7 @@ from custom_components.candy.const import (
     DOMAIN,
     MODE_FULL_CONTROL,
     UNIQUE_ID_WASH_DETERGENT_CYCLES,
+    UNIQUE_ID_WASH_DRY_TOTAL_CYCLES,
     UNIQUE_ID_WASH_LIQUID_DETERGENT,
     UNIQUE_ID_WASH_POWDER_DETERGENT,
     UNIQUE_ID_WASH_PURCHASE_DATE,
@@ -69,6 +74,7 @@ from custom_components.candy.sensor import (
     CandyWashScheduledFinishSensor,
     CandyWashScheduledStartSensor,
     CandyWashSoftenerCyclesSensor,
+    CandyWashTotalDryingCyclesSensor,
     async_setup_entry,
 )
 
@@ -1103,7 +1109,7 @@ async def test_washer_dryer_sensor_setup(
         hass,
         aioclient_mock,
         fixture,
-        statistics_response='{"statusCounters": {"Program1": "10"}}',
+        statistics_response='{"statusCounters": {"Program1": "10", "DryCotton60": "1", "DrySynt60": "16"}}',
         extra_config_data={
             CONF_KEY_IS_WASHER_DRYER: True,
             CONF_KEY_BRAND: "hoover",
@@ -1127,6 +1133,18 @@ async def test_washer_dryer_sensor_setup(
     assert dry_target_state is not None
     assert dry_target_state.state == "extra_dry"
     assert dry_target_state.attributes["friendly_name"] == "Washer dryer Dry target"
+
+    dry_cycles_state = hass.states.get("sensor.washer_dryer_total_drying_cycles")
+    assert dry_cycles_state is not None
+    assert dry_cycles_state.state == "17"
+    assert (
+        dry_cycles_state.attributes["friendly_name"]
+        == "Washer dryer Total drying cycles"
+    )
+    assert dry_cycles_state.attributes["icon"] == "mdi:tumble-dryer"
+    assert dry_cycles_state.attributes["state_class"] == "total_increasing"
+    assert dry_cycles_state.attributes["cotton_cycles"] == 1
+    assert dry_cycles_state.attributes["synthetic_cycles"] == 16
 
 
 async def test_washer_dryer_sensor_wool_dry_target(
@@ -1207,6 +1225,62 @@ async def test_washer_dryer_sensor_not_created_for_washing_machine(
         or hass.states.get("sensor.wash_dry_target")
     )
     assert dry_target_state is None
+
+    dry_cycles_state = (
+        hass.states.get("sensor.washer_dryer_total_drying_cycles")
+        or hass.states.get("sensor.washing_machine_total_drying_cycles")
+        or hass.states.get("sensor.total_drying_cycles")
+    )
+    assert dry_cycles_state is None
+
+
+async def test_total_drying_cycles_shows_cached_value_after_offline_startup(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Total drying cycles sensor should show last known value when stats fetch fails at startup."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="123-dryer",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_IS_WASHER_DRYER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    registry = entity_registry.async_get(hass)
+    cycles_entry = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.entry_id}-wash_dry_total_cycles",
+        config_entry=entry,
+    )
+
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(cycles_entry.entity_id, "25"),
+                SensorExtraStoredData(
+                    native_value=25, native_unit_of_measurement=None
+                ).as_dict(),
+            )
+        ],
+    )
+
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        text=load_fixture("washing_machine/idle.json"),
+    )
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(cycles_entry.entity_id)
+    assert state is not None
+    assert state.state == "25"
 
 
 async def test_program_sensor_disambiguation_multi_programs_same_selector(
@@ -1514,6 +1588,16 @@ async def test_candy_wash_checkup_result_sensor_restoration_and_cached(
     coordinator.data = status
     assert sensor.native_value == "ok"
 
+    # Status has dis_test_res None (e.g. Smart Pro), fallback to cached entry config
+    status.dis_test_res = None
+    assert sensor.native_value == "ok"
+
+    # Status has dis_test_res None and no cached entry config, returns not_run
+    entry_empty = MockConfigEntry(domain=DOMAIN, entry_id="e2", data={})
+    sensor_empty = CandyWashCheckUpResultSensor(coordinator, entry_empty)
+    sensor_empty.hass = hass
+    assert sensor_empty.native_value == "not_run"
+
 
 def test_candy_wash_purchase_date_sensor() -> None:
     """Test CandyWashPurchaseDateSensor properties and None handling."""
@@ -1643,3 +1727,33 @@ async def test_washer_dryer_offline_startup(
     state = hass.states.get(wd_entry.entity_id)
     assert state is not None
     assert state.state == "Off"
+
+
+def test_candy_wash_total_drying_cycles_sensor_properties() -> None:
+    """Test CandyWashTotalDryingCyclesSensor native_value, attributes, and properties."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        entry_id="test_wd_entry",
+        data={CONF_KEY_IS_WASHER_DRYER: True},
+    )
+    coordinator = MagicMock()
+    coordinator.data = WashingMachineStatistics(
+        total_cycles=100,
+        total_drying_cycles=17,
+        drying_cotton_cycles=2,
+        drying_synthetic_cycles=15,
+    )
+    sensor = CandyWashTotalDryingCyclesSensor(coordinator, entry)
+    assert sensor.unique_id == UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(entry.entry_id)
+    assert sensor.native_value == 17
+    assert sensor.icon == "mdi:tumble-dryer"
+    assert sensor.suggested_area() == "Bathroom"
+    assert sensor.extra_state_attributes == {
+        "cotton_cycles": 2,
+        "synthetic_cycles": 15,
+    }
+
+    # When coordinator data is None, attributes are empty and native_value is None
+    coordinator.data = None
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes == {}

@@ -114,6 +114,7 @@ from .const import (
     UNIQUE_ID_WASH_DETERGENT_CYCLES,
     UNIQUE_ID_WASH_DRY_SELECT,
     UNIQUE_ID_WASH_DRY_TARGET,
+    UNIQUE_ID_WASH_DRY_TOTAL_CYCLES,
     UNIQUE_ID_WASH_ERROR,
     UNIQUE_ID_WASH_ESTIMATED_DURATION,
     UNIQUE_ID_WASH_FILL_PERCENT,
@@ -252,6 +253,12 @@ async def async_setup_entry(
         stats_coordinator = hass.data[DOMAIN][config_id].get(DATA_KEY_STATS_COORDINATOR)
         if stats_coordinator is not None:
             entities.append(CandyWashTotalCyclesSensor(stats_coordinator, config_entry))
+            if is_washer_dryer(config_entry, programs) or _was_registered(
+                UNIQUE_ID_WASH_DRY_TOTAL_CYCLES
+            ):
+                entities.append(
+                    CandyWashTotalDryingCyclesSensor(stats_coordinator, config_entry)
+                )
             if config_entry.data.get(CONF_KEY_MAINTENANCE_ENABLED):
                 entities.append(
                     CandyWashMaintFullCheckupSensor(stats_coordinator, config_entry)
@@ -985,14 +992,12 @@ class CandyWashCheckUpResultSensor(CandyBaseSensor, RestoreSensor):
         _code_to_state = {1: "ok", 2: "problem"}
         if self.coordinator.data is not None:
             result = cast(WashingMachineStatus, self.coordinator.data).dis_test_res
-            if result is not None:
-                if result.code != 0:
-                    return _code_to_state.get(result.code)
-                cached = self.config_entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT)
-                if cached in _code_to_state:
-                    return _code_to_state[cached]
-                return "not_run"
-        return self._restored_state
+            if result is not None and result.code != 0:
+                return _code_to_state.get(result.code)
+        cached = self.config_entry.data.get(CONF_KEY_CHECKUP_LAST_RESULT)
+        if cached in _code_to_state:
+            return _code_to_state[cached]
+        return self._restored_state or "not_run"
 
     @property
     def icon(self) -> str:
@@ -1111,6 +1116,62 @@ class CandyWashTotalCyclesSensor(CandyBaseSensor, RestoreSensor):
     @property
     def icon(self) -> str:
         return "mdi:counter"
+
+
+class CandyWashTotalDryingCyclesSensor(CandyBaseSensor, RestoreSensor):
+    """Total number of drying cycles completed by the washer-dryer."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "wash_dry_total_cycles"
+    _attr_name = "Total drying cycles"
+    _restored_cycles: int | None = None
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                self._restored_cycles = int(str(last.native_value))
+
+    @property
+    def available(self) -> bool:
+        return super().available or self._restored_cycles is not None
+
+    def device_name(self) -> str:
+        return wash_device_name(self.config_entry)
+
+    def suggested_area(self) -> str:
+        return SUGGESTED_AREA_BATHROOM
+
+    @property
+    def entity_category(self) -> EntityCategory:
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def unique_id(self) -> str:
+        return UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(self.config_id)
+
+    @property
+    def native_value(self) -> StateType:
+        if self.coordinator.data is not None:
+            return cast(
+                WashingMachineStatistics, self.coordinator.data
+            ).total_drying_cycles
+        return self._restored_cycles
+
+    @property
+    def icon(self) -> str:
+        return "mdi:tumble-dryer"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if self.coordinator.data is not None:
+            stats = cast(WashingMachineStatistics, self.coordinator.data)
+            return {
+                "cotton_cycles": stats.drying_cotton_cycles,
+                "synthetic_cycles": stats.drying_synthetic_cycles,
+            }
+        return {}
 
 
 class CandyWashMaintFullCheckupSensor(CandyBaseSensor, RestoreSensor):

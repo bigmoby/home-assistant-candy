@@ -70,7 +70,7 @@ The remote control functionality has been implemented for several physical appli
 | Washing Machine / Washer Dryer | DualTech (`3D_DUAL`, `4D_DUAL`, `DUALTECH`) | Yes | Tested on `3D_DUAL` hardware. Remote pause is unsupported by hardware. |
 | Washer Dryer | Candy RapidÓ (`ROW` series) | Yes | Reference Hardware ( `CSOW 4963TWCE-80`). |
 | Washing Machine / Washer Dryer | Candy Bianca (`BIANCA`, `BWD` series) | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by Bianca hardware. |
-| Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. |
+| Washing Machine | Candy Smart Pro / Hoover H-WASH 300 / X-Care (`SMARTPRO`, `HWASH300`, `XCARE`) | No | Implemented from protocol specifications. Uses `GetStat=1` for cycle statistics. |
 | Dishwasher | Candy (local API) | Yes | Reference hardware (`CDIN 1D360PB`). The program list is tested only on this model. |
 
 Other appliance series may not behave correctly. If you encounter issues or unexpected behaviour, please open an [Issue](https://github.com/bigmoby/home-assistant-candy/issues) and attach the output of the `simplyfi.py`  tool. Feedback is very welcome.

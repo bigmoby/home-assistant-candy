@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from .client import CandyClient, get_dryer_command_builder, parse_wash_programs
 from .client.model import (
+    CheckUpResult,
     CheckUpState,
     DishwasherState,
     DishwasherStatus,
@@ -92,6 +93,7 @@ from .const import (
     UNIQUE_ID_DISHWASHER,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
+    UNIQUE_ID_WASH_DRY_TOTAL_CYCLES,
     UNIQUE_ID_WASH_TOTAL_CYCLES,
     UNIQUE_ID_WASHER_DRYER,
     UNIQUE_ID_WASHING_MACHINE,
@@ -236,17 +238,45 @@ def _restore_last_known_statistics(
     registry = er.async_get(hass)
     unique_id = UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
     entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-    if entity_id is None:
+    wash_cycles: int | None = None
+    if entity_id is not None:
+        state = hass.states.get(entity_id)
+        if state is not None and state.state.isdigit():
+            wash_cycles = int(state.state)
+            _LOGGER.debug(
+                "Restored total_cycles from HA state machine: %s = %s",
+                entity_id,
+                state.state,
+            )
+
+    dry_unique_id = UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(config_entry_id)
+    dry_entity_id = registry.async_get_entity_id("sensor", DOMAIN, dry_unique_id)
+    dry_cycles = 0
+    cotton_cycles = 0
+    synthetic_cycles = 0
+    has_dry_cycles = False
+    if dry_entity_id is not None:
+        dry_state = hass.states.get(dry_entity_id)
+        if dry_state is not None and dry_state.state.isdigit():
+            dry_cycles = int(dry_state.state)
+            cotton_cycles = int(dry_state.attributes.get("cotton_cycles", 0))
+            synthetic_cycles = int(dry_state.attributes.get("synthetic_cycles", 0))
+            has_dry_cycles = True
+            _LOGGER.debug(
+                "Restored total_drying_cycles from HA state machine: %s = %s",
+                dry_entity_id,
+                dry_state.state,
+            )
+
+    if wash_cycles is None and not has_dry_cycles:
         return None
-    state = hass.states.get(entity_id)
-    if state is None or not state.state.isdigit():
-        return None
-    _LOGGER.debug(
-        "Restored total_cycles from HA state machine: %s = %s",
-        entity_id,
-        state.state,
+
+    return WashingMachineStatistics(
+        total_cycles=wash_cycles if wash_cycles is not None else 0,
+        total_drying_cycles=dry_cycles,
+        drying_cotton_cycles=cotton_cycles,
+        drying_synthetic_cycles=synthetic_cycles,
     )
-    return WashingMachineStatistics(total_cycles=int(state.state))
 
 
 def _offline_washing_machine() -> WashingMachineStatus:
@@ -361,9 +391,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     ip_address = config_entry.data[CONF_IP_ADDRESS]
     encryption_key = config_entry.data.get(CONF_PASSWORD, "")
     use_encryption = config_entry.data.get(CONF_KEY_USE_ENCRYPTION, True)
+    interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
 
     session = async_get_clientsession(hass)
-    client = CandyClient(session, ip_address, encryption_key, use_encryption)
+    client = CandyClient(
+        session, ip_address, encryption_key, use_encryption, interface_type
+    )
 
     @callback
     def _migrate_unique_ids(entry: er.RegistryEntry) -> dict[str, Any] | None:
@@ -477,7 +510,55 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 raise UpdateFailed("Machine is OFF; statistics unavailable.")
             try:
                 async with async_timeout.timeout(40):
-                    stats = await client.statistics_with_retry()
+                    stats = cast(
+                        WashingMachineStatistics,
+                        await client.statistics_with_retry(),
+                    )
+                    if (
+                        stats.total_cycles == 0
+                        and last_known_statistics is not None
+                        and last_known_statistics.total_cycles > 0
+                    ):
+                        _LOGGER.warning(
+                            "Ignoring transient total_cycles=0 reading; returning last known value (%s).",
+                            last_known_statistics.total_cycles,
+                        )
+                        return last_known_statistics
+
+                    if last_known_statistics is None:
+                        if stats_coordinator.data is not None:
+                            last_known_statistics = stats_coordinator.data
+                        else:
+                            last_known_statistics = _restore_last_known_statistics(
+                                hass, config_entry.entry_id
+                            )
+
+                    max_baseline = max(
+                        config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, 0
+                        ),
+                        config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_LIMESCALE, 0),
+                        config_entry.data.get(CONF_KEY_MAINTENANCE_LAST_FILTER, 0),
+                    )
+
+                    if stats.total_cycles == 0 or (
+                        max_baseline > 0 and stats.total_cycles < max_baseline
+                    ):
+                        if (
+                            last_known_statistics is not None
+                            and last_known_statistics.total_cycles > 0
+                        ):
+                            _LOGGER.warning(
+                                "Ignoring transient total_cycles=%s reading; returning last known value (%s).",
+                                stats.total_cycles,
+                                last_known_statistics.total_cycles,
+                            )
+                            return last_known_statistics
+                        if max_baseline > 0:
+                            raise UpdateFailed(
+                                f"Appliance returned total_cycles={stats.total_cycles}, but stored baselines indicate at least {max_baseline}; "
+                                "ignoring transient reading."
+                            )
                     last_known_statistics = stats
                     return stats
             except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as err:
@@ -514,7 +595,16 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             DOMAIN,
             UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry.entry_id),
         )
-        if stats_coordinator.last_update_success or stats_entity_id is not None:
+        dry_stats_entity_id = er.async_get(hass).async_get_entity_id(
+            "sensor",
+            DOMAIN,
+            UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(config_entry.entry_id),
+        )
+        if (
+            stats_coordinator.last_update_success
+            or stats_entity_id is not None
+            or dry_stats_entity_id is not None
+        ):
             hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_COORDINATOR] = (
                 stats_coordinator
             )
@@ -534,13 +624,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 unsub_checkup
             )
 
-        if stats_coordinator is not None:
-            unsub_stats_refresh = _register_stats_refresh_listener(
-                hass, config_entry, coordinator, stats_coordinator
-            )
-            hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
-                unsub_stats_refresh
-            )
+        unsub_stats_refresh = _register_stats_refresh_listener(
+            hass, config_entry, coordinator, stats_coordinator
+        )
+        hass.data[DOMAIN][config_entry.entry_id][DATA_KEY_STATS_REFRESH_UNSUB] = (
+            unsub_stats_refresh
+        )
 
         unsub_full_checkup = _register_full_checkup_listener(
             hass, config_entry, coordinator, stats_coordinator, client
@@ -583,6 +672,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+
+    if isinstance(coordinator.data, WashingMachineStatus):
+        stats_coord = (
+            hass.data.get(DOMAIN, {})
+            .get(config_entry.entry_id, {})
+            .get(DATA_KEY_STATS_COORDINATOR)
+        )
+        if stats_coord is not None and stats_coord.data is None:
+            restored = _restore_last_known_statistics(hass, config_entry.entry_id)
+            if restored is not None:
+                stats_coord.async_set_updated_data(restored)
 
     return True
 
@@ -697,6 +797,7 @@ def _register_checkup_listener(
                     new_data[CONF_KEY_CHECKUP_LAST_RESULT] = curr_code
                     new_data[CONF_KEY_CHECKUP_PENDING] = False
                     hass.config_entries.async_update_entry(config_entry, data=new_data)
+                    coordinator.async_update_listeners()
                     return
         elif (
             is_pending
@@ -765,58 +866,83 @@ def _register_full_checkup_listener(
             )
             pn_async_dismiss(hass, NOTIF_ID_MAINT_FULL_CHECKUP.format(entry_id))
 
-            if stats_coordinator is not None:
+            new_data = dict(config_entry.data)
+            new_data[CONF_KEY_CHECKUP_LAST_DATE] = dt_util.utcnow().timestamp()
+            new_data[CONF_KEY_CHECKUP_LAST_RESULT] = (
+                status.dis_test_res.code
+                if status.dis_test_res is not None and status.dis_test_res.code != 0
+                else CheckUpResult.OK.code
+            )
+            new_data[CONF_KEY_CHECKUP_PENDING] = False
+            hass.config_entries.async_update_entry(config_entry, data=new_data)
+            coordinator.async_update_listeners()
 
-                async def _update_baseline() -> None:
-                    await stats_coordinator.async_request_refresh()
-                    total: int | None = None
-                    if stats_coordinator.data is not None:
-                        total = stats_coordinator.data.total_cycles
-                    else:
-                        restored = _restore_last_known_statistics(hass, entry_id)
-                        if restored is not None:
-                            total = restored.total_cycles
-
-                    if total is not None:
-                        new_data = dict(config_entry.data)
-                        new_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = total
-                        hass.config_entries.async_update_entry(
-                            config_entry, data=new_data
-                        )
-                        stats_coordinator.async_update_listeners()
-
-                config_entry.async_create_background_task(
-                    hass,
-                    _update_baseline(),
-                    name=f"{DOMAIN}_{config_entry.entry_id}_update_full_checkup_baseline",
-                )
-
-            if (
+            needs_reset = (
                 config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL
                 and status.remote_control
-            ):
-                interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-                reset_prnm = 2 if is_dualtech(interface_type) else 11
+            )
+            if needs_reset or stats_coordinator is not None:
 
-                async def _send_reset() -> None:
-                    try:
-                        await client.send_command(
-                            urlencode(
-                                {"Write": 1, "StSt": 0, "PrNm": reset_prnm},
-                                quote_via=quote,
+                async def _handle_full_checkup_completion() -> None:
+                    if needs_reset:
+                        interface_type = config_entry.data.get(
+                            CONF_KEY_INTERFACE_TYPE, ""
+                        )
+                        reset_prnm = 2 if is_dualtech(interface_type) else 11
+                        try:
+                            await client.send_command(
+                                urlencode(
+                                    {"Write": 1, "StSt": 0, "PrNm": reset_prnm},
+                                    quote_via=quote,
+                                )
                             )
+                            await asyncio.sleep(5)
+                            await coordinator.async_request_refresh()
+                        except Exception as err:
+                            _LOGGER.warning(
+                                "Failed to reset appliance check-up state: %s", err
+                            )
+
+                    if stats_coordinator is not None:
+                        await stats_coordinator.async_request_refresh()
+                        total: int | None = None
+                        if (
+                            stats_coordinator.data is not None
+                            and stats_coordinator.data.total_cycles > 0
+                        ):
+                            total = stats_coordinator.data.total_cycles
+                        else:
+                            restored = _restore_last_known_statistics(hass, entry_id)
+                            if restored is not None and restored.total_cycles > 0:
+                                total = restored.total_cycles
+
+                        current_baseline = config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP, 0
                         )
-                        await asyncio.sleep(5)
-                        await coordinator.async_request_refresh()
-                    except Exception as err:
-                        _LOGGER.warning(
-                            "Failed to reset appliance check-up state: %s", err
-                        )
+                        if (
+                            total is not None
+                            and total > 0
+                            and total >= current_baseline
+                        ):
+                            new_entry_data = dict(config_entry.data)
+                            new_entry_data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] = (
+                                total
+                            )
+                            hass.config_entries.async_update_entry(
+                                config_entry, data=new_entry_data
+                            )
+                            stats_coordinator.async_update_listeners()
+                        elif total is not None and total < current_baseline:
+                            _LOGGER.warning(
+                                "Ignoring cycle count %s lower than current baseline %s",
+                                total,
+                                current_baseline,
+                            )
 
                 config_entry.async_create_background_task(
                     hass,
-                    _send_reset(),
-                    name=f"{DOMAIN}_{config_entry.entry_id}_send_full_checkup_reset",
+                    _handle_full_checkup_completion(),
+                    name=f"{DOMAIN}_{config_entry.entry_id}_complete_full_checkup",
                 )
 
     return coordinator.async_add_listener(_on_status_update)
@@ -889,20 +1015,36 @@ def _register_limescale_listener(
                     async def _update_baseline() -> None:
                         await stats_coordinator.async_request_refresh()
                         total: int | None = None
-                        if stats_coordinator.data is not None:
+                        if (
+                            stats_coordinator.data is not None
+                            and stats_coordinator.data.total_cycles > 0
+                        ):
                             total = stats_coordinator.data.total_cycles
                         else:
                             restored = _restore_last_known_statistics(hass, entry_id)
-                            if restored is not None:
+                            if restored is not None and restored.total_cycles > 0:
                                 total = restored.total_cycles
 
-                        if total is not None:
+                        current_baseline = config_entry.data.get(
+                            CONF_KEY_MAINTENANCE_LAST_LIMESCALE, 0
+                        )
+                        if (
+                            total is not None
+                            and total > 0
+                            and total >= current_baseline
+                        ):
                             new_data = dict(config_entry.data)
                             new_data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] = total
                             hass.config_entries.async_update_entry(
                                 config_entry, data=new_data
                             )
                             stats_coordinator.async_update_listeners()
+                        elif total is not None and total < current_baseline:
+                            _LOGGER.warning(
+                                "Ignoring cycle count %s lower than current baseline %s",
+                                total,
+                                current_baseline,
+                            )
 
                     config_entry.async_create_background_task(
                         hass,
@@ -1182,7 +1324,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        entry_data = hass.data[DOMAIN].pop(entry.entry_id, {})
+        entry_data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, {})
         for key in (
             DATA_KEY_MAINT_UNSUB,
             DATA_KEY_CHECKUP_UNSUB,
@@ -1197,6 +1339,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             unsub = entry_data.get(key)
             if unsub is not None:
                 unsub()
-        if not hass.data[DOMAIN]:
+        if DOMAIN in hass.data and not hass.data[DOMAIN]:
             del hass.data[DOMAIN]
     return unload_ok
