@@ -782,7 +782,7 @@ class WashMaintResetButton(CoordinatorEntity, ButtonEntity):
             ).total_cycles
         else:
             restored = restore_last_known_wash_statistics(self.hass, self.config_id)
-            if restored is not None:
+            if restored is not None and restored.total_cycles > 0:
                 total = restored.total_cycles
             else:
                 total = self.config_entry.data.get(self._conf_key, 0)

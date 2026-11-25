@@ -392,7 +392,10 @@ async def _attach_maintenance_cb(hass, initial_total_cycles):
     stats_coordinator = MagicMock()
     if initial_total_cycles is not None:
         stats_coordinator.data = WashingMachineStatistics(
-            total_cycles=initial_total_cycles
+            total_cycles=initial_total_cycles,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
         )
     else:
         stats_coordinator.data = None
@@ -429,7 +432,12 @@ async def test_maintenance_trigger_fires_on_transition_to_zero(hass):
 
     with patch.object(hass, "async_run_hass_job") as mock_job:
         # total=100 → elapsed=100 >= threshold → remaining=0; prev was 50 → fires
-        stats_coordinator.data = WashingMachineStatistics(total_cycles=100)
+        stats_coordinator.data = WashingMachineStatistics(
+            total_cycles=100,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        )
         on_update()
         assert mock_job.call_count == 1
 
@@ -444,7 +452,12 @@ async def test_maintenance_trigger_no_fire_when_remaining_positive(hass):
 
     with patch.object(hass, "async_run_hass_job") as mock_job:
         # total=51 → remaining=49 (non-zero); prev was 50 → no fire
-        stats_coordinator.data = WashingMachineStatistics(total_cycles=51)
+        stats_coordinator.data = WashingMachineStatistics(
+            total_cycles=51,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        )
         on_update()
         assert mock_job.call_count == 0
 
@@ -460,7 +473,12 @@ async def test_maintenance_trigger_initial_none_stats(hass):
         assert mock_job.call_count == 0
 
         # Stats appear with remaining > 0 → no fire
-        stats_coordinator.data = WashingMachineStatistics(total_cycles=10)
+        stats_coordinator.data = WashingMachineStatistics(
+            total_cycles=10,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        )
         on_update()
         assert mock_job.call_count == 0
 
