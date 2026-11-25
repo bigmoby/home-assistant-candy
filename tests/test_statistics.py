@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from custom_components.candy import CONF_KEY_USE_ENCRYPTION, DOMAIN
 from custom_components.candy.client.model import MachineState, WashingMachineStatistics
 from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
     DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
 )
@@ -257,3 +258,70 @@ def test_total_cycles_survives_program_counter_wraparound():
     }
     stats = WashingMachineStatistics.from_json(payload)
     assert stats.total_cycles == 395
+
+
+def test_washer_dryer_drying_counters_from_json():
+    """Test that Drying counters (DryCotton* and DrySynt*) are parsed into drying cycle counts."""
+    payload = {
+        "Temp0to30": "100",
+        "Temp40": "50",
+        "Temp60to90": "20",
+        "DryCotton60": "1",
+        "DryCotton90": "2",
+        "DrySynt30": "3",
+        "DrySynt60": "4",
+        "DrySynt90": "5",
+        "DrySynt120": "6",
+    }
+    stats = WashingMachineStatistics.from_json(payload)
+    assert stats.total_cycles == 170
+    assert stats.drying_cotton_cycles == 3
+    assert stats.drying_synthetic_cycles == 18
+    assert stats.total_drying_cycles == 21
+
+
+def test_washer_dryer_missing_or_invalid_drying_counters():
+    """Missing or invalid drying counters gracefully parse as zero."""
+    payload = {
+        "Temp0to30": "10",
+        "DryCotton60": "invalid",
+        "DrySynt30": "-5",
+    }
+    stats = WashingMachineStatistics.from_json(payload)
+    assert stats.total_cycles == 10
+    assert stats.drying_cotton_cycles == 0
+    assert stats.drying_synthetic_cycles == 0
+    assert stats.total_drying_cycles == 0
+
+
+async def test_smartpro_statistics_integration_setup(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Test that a SmartPro appliance uses /http-write.json with GetStat=1 during integration setup."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-smartpro-stats",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_INTERFACE_TYPE: "SMARTPRO_5DIG_STM_NEL",
+        },
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0", text=_STATUS_RUNNING
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&GetStat=1",
+        text=_STATS_OK,
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id].get(
+        DATA_KEY_STATS_COORDINATOR
+    )
+    assert stats_coordinator is not None
+    assert stats_coordinator.data is not None
+    assert stats_coordinator.data.total_cycles == 388
