@@ -57,6 +57,7 @@ from custom_components.candy.const import (
     UNIQUE_ID_WASH_POWDER_DETERGENT,
     UNIQUE_ID_WASH_PURCHASE_DATE,
     UNIQUE_ID_WASH_SOFTENER_CYCLES,
+    UNIQUE_ID_WASHER_DRYER,
     UNIQUE_ID_WASHING_MACHINE,
 )
 from custom_components.candy.sensor import (
@@ -1681,6 +1682,51 @@ def test_candy_wash_scheduled_start_and_finish_sensors(hass: HomeAssistant) -> N
     status_error.machine_state = MachineState.ERROR
     coordinator.data = status_error
     assert finish_sensor.native_value is None
+
+
+async def test_washer_dryer_offline_startup(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Washer-dryer should load as Off when device is unreachable at startup."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="123-456",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_IS_WASHER_DRYER: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    reg = entity_registry.async_get(hass)
+    wd_entry = reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASHER_DRYER.format(entry.entry_id),
+        config_entry=entry,
+    )
+
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        exc=TimeoutError,
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        text='{"statusCounters": {"Program1": "10"}}',
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        text='{"statusCounters": {"Program1": "10"}}',
+    )
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(wd_entry.entity_id)
+    assert state is not None
+    assert state.state == "Off"
 
 
 def test_candy_wash_total_drying_cycles_sensor_properties() -> None:

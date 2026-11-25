@@ -60,6 +60,22 @@ _STATUS_DW_IDLE = """{
   }
 }"""
 
+_STATUS_DW_FINISHED = """{
+  "statusDWash": {
+    "StatoWiFi": "1", "StatoDWash": "5", "CodiceErrore": "0", "Program": "P1",
+    "OpzProg": "0", "RemTime": "0", "DelayStart": "0", "OpenDoor": "0",
+    "OpenDoorOpt": "0", "Eco": "0", "MissSalt": "0", "MissRinse": "0"
+  }
+}"""
+
+_STATUS_WASH_DELAYED_START = """{
+  "statusLavatrice": {
+    "WiFiStatus": "1", "Err": "0", "MachMd": "5", "PrPh": "0",
+    "Pr": "1", "PrCode": "136", "SLevel": "0", "Temp": "40", "SpinSp": "8",
+    "DelVal": "120", "RemTime": "7200", "FillR": "0"
+  }
+}"""
+
 _STATUS_OVEN_IDLE = """{
   "statusForno": {
     "StatoWiFi": "1", "StartStop": "0", "Program": "1", "Selettore": "1",
@@ -288,3 +304,59 @@ async def test_connection_flapping_jitter_resets_counter(
 
     # After 3 separate single dropouts, machine is still IDLE, not OFF
     assert coordinator.data.machine_state == MachineState.IDLE
+
+
+# ---------------------------------------------------------------------------
+# Test 7: Dishwasher Finished to Synthetic IDLE (Off)
+# ---------------------------------------------------------------------------
+
+
+async def test_dishwasher_finished_3_strike_timeout(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Dishwasher in FINISHED state on 3rd timeout must safely transition to IDLE with 0 remaining minutes."""
+    entry = await init_integration(hass, aioclient_mock, _STATUS_DW_FINISHED)
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    assert coordinator.data.machine_state == DishwasherState.FINISHED
+
+    with patch(
+        "custom_components.candy.client.CandyClient.status", side_effect=TimeoutError
+    ):
+        for _ in range(3):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+    assert coordinator.data.machine_state == DishwasherState.IDLE
+    assert coordinator.data.remaining_minutes == 0
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING
+
+
+# ---------------------------------------------------------------------------
+# Test 8: Washing Machine Delayed Start to Synthetic OFF
+# ---------------------------------------------------------------------------
+
+
+async def test_washing_machine_delayed_start_3_strike_timeout(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Washing machine in DELAYED_START_PROGRAMMED on 3rd timeout must safely infer OFF."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _STATUS_WASH_DELAYED_START,
+        statistics_response=_STATS_MOCK,
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+
+    assert coordinator.data.machine_state == MachineState.DELAYED_START_PROGRAMMED
+
+    with patch(
+        "custom_components.candy.client.CandyClient.status", side_effect=TimeoutError
+    ):
+        for _ in range(3):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+    assert coordinator.data.machine_state == MachineState.OFF
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING
