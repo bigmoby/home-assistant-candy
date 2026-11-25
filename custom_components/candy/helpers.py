@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 
 from .client import parse_wash_programs
 from .client.dryer_commands import is_dualtech_dryer_interface
 from .client.model import (
     TumbleDryerStatus,
+    WashingMachineStatistics,
     WashingMachineStatus,
     WashingMachineWashProgram,
 )
@@ -34,8 +37,12 @@ from .const import (
     MODE_FULL_CONTROL,
     SUGGESTED_AREA_BATHROOM,
     SUGGESTED_AREA_KITCHEN,
+    UNIQUE_ID_WASH_DRY_TOTAL_CYCLES,
+    UNIQUE_ID_WASH_TOTAL_CYCLES,
     VALUE_TO_DRY_TARGET,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 _NOTIFICATION_STRINGS: dict[str, dict[str, str]] = json.loads(
     (Path(__file__).parent / "client" / "notification_strings.json").read_text(
@@ -249,3 +256,56 @@ def get_dryer_error_notification_strings(
 ) -> tuple[str, str] | None:
     """Return (title, message) for tumble dryer error, or None if unknown code."""
     return get_appliance_error_notification_strings("dryer", error_code, language)
+
+
+def restore_last_known_wash_statistics(
+    hass: HomeAssistant,
+    config_entry_id: str,
+) -> WashingMachineStatistics | None:
+    """Read the persisted total-cycles value from HA's state machine.
+
+    Returns a WashingMachineStatistics populated from the last known sensor state,
+    or None if the entity was never registered or its state is not a valid integer.
+    """
+    registry = er.async_get(hass)
+    unique_id = UNIQUE_ID_WASH_TOTAL_CYCLES.format(config_entry_id)
+    entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
+    wash_cycles: int | None = None
+    if entity_id is not None:
+        state = hass.states.get(entity_id)
+        if state is not None and state.state.isdigit():
+            wash_cycles = int(state.state)
+            _LOGGER.debug(
+                "Restored total_cycles from HA state machine: %s = %s",
+                entity_id,
+                state.state,
+            )
+
+    dry_unique_id = UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(config_entry_id)
+    dry_entity_id = registry.async_get_entity_id("sensor", DOMAIN, dry_unique_id)
+    dry_cycles = 0
+    cotton_cycles = 0
+    synthetic_cycles = 0
+    has_dry_cycles = False
+    if dry_entity_id is not None:
+        dry_state = hass.states.get(dry_entity_id)
+        if dry_state is not None and dry_state.state.isdigit():
+            dry_cycles = int(dry_state.state)
+            cotton_cycles = int(dry_state.attributes.get("cotton_cycles", 0))
+            synthetic_cycles = int(dry_state.attributes.get("synthetic_cycles", 0))
+            has_dry_cycles = True
+            _LOGGER.debug(
+                "Restored total_drying_cycles from HA state machine: %s = %s",
+                dry_entity_id,
+                dry_state.state,
+            )
+
+    if wash_cycles is None and not has_dry_cycles:
+        return None
+
+    return WashingMachineStatistics(
+        total_cycles=wash_cycles if wash_cycles is not None else 0,
+        total_drying_cycles=dry_cycles,
+        drying_cotton_cycles=cotton_cycles,
+        drying_synthetic_cycles=synthetic_cycles,
+    )

@@ -109,6 +109,7 @@ from .helpers import (
     is_washer_dryer,
     localized_notification_text,
     remote_control_enabled,
+    restore_last_known_wash_statistics,
     supports_remote_pause,
     wash_device_info,
 )
@@ -214,7 +215,6 @@ async def async_setup_entry(
                     stats_coordinator,
                     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
                     UNIQUE_ID_WASH_MAINT_FULL_CHECKUP_BUTTON,
-                    "Check-up maintenance reset",
                     "wash_maint_full_checkup_reset",
                     "mdi:washing-machine-alert",
                 ),
@@ -227,7 +227,6 @@ async def async_setup_entry(
                         stats_coordinator,
                         CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
                         UNIQUE_ID_WASH_MAINT_LIMESCALE_BUTTON,
-                        "Limescale maintenance reset",
                         "wash_maint_limescale_reset",
                         "mdi:water-remove",
                     )
@@ -240,7 +239,6 @@ async def async_setup_entry(
                         stats_coordinator,
                         CONF_KEY_MAINTENANCE_LAST_FILTER,
                         UNIQUE_ID_WASH_MAINT_FILTER_BUTTON,
-                        "Filter maintenance reset",
                         "wash_maint_filter_reset",
                         "mdi:filter-remove",
                     )
@@ -753,7 +751,6 @@ class WashMaintResetButton(CoordinatorEntity, ButtonEntity):
         stats_coordinator: DataUpdateCoordinator,
         conf_key: str,
         unique_id_template: str,
-        name: str,
         translation_key: str,
         icon: str,
     ) -> None:
@@ -763,9 +760,12 @@ class WashMaintResetButton(CoordinatorEntity, ButtonEntity):
         self._stats_coordinator = stats_coordinator
         self._conf_key = conf_key
         self._unique_id_template = unique_id_template
-        self._attr_name = name
         self._attr_translation_key = translation_key
         self._attr_icon = icon
+
+    @property
+    def available(self) -> bool:
+        return True
 
     @property
     def unique_id(self) -> str:
@@ -776,11 +776,16 @@ class WashMaintResetButton(CoordinatorEntity, ButtonEntity):
         return wash_device_info(self.config_entry)
 
     async def async_press(self) -> None:
-        total = 0
         if self._stats_coordinator.data is not None:
             total = cast(
                 WashingMachineStatistics, self._stats_coordinator.data
             ).total_cycles
+        else:
+            restored = restore_last_known_wash_statistics(self.hass, self.config_id)
+            if restored is not None and restored.total_cycles > 0:
+                total = restored.total_cycles
+            else:
+                total = self.config_entry.data.get(self._conf_key, 0)
         new_data = dict(self.config_entry.data)
         new_data[self._conf_key] = total
         self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
