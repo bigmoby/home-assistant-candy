@@ -4,6 +4,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+# Dishwasher interface types whose firmware hangs/times out on local statistics
+# (/http-prepareStatistics.json and /http-getStatistics.json).
+DISHWASHER_UNSUPPORTED_STATISTICS_INTERFACES: frozenset[str] = frozenset(
+    {
+        # Verified via Hoover HDIN 2L360PB (PCAP + isolated probe, issue #29)
+        "AXI_BI_LED",
+    }
+)
+
 
 def is_open_door_supported(interface_type: str | None) -> bool:
     """Return True if interface_type ends with or contains _OD (motorized Auto-Open Door)."""
@@ -20,6 +29,15 @@ def is_legacy_dishwasher(interface_type: str | None) -> bool:
         term in interface_type
         for term in ("FSTouch", "BuiltIn", "NFC_DIGIT", "DishwasherInterfaceType")
     )
+
+
+def supports_dishwasher_statistics(interface_type: str | None) -> bool:
+    """Return True if the dishwasher interface supports local statistics endpoints."""
+    if is_legacy_dishwasher(interface_type):
+        return False
+    if not interface_type:
+        return True
+    return interface_type.upper() not in DISHWASHER_UNSUPPORTED_STATISTICS_INTERFACES
 
 
 def is_modern_dishwasher(interface_type: str | None) -> bool:

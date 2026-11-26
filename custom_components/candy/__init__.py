@@ -29,8 +29,8 @@ from .client import (
     CandyClient,
     get_dishwasher_command_builder,
     get_dryer_command_builder,
-    is_legacy_dishwasher,
     parse_wash_programs,
+    supports_dishwasher_statistics,
 )
 from .client.model import (
     CheckUpResult,
@@ -649,7 +649,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
         dw_stats_coordinator: DataUpdateCoordinator[DishwasherStatistics] | None = None
         interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
-        if not is_legacy_dishwasher(interface_type):
+        if supports_dishwasher_statistics(interface_type):
             last_known_dw_stats = cast(
                 DishwasherStatistics | None,
                 _restore_last_known_statistics(hass, config_entry.entry_id, True),

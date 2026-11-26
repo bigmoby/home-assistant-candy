@@ -36,6 +36,7 @@ from .client import (
     WashingMachineStatus,
     WashingMachineWashProgram,
     is_legacy_dishwasher,
+    is_modern_dishwasher,
     load_downloadable_programs,
     parse_dryer_programs,
     parse_wash_programs,
@@ -331,7 +332,7 @@ async def async_setup_entry(
         stats_coordinator = hass.data[DOMAIN][config_id].get(DATA_KEY_STATS_COORDINATOR)
         interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
         if (
-            stats_coordinator is None
+            (stats_coordinator is None and not is_modern_dishwasher(interface_type))
             or is_legacy_dishwasher(interface_type)
             or _was_dw_registered(UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES)
         ):

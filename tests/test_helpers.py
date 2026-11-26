@@ -6,6 +6,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.candy import CONF_KEY_USE_ENCRYPTION
+from custom_components.candy.client import supports_dishwasher_statistics
 from custom_components.candy.const import (
     CONF_KEY_APPLIANCE_TYPE,
     CONF_KEY_BRAND,
@@ -473,3 +474,15 @@ def test_dishwasher_program_description_resolution_fallbacks() -> None:
             resolve_dishwasher_program_description("TEST_PROG", "en")
             == "Test description"
         )
+
+
+def test_supports_dishwasher_statistics() -> None:
+    """Verify supports_dishwasher_statistics excludes legacy and AXI_BI_LED models."""
+    assert supports_dishwasher_statistics("AXI_BI_LED") is False
+    assert supports_dishwasher_statistics("axi_bi_led") is False
+    assert supports_dishwasher_statistics("DishwasherInterfaceTypeBuiltIn") is False
+    assert supports_dishwasher_statistics("DishwasherInterfaceTypeFSTouch") is False
+    assert supports_dishwasher_statistics("BRAVA_BI_DIGIT_OD") is True
+    assert supports_dishwasher_statistics("AXI_FS_SMOOTH_OD") is True
+    assert supports_dishwasher_statistics(None) is True
+    assert supports_dishwasher_statistics("") is True

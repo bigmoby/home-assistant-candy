@@ -23,12 +23,14 @@ from custom_components.candy.const import (
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_STATS_COORDINATOR,
     UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
+    UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES,
     UNIQUE_ID_DISHWASHER_MAINT_FILTER,
     UNIQUE_ID_DISHWASHER_MAINT_FILTER_BUTTON,
     UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP,
     UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON,
     UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE,
     UNIQUE_ID_DISHWASHER_MAINT_LIMESCALE_BUTTON,
+    UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE,
     UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
 )
 from custom_components.candy.device_trigger import async_get_triggers
@@ -414,3 +416,59 @@ async def test_modern_dishwasher_maintenance_reset_button_when_offline_uses_rest
 
     # Baseline is set to 30 (restored total cycles), not corrupted to 0
     assert entry.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 30
+
+
+async def test_axi_bi_led_skips_statistics_and_lifetime_cycles_r8(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify AXI_BI_LED skips statistics polling and does not treat r8 as cycle count."""
+    status = _make_status_json(
+        _READY_FIXTURE,
+        {
+            "StatoWiFi": "1",
+            "StatoDWash": "2",
+            "r8": "1",
+        },
+    )
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        status,
+        None,
+        {
+            CONF_KEY_INTERFACE_TYPE: "AXI_BI_LED",
+            CONF_KEY_IS_DISHWASHER: True,
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+        },
+    )
+
+    # No statistics coordinator or endpoint requests on AXI_BI_LED
+    assert hass.data[DOMAIN][entry.entry_id].get(DATA_KEY_STATS_COORDINATOR) is None
+    assert not any("Statistics" in str(call[1]) for call in aioclient_mock.mock_calls)
+
+    registry = er.async_get(hass)
+    assert (
+        registry.async_get_entity_id(
+            "sensor",
+            DOMAIN,
+            UNIQUE_ID_DISHWASHER_TOTAL_CYCLES.format(entry.entry_id),
+        )
+        is None
+    )
+    assert (
+        registry.async_get_entity_id(
+            "sensor",
+            DOMAIN,
+            UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES.format(entry.entry_id),
+        )
+        is None
+    )
+    memo_entity_id = registry.async_get_entity_id(
+        "binary_sensor",
+        DOMAIN,
+        UNIQUE_ID_DISHWASHER_REMEMBER_LAST_CYCLE.format(entry.entry_id),
+    )
+    assert memo_entity_id is not None
+    memo_state = hass.states.get(memo_entity_id)
+    assert memo_state is not None
+    assert memo_state.state == "on"

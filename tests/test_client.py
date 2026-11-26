@@ -726,6 +726,21 @@ async def test_fetch_all_endpoints_modern_vs_legacy_dishwasher(hass, aioclient_m
         in endpoints_legacy["http-getStatistics.json"]["status"]
     )
 
+    # Unsupported statistics interface (AXI_BI_LED) -> skips statistics
+    axi_led_client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    axi_led_client.interface_type = "AXI_BI_LED"
+    endpoints_axi_led = await axi_led_client.fetch_all_endpoints()
+    assert endpoints_axi_led["http-read.json"] == telemetry
+    assert (
+        "not supported for this dishwasher interface"
+        in endpoints_axi_led["http-getStatistics.json"]["status"]
+    )
+
 
 async def test_set_dishwasher_water_hardness(hass, aioclient_mock):
     """Test set_dishwasher_water_hardness sends HL command."""

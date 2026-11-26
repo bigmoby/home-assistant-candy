@@ -20,6 +20,7 @@ from .dishwasher_commands import (
     is_legacy_dishwasher as is_legacy_dishwasher,
     is_modern_dishwasher as is_modern_dishwasher,
     is_open_door_supported as is_open_door_supported,
+    supports_dishwasher_statistics as supports_dishwasher_statistics,
 )
 from .dryer_commands import (
     DryerCommandBuilder as DryerCommandBuilder,
@@ -247,10 +248,13 @@ class CandyClient:
         # 2. Statistics counters (/http-getStatistics.json)
         is_dw = "statusDWash" in telemetry
         is_legacy_dw = is_dw and is_legacy_dishwasher(self.interface_type)
+        is_unsupported_dw = is_dw and not supports_dishwasher_statistics(
+            self.interface_type
+        )
         has_stats_support = any(
             k in telemetry
             for k in ("statusLavatrice", "statusWD", "statusWM", "statusTD")
-        ) or (is_dw and not is_legacy_dw)
+        ) or (is_dw and not is_unsupported_dw)
         if has_stats_support:
             try:
                 async with async_timeout.timeout(30):
@@ -261,11 +265,16 @@ class CandyClient:
                     "error": f"Error fetching statistics: {err!r}"
                 }
         else:
-            status_msg = (
-                "Statistics counters not supported for legacy dishwashers"
-                if is_legacy_dw
-                else "Statistics counters not supported for this appliance family"
-            )
+            if is_legacy_dw:
+                status_msg = "Statistics counters not supported for legacy dishwashers"
+            elif is_unsupported_dw:
+                status_msg = (
+                    "Statistics counters not supported for this dishwasher interface"
+                )
+            else:
+                status_msg = (
+                    "Statistics counters not supported for this appliance family"
+                )
             endpoints["http-getStatistics.json"] = {"status": status_msg}
 
         return endpoints
