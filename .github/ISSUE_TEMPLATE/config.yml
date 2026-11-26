@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/bigmoby/home-assistant-candy/blob/main/docs/remote-control.md
     about: Check hardware prerequisites, dial positions, and safety gating rules for Full Control.
   - name: Network Discovery & simplyfi.py Diagnostic Tool
-    url: https://github.com/bigmoby/home-assistant-candy#readme
+    url: https://github.com/bigmoby/home-assistant-candy#-built-in-debugging-tool-simplyfipy-v200
     about: Learn how to find your appliance IP and run tools/simplyfi.py locally.

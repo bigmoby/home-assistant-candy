@@ -59,9 +59,9 @@ body:
         1. **Option A — Home Assistant Diagnostics** *(if the device is already added in HA)*:
            Go to **Settings → Devices & Services → Candy → `⋮` → Download diagnostics**, then **drag & drop** the `.json` file into the box below.
         2. **Option B — `simplyfi.py` Diagnostic Tool** *(if setup fails or the device is not in HA yet)*:
-           Run the following command on a machine on the same local network as the appliance (output is sanitized by default):
+           Download [`tools/simplyfi.py`](https://github.com/bigmoby/home-assistant-candy/blob/main/tools/simplyfi.py) (standalone Python 3 script, no external dependencies) and run it on a machine on the same local network as the appliance (output is sanitized by default):
            ```bash
-           python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
+           python3 simplyfi.py <YOUR_APPLIANCE_IP> diagnose
            ```
            *(Not sure of the IP? See [Finding Your Appliance on the Network](https://github.com/bigmoby/home-assistant-candy#-finding-your-appliance-on-the-network).)*
 

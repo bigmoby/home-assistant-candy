@@ -12,7 +12,7 @@ body:
     id: versions
     attributes:
       label: Integration & Home Assistant Versions
-      placeholder: "e.g. Candy vX.Y.Z, Home Assistant 2025.x.x"
+      placeholder: "e.g. Candy vX.Y.Z (HACS/Marketplace), Home Assistant 2025.x.x"
     validations:
       required: true
 
@@ -54,17 +54,18 @@ body:
                custom_components.candy: debug
            ```
         3. **`simplyfi.py` (recommended for telemetry or remote control issues):**
+           Download [`tools/simplyfi.py`](https://github.com/bigmoby/home-assistant-candy/blob/main/tools/simplyfi.py) (standalone Python 3 script, no external dependencies) and run:
            ```bash
-           python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
+           python3 simplyfi.py <YOUR_APPLIANCE_IP> diagnose
            # Or for remote control / dial readiness checks:
-           python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> remote
+           python3 simplyfi.py <YOUR_APPLIANCE_IP> remote
            ```
 
   - type: textarea
     id: diagnostics
     attributes:
       label: HA Diagnostics (.json) and/or simplyfi.py Output
-      description: Drag & drop your HA diagnostics `.json` file here, or paste the output from `tools/simplyfi.py`.
+      description: Drag & drop your HA diagnostics `.json` file here, or paste the output from `simplyfi.py`.
     validations:
       required: true
 
@@ -72,7 +73,7 @@ body:
     id: logs
     attributes:
       label: Home Assistant Logs
-      description: Paste any relevant log entries or tracebacks.
+      description: Paste any relevant log entries or tracebacks. If no errors appear in your logs, write "No errors in logs".
       render: text
     validations:
       required: true

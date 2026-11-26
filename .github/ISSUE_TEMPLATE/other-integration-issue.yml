@@ -12,7 +12,7 @@ body:
     id: versions
     attributes:
       label: Integration & Home Assistant Versions
-      placeholder: "e.g. Candy vX.Y.Z, Home Assistant 2025.x.x"
+      placeholder: "e.g. Candy vX.Y.Z (HACS/Marketplace), Home Assistant 2025.x.x"
     validations:
       required: true
 
@@ -42,7 +42,7 @@ body:
     attributes:
       value: |
         ### Required Logs & Diagnostics
-        * **Home Assistant Diagnostics:** Go to **Settings → Devices & Services → Candy → `⋮` → Download diagnostics** (or **Download diagnostics** on the integration entry) and drag & drop the `.json` file below. *(If setup failed before an entry was created, note that and attach `python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose` output instead.)*
+        * **Home Assistant Diagnostics:** Go to **Settings → Devices & Services → Candy → `⋮` → Download diagnostics** (or **Download diagnostics** on the integration entry) and drag & drop the `.json` file below. *(If setup failed before an entry was created, download [`tools/simplyfi.py`](https://github.com/bigmoby/home-assistant-candy/blob/main/tools/simplyfi.py) — standalone Python 3 script, no external dependencies — and attach `python3 simplyfi.py <YOUR_APPLIANCE_IP> diagnose` output instead.)*
         * **Home Assistant Logs:** Paste relevant errors/tracebacks from **Settings → System → Logs** (ideally with `custom_components.candy: debug` enabled).
 
   - type: textarea
@@ -57,7 +57,7 @@ body:
     id: logs
     attributes:
       label: Home Assistant Logs
-      description: Paste any relevant log entries or tracebacks.
+      description: Paste any relevant log entries or tracebacks. If no errors appear in your logs, write "No errors in logs".
       render: text
     validations:
       required: true
