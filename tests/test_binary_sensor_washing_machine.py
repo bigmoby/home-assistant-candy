@@ -16,7 +16,7 @@ from custom_components.candy.const import CONF_KEY_INTERFACE_TYPE, DOMAIN
 
 from .common import init_integration
 
-_REMOTE_CONTROL = "binary_sensor.remote_control"
+_REMOTE_CONTROL = "binary_sensor.washing_machine_remote_control"
 
 
 async def test_remote_control_on_when_enabled(

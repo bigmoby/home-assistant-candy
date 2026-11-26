@@ -41,7 +41,7 @@ async def test_program_sensor(hass: HomeAssistant, aioclient_mock: AiohttpClient
     assert state
     assert state.state == "Red wine"
     assert state.attributes == {
-        "friendly_name": "Wine cooler program",
+        "friendly_name": "Wine cooler Program",
         "icon": "mdi:bottle-wine",
     }
 
@@ -59,7 +59,7 @@ async def test_temp_sensor(hass: HomeAssistant, aioclient_mock: AiohttpClientMoc
         "device_class": "temperature",
         "state_class": "measurement",
         "unit_of_measurement": "°C",
-        "friendly_name": "Wine cooler target temperature",
+        "friendly_name": "Wine cooler Target temperature",
         "icon": "mdi:thermometer",
     }
 
@@ -74,7 +74,7 @@ async def test_light_sensor(hass: HomeAssistant, aioclient_mock: AiohttpClientMo
     assert state
     assert state.state == "On"
     assert state.attributes == {
-        "friendly_name": "Wine cooler light",
+        "friendly_name": "Wine cooler Light",
         "icon": "mdi:lightbulb",
     }
 
@@ -91,7 +91,7 @@ async def test_error_sensor_none(
     assert state
     assert state.state == "None"
     assert state.attributes == {
-        "friendly_name": "Wine cooler error code",
+        "friendly_name": "Wine cooler Error code",
         "icon": "mdi:alert-circle",
     }
 

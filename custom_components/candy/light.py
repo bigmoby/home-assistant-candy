@@ -51,7 +51,7 @@ class CandyWineCoolerLight(CoordinatorEntity[DataUpdateCoordinator[Any]], LightE
     _attr_supported_color_modes = {ColorMode.ONOFF}
     _attr_color_mode = ColorMode.ONOFF
     _attr_has_entity_name = True
-    _attr_name = "Light"
+    _attr_translation_key = "wine_cooler_light"
 
     def __init__(
         self,

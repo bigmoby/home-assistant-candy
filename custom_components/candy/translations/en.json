@@ -261,34 +261,34 @@
         "name": "Washer dryer"
       },
       "wash_cycle_status": {
-        "name": "Cycle status"
+        "name": "Wash cycle status"
       },
       "wash_remaining_time": {
-        "name": "Cycle remaining time"
+        "name": "Wash cycle remaining time"
       },
       "wash_temperature": {
-        "name": "Temperature"
+        "name": "Wash temperature"
       },
       "wash_spin_speed": {
-        "name": "Spin speed"
+        "name": "Wash spin speed"
       },
       "wash_fill_level": {
-        "name": "Fill level"
+        "name": "Wash fill level"
       },
       "wash_error_code": {
-        "name": "Error code"
+        "name": "Wash error code"
       },
       "wash_delay_start": {
         "name": "Wash delay start"
       },
       "wash_ntc_water": {
-        "name": "NTC water"
+        "name": "Wash NTC water"
       },
       "wash_ntc_drum": {
-        "name": "NTC drum"
+        "name": "Wash NTC drum"
       },
       "wash_motor_frequency": {
-        "name": "Motor frequency"
+        "name": "Wash motor frequency"
       },
       "wash_maintenance": {
         "name": "Wash maintenance"
@@ -323,7 +323,7 @@
         "name": "Filter maintenance remaining cycles"
       },
       "wash_soil_level": {
-        "name": "Stain level",
+        "name": "Wash stain level",
         "state": {
           "low": "Low",
           "normal": "Normal",
@@ -355,13 +355,13 @@
         "name": "Wash scheduled finish"
       },
       "wash_liquid_detergent": {
-        "name": "Liquid detergent dose"
+        "name": "Wash liquid detergent dose"
       },
       "wash_powder_detergent": {
-        "name": "Powder detergent dose"
+        "name": "Wash powder detergent dose"
       },
       "wash_cycle_capacity": {
-        "name": "Max load capacity"
+        "name": "Wash max cycle capacity"
       },
       "wash_program": {
         "name": "Wash program"
@@ -400,10 +400,10 @@
         "name": "Oven"
       },
       "oven_temperature": {
-        "name": "Oven temperature"
+        "name": "Temperature"
       },
       "oven_program": {
-        "name": "Oven program"
+        "name": "Program"
       },
       "dishwasher": {
         "name": "Dishwasher"
@@ -445,16 +445,16 @@
         "name": "Wine cooler"
       },
       "wine_cooler_program": {
-        "name": "Wine cooler program"
+        "name": "Program"
       },
       "wine_cooler_temperature": {
-        "name": "Wine cooler target temperature"
+        "name": "Target temperature"
       },
       "wine_cooler_light": {
-        "name": "Wine cooler light"
+        "name": "Light"
       },
       "wine_cooler_error_code": {
-        "name": "Wine cooler error code"
+        "name": "Error code"
       },
       "wash_detergent_cycles": {
         "name": "Detergent remaining cycles"
@@ -467,6 +467,12 @@
       },
       "dishwasher_error_code": {
         "name": "Error code"
+      },
+      "wine_cooler_lower_temperature": {
+        "name": "Lower zone target temperature"
+      },
+      "wine_cooler_lower_program": {
+        "name": "Lower zone program"
       }
     },
     "light": {
@@ -487,13 +493,13 @@
         "name": "Wash program"
       },
       "wash_temp_select": {
-        "name": "Temperature"
+        "name": "Wash temperature"
       },
       "wash_spin_select": {
-        "name": "Spin speed"
+        "name": "Wash spin speed"
       },
       "wash_soil_select": {
-        "name": "Stain level",
+        "name": "Wash stain level",
         "state": {
           "low": "Low",
           "normal": "Normal",
@@ -571,7 +577,7 @@
     },
     "number": {
       "wash_delay_number": {
-        "name": "Delay"
+        "name": "Wash delay"
       },
       "dryer_delay_number": {
         "name": "Delay"
@@ -582,7 +588,7 @@
     },
     "switch": {
       "wash_steam_switch": {
-        "name": "Steam"
+        "name": "Wash steam"
       },
       "wash_nfc_switch": {
         "name": "Special programs"

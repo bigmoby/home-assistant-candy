@@ -59,13 +59,13 @@ async def async_setup_entry(
 
 
 class WashDelayNumber(CoordinatorEntity, NumberEntity):
+    _attr_has_entity_name = True
     _attr_native_min_value = 0
     _attr_native_max_value = 1380
     _attr_native_step = 30
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
     _attr_mode = NumberMode.BOX
     _attr_icon = "mdi:timer-outline"
-    _attr_name = "Wash delay"
     _attr_translation_key = "wash_delay_number"
 
     def __init__(

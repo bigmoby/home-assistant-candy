@@ -486,6 +486,8 @@ def _build_dualtech_stop_params(program: int) -> dict[str, int]:
 
 
 class CandyWashButtonBase(CoordinatorEntity, ButtonEntity):
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
@@ -531,7 +533,6 @@ class CandyWashButtonBase(CoordinatorEntity, ButtonEntity):
 
 
 class WashStartButton(CandyWashButtonBase):
-    _attr_name = "Start wash"
     _attr_translation_key = "wash_start_button"
 
     def __init__(
@@ -947,7 +948,6 @@ class DishwasherMaintResetButton(CoordinatorEntity, ButtonEntity):
 
 
 class WashPauseButton(CandyWashButtonBase):
-    _attr_name = "Pause wash"
     _attr_translation_key = "wash_pause_button"
     _attr_icon = "mdi:pause-circle-outline"
 
@@ -967,7 +967,6 @@ class WashPauseButton(CandyWashButtonBase):
 
 
 class WashResumeButton(CandyWashButtonBase):
-    _attr_name = "Resume wash"
     _attr_translation_key = "wash_resume_button"
     _attr_icon = "mdi:play-circle-outline"
 
@@ -1007,7 +1006,6 @@ class WashGoodNightResumeButton(CandyWashButtonBase):
 
 
 class WashStopButton(CandyWashButtonBase):
-    _attr_name = "Stop wash"
     _attr_translation_key = "wash_stop_button"
 
     @property
@@ -1038,7 +1036,6 @@ class WashStopButton(CandyWashButtonBase):
 class WashFullCheckUpButton(CandyWashButtonBase):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
-    _attr_name = "Full Check-up"
     _attr_translation_key = "wash_full_checkup"
     _attr_icon = "mdi:stethoscope"
 
@@ -1075,7 +1072,6 @@ class WashFullCheckUpButton(CandyWashButtonBase):
 class WashLimescaleCleanButton(CandyWashButtonBase):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
-    _attr_name = "Limescale Cleaning"
     _attr_translation_key = "wash_limescale_clean"
     _attr_icon = "mdi:water-remove"
 

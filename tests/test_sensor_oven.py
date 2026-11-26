@@ -40,7 +40,7 @@ async def test_program_sensor_idle(
     assert state.state == "2"
     assert state.attributes == {
         "selection": 1,
-        "friendly_name": "Oven program",
+        "friendly_name": "Oven Program",
         "icon": "mdi:stove",
     }
 
@@ -97,7 +97,7 @@ async def test_temp_sensor_heating(
     assert state.state == "143"
     assert state.attributes == {
         "device_class": "temperature",
-        "friendly_name": "Oven temperature",
+        "friendly_name": "Oven Temperature",
         "icon": "mdi:thermometer",
         "unit_of_measurement": "°C",
     }
