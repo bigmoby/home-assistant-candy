@@ -774,5 +774,48 @@
       "maintenance_limescale_due": "Promemoria pulizia anticalcare",
       "maintenance_filter_due": "Promemoria pulizia filtro"
     }
+  },
+  "issues": {
+    "dishwasher_full_control_required": {
+      "title": "I controlli della lavastoviglie richiedono la modalità Controllo Completo ({entry_title})",
+      "description": "In questa versione, le entità di controllo della lavastoviglie (avvio, arresto, programma, ritardo, eco, 3-in-1) richiedono la modalità Controllo Completo per scaricare da Simply-Fi il catalogo programmi e l'interfaccia hardware.\n\nSeleziona Correggi per accedere con Simply-Fi e ripristinare i controlli, oppure mantieni la modalità Solo Lettura rimuovendo le vecchie entità di controllo.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Modalità di controllo lavastoviglie",
+            "description": "Scegli come aggiornare {entry_title}.",
+            "menu_options": {
+              "switch_to_full_control": "Passa a Controllo Completo (accesso Simply-Fi)",
+              "keep_read_only": "Mantieni Solo Lettura (rimuovi vecchie entità di controllo)"
+            }
+          },
+          "switch_to_full_control": {
+            "title": "Account Simply-Fi",
+            "description": "Inserisci le tue credenziali Simply-Fi / hOn.\n\nLe credenziali vengono usate solo per scaricare i dati dell'elettrodomestico, poi vengono eliminate. L'elettrodomestico deve essere già registrato su Candy Simply-Fi.",
+            "data": {
+              "email": "Email",
+              "password": "Password"
+            }
+          },
+          "language": {
+            "title": "Lingua elettrodomestico",
+            "description": "Scegli la lingua per i nomi dei programmi e i messaggi dell'elettrodomestico.",
+            "data": {
+              "program_language": "Lingua"
+            }
+          },
+          "keep_read_only": {
+            "title": "Mantieni modalità Solo Lettura",
+            "description": "Questa operazione rimuoverà da Home Assistant le entità di controllo non disponibili e manterrà la lavastoviglie in modalità di solo monitoraggio.\n\nPotrai passare a Controllo Completo in qualsiasi momento dal menu Configura dell'integrazione."
+          }
+        },
+        "error": {
+          "cloud_auth": "Impossibile connettersi al cloud Simply-Fi. Controlla le credenziali e riprova."
+        },
+        "abort": {
+          "entry_not_found": "La voce di integrazione della lavastoviglie non è più presente."
+        }
+      }
+    }
   }
 }

@@ -467,6 +467,18 @@ UNIQUE_ID_DISHWASHER_MAINT_FULL_CHECKUP_BUTTON = (
     "{0}-dishwasher_maint_full_checkup_reset"
 )
 
+# Repair issue ID and legacy v1.7.0 dishwasher control entities that were created
+# without requiring Full Control mode.
+ISSUE_ID_DISHWASHER_FULL_CONTROL = "dishwasher_full_control_{0}"
+LEGACY_DISHWASHER_CONTROL_ENTITIES: tuple[tuple[str, str], ...] = (
+    ("button", UNIQUE_ID_DISHWASHER_START_BUTTON),
+    ("button", UNIQUE_ID_DISHWASHER_STOP_BUTTON),
+    ("select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT),
+    ("number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER),
+    ("switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH),
+    ("switch", UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH),
+)
+
 # Select option that keeps the program chosen on the machine panel
 DISHWASHER_PROGRAM_PANEL = "panel"
 # Select option -> program code used by the local API, in panel order.

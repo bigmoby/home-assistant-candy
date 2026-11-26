@@ -20,7 +20,7 @@ from homeassistant.components.persistent_notification import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -94,6 +94,8 @@ from .const import (
     DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
     DISHWASHER_MAINTENANCE_FILTER_THRESHOLD,
     DOMAIN,
+    ISSUE_ID_DISHWASHER_FULL_CONTROL,
+    LEGACY_DISHWASHER_CONTROL_ENTITIES,
     MAINTENANCE_FILTER_THRESHOLD,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MAINTENANCE_HARDNESS_THRESHOLDS,
@@ -870,6 +872,35 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     if needs_update:
         hass.config_entries.async_update_entry(config_entry, data=new_data)
 
+    # Notify users upgrading a dishwasher from <= 1.7.0 that control entities
+    # now require Full Control mode (Simply-Fi cloud metadata).
+    if isinstance(coordinator.data, DishwasherStatus) or new_data.get(
+        CONF_KEY_IS_DISHWASHER
+    ):
+        issue_id = ISSUE_ID_DISHWASHER_FULL_CONTROL.format(config_entry.entry_id)
+        if new_data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL:
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+        else:
+            entity_reg = er.async_get(hass)
+            has_legacy_controls = any(
+                entity_reg.async_get_entity_id(
+                    platform, DOMAIN, uid_template.format(config_entry.entry_id)
+                )
+                is not None
+                for platform, uid_template in LEGACY_DISHWASHER_CONTROL_ENTITIES
+            )
+            if has_legacy_controls:
+                ir.async_create_issue(
+                    hass,
+                    DOMAIN,
+                    issue_id,
+                    is_fixable=True,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="dishwasher_full_control_required",
+                    translation_placeholders={"entry_title": config_entry.title},
+                    data={"entry_id": config_entry.entry_id},
+                )
+
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     if isinstance(coordinator.data, WashingMachineStatus):
@@ -886,6 +917,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 stats_coord.async_set_updated_data(restored)
 
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Clean up any repair issues when a config entry is removed."""
+    ir.async_delete_issue(
+        hass,
+        DOMAIN,
+        ISSUE_ID_DISHWASHER_FULL_CONTROL.format(config_entry.entry_id),
+    )
 
 
 def _register_maintenance_notifications(

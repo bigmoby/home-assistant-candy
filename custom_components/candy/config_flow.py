@@ -31,7 +31,7 @@ from .client import (
     parse_wash_programs,
     supports_dishwasher_statistics,
 )
-from .client.cloud import SimplyFiCloudError, fetch_appliance_data
+from .client.cloud import CloudApplianceData, SimplyFiCloudError, fetch_appliance_data
 from .client.decryption import Encryption
 from .client.model import DishwasherStatus, TumbleDryerStatus, WashingMachineStatus
 from .const import (
@@ -322,6 +322,61 @@ def _get_local_subnet(hass_ip: str) -> str:
     """Return the /24 subnet string for the given IP (e.g. '192.168.1.1' → '192.168.1.0')."""
     parts = hass_ip.split(".")[:3]
     return ".".join(parts) + ".0"
+
+
+def apply_cloud_appliance_data(
+    current_data: dict[str, Any],
+    appliance: CloudApplianceData,
+    *,
+    is_washing_machine: bool,
+    is_tumble_dryer: bool,
+    is_dishwasher: bool,
+) -> dict[str, Any]:
+    """Merge Simply-Fi cloud appliance metadata into config entry data for Full Control."""
+    new_data = dict(current_data)
+    new_data[CONF_KEY_MODE] = MODE_FULL_CONTROL
+    if is_washing_machine:
+        new_data[CONF_KEY_IS_WASHING_MACHINE] = True
+    if is_tumble_dryer:
+        new_data[CONF_KEY_IS_TUMBLE_DRYER] = True
+    if is_dishwasher:
+        new_data[CONF_KEY_IS_DISHWASHER] = True
+    if CONF_KEY_USE_ENCRYPTION not in current_data and appliance.encryption_key:
+        new_data[CONF_KEY_USE_ENCRYPTION] = True
+        new_data[CONF_PASSWORD] = appliance.encryption_key
+    if appliance.mac_address:
+        new_data[CONF_KEY_MAC_ADDRESS] = appliance.mac_address
+    if appliance.appliance_model:
+        new_data[CONF_KEY_DEVICE_MODEL] = appliance.appliance_model
+    if appliance.serial_number:
+        new_data[CONF_KEY_SERIAL_NUMBER] = appliance.serial_number
+    if appliance.purchase_date:
+        new_data[CONF_KEY_PURCHASE_DATE] = appliance.purchase_date
+    new_data[CONF_KEY_PROGRAMS] = (
+        DEFAULT_DISHWASHER_PROGRAMS
+        if is_dishwasher and not appliance.programs
+        else appliance.programs
+    )
+    new_data[CONF_KEY_DOWNLOADABLE_PROGRAMS] = appliance.downloadable_programs
+    if appliance.interface_type:
+        new_data[CONF_KEY_INTERFACE_TYPE] = appliance.interface_type
+    if appliance.brand:
+        new_data[CONF_KEY_BRAND] = appliance.brand
+    if appliance.appliance_type:
+        new_data[CONF_KEY_APPLIANCE_TYPE] = appliance.appliance_type
+        if appliance.appliance_type == "washer_dryer":
+            new_data[CONF_KEY_IS_WASHER_DRYER] = True
+    elif appliance.programs:
+        try:
+            parsed = parse_wash_programs(appliance.programs)
+            if any(
+                p.program_type in ("D", "WD") or p.selector_position_dry is not None
+                for p in parsed
+            ):
+                new_data[CONF_KEY_IS_WASHER_DRYER] = True
+        except (KeyError, TypeError, ValueError):
+            pass
+    return new_data
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
@@ -894,52 +949,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 step_id="update_cloud_data", data_schema=CLOUD_SCHEMA, errors=errors
             )
 
-        new_data = dict(self.config_entry.data)
-        new_data[CONF_KEY_MODE] = MODE_FULL_CONTROL
-        if self._is_washing_machine():
-            new_data[CONF_KEY_IS_WASHING_MACHINE] = True
-        if self._is_tumble_dryer():
-            new_data[CONF_KEY_IS_TUMBLE_DRYER] = True
-        if self._is_dishwasher():
-            new_data[CONF_KEY_IS_DISHWASHER] = True
-            if not appliance.programs:
-                new_data[CONF_KEY_PROGRAMS] = DEFAULT_DISHWASHER_PROGRAMS
-        if (
-            CONF_KEY_USE_ENCRYPTION not in self.config_entry.data
-            and appliance.encryption_key
-        ):
-            new_data[CONF_KEY_USE_ENCRYPTION] = True
-            new_data[CONF_PASSWORD] = appliance.encryption_key
-        if appliance.mac_address:
-            new_data[CONF_KEY_MAC_ADDRESS] = appliance.mac_address
-        if appliance.appliance_model:
-            new_data[CONF_KEY_DEVICE_MODEL] = appliance.appliance_model
-        if appliance.serial_number:
-            new_data[CONF_KEY_SERIAL_NUMBER] = appliance.serial_number
-        if appliance.purchase_date:
-            new_data[CONF_KEY_PURCHASE_DATE] = appliance.purchase_date
-        new_data[CONF_KEY_PROGRAMS] = appliance.programs
-        new_data[CONF_KEY_DOWNLOADABLE_PROGRAMS] = appliance.downloadable_programs
-        if appliance.interface_type:
-            new_data[CONF_KEY_INTERFACE_TYPE] = appliance.interface_type
-        if appliance.brand:
-            new_data[CONF_KEY_BRAND] = appliance.brand
-        if appliance.appliance_type:
-            new_data[CONF_KEY_APPLIANCE_TYPE] = appliance.appliance_type
-            if appliance.appliance_type == "washer_dryer":
-                new_data[CONF_KEY_IS_WASHER_DRYER] = True
-        elif appliance.programs:
-            try:
-                parsed = parse_wash_programs(appliance.programs)
-                if any(
-                    p.program_type in ("D", "WD") or p.selector_position_dry is not None
-                    for p in parsed
-                ):
-                    new_data[CONF_KEY_IS_WASHER_DRYER] = True
-            except (KeyError, TypeError, ValueError):
-                pass
-
-        self._pending_data = new_data
+        self._pending_data = apply_cloud_appliance_data(
+            dict(self.config_entry.data),
+            appliance,
+            is_washing_machine=self._is_washing_machine(),
+            is_tumble_dryer=self._is_tumble_dryer(),
+            is_dishwasher=self._is_dishwasher(),
+        )
         return await self.async_step_language()
 
     async def async_step_language(
