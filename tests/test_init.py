@@ -97,6 +97,7 @@ from custom_components.candy.const import (
     UNIQUE_ID_DISHWASHER_TOTAL_CYCLES,
     UNIQUE_ID_OVEN,
     UNIQUE_ID_TUMBLE_DRYER,
+    UNIQUE_ID_WASH_DRY_TOTAL_CYCLES,
     UNIQUE_ID_WASH_TOTAL_CYCLES,
     UNIQUE_ID_WASHING_MACHINE,
     UNIQUE_ID_WINE_COOLER,
@@ -332,9 +333,51 @@ async def test_restore_last_known_statistics_from_state(hass: HomeAssistant):
     )
     hass.states.async_set(ent.entity_id, "42")
 
+    dry_ent = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(entry.entry_id),
+        config_entry=entry,
+    )
+    hass.states.async_set(
+        dry_ent.entity_id,
+        "25",
+        attributes={"cotton_cycles": 15, "synthetic_cycles": 10},
+    )
+
     result = _restore_last_known_statistics(hass, entry.entry_id, False)
     assert result is not None
     assert result.total_cycles == 42
+    assert result.total_drying_cycles == 25
+    assert result.drying_cotton_cycles == 15
+    assert result.drying_synthetic_cycles == 10
+
+    # Test only drying cycles (wash cycles is None)
+    entry_dry_only = MockConfigEntry(domain=DOMAIN, unique_id="test-restore-dry-only")
+    entry_dry_only.add_to_hass(hass)
+    dry_ent_only = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASH_DRY_TOTAL_CYCLES.format(entry_dry_only.entry_id),
+        config_entry=entry_dry_only,
+    )
+    hass.states.async_set(dry_ent_only.entity_id, "30")
+    res_dry = _restore_last_known_statistics(hass, entry_dry_only.entry_id, False)
+    assert res_dry is not None
+    assert res_dry.total_cycles == 0
+    assert res_dry.total_drying_cycles == 30
+
+    # Test non-digit state returns None
+    entry_invalid = MockConfigEntry(domain=DOMAIN, unique_id="test-restore-invalid")
+    entry_invalid.add_to_hass(hass)
+    ent_inv = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        UNIQUE_ID_WASH_TOTAL_CYCLES.format(entry_invalid.entry_id),
+        config_entry=entry_invalid,
+    )
+    hass.states.async_set(ent_inv.entity_id, "unknown")
+    assert _restore_last_known_statistics(hass, entry_invalid.entry_id, False) is None
 
     dw_ent = registry.async_get_or_create(
         "sensor",
@@ -2337,7 +2380,12 @@ async def test_full_checkup_completion_dualtech_reset_command(
     client.send_command = AsyncMock()
 
     stats_coordinator = MagicMock()
-    stats_coordinator.data = WashingMachineStatistics(total_cycles=60)
+    stats_coordinator.data = WashingMachineStatistics(
+        total_cycles=60,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
     stats_coordinator.async_request_refresh = AsyncMock()
 
     _register_full_checkup_listener(
@@ -2578,7 +2626,12 @@ async def test_full_checkup_listener_baseline_warning(
     client = MagicMock()
 
     stats_coordinator = MagicMock()
-    stats_coordinator.data = WashingMachineStatistics(total_cycles=50)
+    stats_coordinator.data = WashingMachineStatistics(
+        total_cycles=50,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
     stats_coordinator.async_request_refresh = AsyncMock()
 
     _register_full_checkup_listener(
@@ -2589,7 +2642,7 @@ async def test_full_checkup_listener_baseline_warning(
     listener_cb()
     await hass.async_block_till_done()
 
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 50
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 100
 
 
 async def test_full_checkup_completion_restores_from_storage_when_stats_none(
@@ -2869,7 +2922,12 @@ async def test_limescale_listener_lifecycle_and_baseline_warning(
     mock_coordinator.async_add_listener = _capture_listener
 
     stats_coordinator = MagicMock()
-    stats_coordinator.data = WashingMachineStatistics(total_cycles=40)
+    stats_coordinator.data = WashingMachineStatistics(
+        total_cycles=40,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
     stats_coordinator.async_request_refresh = AsyncMock()
 
     _register_limescale_listener(hass, entry, mock_coordinator, stats_coordinator)
@@ -2882,12 +2940,12 @@ async def test_limescale_listener_lifecycle_and_baseline_warning(
     mock_coordinator.data = None
     listener_cb()
 
-    # 2. Status finished updates baseline to 40
+    # 2. Status finished ignores baseline 40 (< current baseline 100)
     mock_coordinator.data = status_finished
     listener_cb()
     await hass.async_block_till_done()
 
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 40
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 100
 
     # 3. Transition to IDLE clears was_running_autoclean
     mock_coordinator.data = status_idle
@@ -3302,3 +3360,376 @@ async def test_client_interface_type_populated_on_setup(
 
     client = hass.data[DOMAIN][entry.entry_id]["client"]
     assert client.interface_type == "BRAVA_BI_DIGIT_OD"
+
+
+async def test_maintenance_notification_options_and_none_stats(
+    hass: HomeAssistant,
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-maint-options",
+        data={
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+            CONF_KEY_WATER_HARDNESS: 2,
+            CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED: False,
+            CONF_KEY_MAINTENANCE_FILTER_ENABLED: False,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    stats_coordinator = MagicMock()
+    stats_coordinator.data = None
+    listener_cb = None
+
+    def _capture(cb):
+        nonlocal listener_cb
+        listener_cb = cb
+        return MagicMock()
+
+    stats_coordinator.async_add_listener = _capture
+    _register_maintenance_notifications(hass, entry, stats_coordinator)
+    assert listener_cb is not None
+    # stats is None returns early
+    listener_cb()
+
+
+async def test_full_checkup_listener_branches_and_baseline_warning(
+    hass: HomeAssistant,
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-fc-branches",
+        data={
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 100,
+            CONF_KEY_INTERFACE_TYPE: "3D_DUAL",
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    status_running = WashingMachineStatus(
+        machine_state=MachineState.RUNNING,
+        program_state=WashProgramState.WASH,
+        program=1,
+        program_code=None,
+        temp=0,
+        spin_speed=0,
+        remaining_minutes=2,
+        remote_control=False,
+        fill_percent=None,
+        error=0,
+        delay_value=0,
+        ntc_water=None,
+        ntc_drum=None,
+        motor_speed_freq=None,
+        motor_state=None,
+        unbalance_fault=None,
+        unbalance_count=None,
+        fault_count=None,
+        dis_test_res=None,
+        checkup_state=CheckUpState.RUNNING,
+        soil_level=None,
+        recipe_id=None,
+        dry_target=None,
+        detergent_on=None,
+        softener_on=None,
+        detergent_empty=None,
+        softener_empty=None,
+        detergent_reserve=None,
+        softener_reserve=None,
+        detergent_cycles_remaining=None,
+        softener_cycles_remaining=None,
+        water_hardness=None,
+        extra_dose_active=None,
+    )
+    status_completed = copy.copy(status_running)
+    status_completed.checkup_state = CheckUpState.COMPLETED
+
+    mock_coordinator = MagicMock()
+    mock_coordinator.data = status_running
+    listener_cb = None
+
+    def _capture_listener(cb):
+        nonlocal listener_cb
+        listener_cb = cb
+        return MagicMock()
+
+    mock_coordinator.async_add_listener = _capture_listener
+    client = MagicMock()
+
+    # 1. needs_reset=False (remote_control=False) and stats_coordinator=None (835->exit)
+    _register_full_checkup_listener(hass, entry, mock_coordinator, None, client)
+    mock_coordinator.data = status_completed
+    listener_cb()
+    await hass.async_block_till_done()
+
+    # 2. needs_reset=True (remote_control=True) and stats_coordinator=None (857->exit)
+    status_rc = copy.copy(status_completed)
+    status_rc.remote_control = True
+    client.send_command = AsyncMock()
+    mock_coordinator.data = status_running
+    _register_full_checkup_listener(hass, entry, mock_coordinator, None, client)
+    mock_coordinator.data = status_rc
+    with patch("custom_components.candy.asyncio.sleep", new_callable=AsyncMock):
+        listener_cb()
+        await hass.async_block_till_done()
+    client.send_command.assert_awaited_once_with("Write=1&StSt=0&PrNm=2")
+
+    # 3. total (50) < current_baseline (100) logs warning (line 884)
+    stats_coord = MagicMock()
+    stats_coord.data = WashingMachineStatistics(50, 0, 0, 0)
+    stats_coord.async_request_refresh = AsyncMock()
+    mock_coordinator.data = status_running
+    _register_full_checkup_listener(hass, entry, mock_coordinator, stats_coord, client)
+    mock_coordinator.data = status_completed
+    with patch("custom_components.candy._LOGGER.warning") as mock_warn:
+        listener_cb()
+        await hass.async_block_till_done()
+    assert any(
+        "Ignoring cycle count %s lower than current baseline %s" in call[0][0]
+        for call in mock_warn.call_args_list
+    )
+
+
+async def test_limescale_listener_branches_and_baseline_warning(
+    hass: HomeAssistant,
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="test-limescale-branches",
+        data={
+            CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED: True,
+            CONF_KEY_MAINTENANCE_LAST_LIMESCALE: 100,
+            CONF_KEY_PROGRAMS: [
+                {
+                    "program": {
+                        "position": 1,
+                        "name": "AutoClean",
+                        "command_parameters": [
+                            {
+                                "command_parameter": {
+                                    "name": "selector_position",
+                                    "validation": "15",
+                                }
+                            }
+                        ],
+                    }
+                }
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    status_running = WashingMachineStatus(
+        machine_state=MachineState.RUNNING,
+        program_state=WashProgramState.WASH,
+        program=15,
+        program_code=None,
+        temp=60,
+        spin_speed=1000,
+        remaining_minutes=45,
+        remote_control=False,
+        fill_percent=None,
+        error=0,
+        delay_value=0,
+        ntc_water=None,
+        ntc_drum=None,
+        motor_speed_freq=None,
+        motor_state=None,
+        unbalance_fault=None,
+        unbalance_count=None,
+        fault_count=None,
+        dis_test_res=None,
+        checkup_state=None,
+        soil_level=None,
+        recipe_id=None,
+        dry_target=None,
+        detergent_on=None,
+        softener_on=None,
+        detergent_empty=None,
+        softener_empty=None,
+        detergent_reserve=None,
+        softener_reserve=None,
+        detergent_cycles_remaining=None,
+        softener_cycles_remaining=None,
+        water_hardness=None,
+        extra_dose_active=None,
+    )
+    status_finished = copy.copy(status_running)
+    status_finished.machine_state = MachineState.FINISHED1
+
+    mock_coordinator = MagicMock()
+    mock_coordinator.data = status_running
+    listener_cb = None
+
+    def _capture_listener(cb):
+        nonlocal listener_cb
+        listener_cb = cb
+        return MagicMock()
+
+    mock_coordinator.async_add_listener = _capture_listener
+
+    # 1. stats_coordinator is None (961->exit)
+    _register_limescale_listener(hass, entry, mock_coordinator, None)
+    mock_coordinator.data = status_finished
+    listener_cb()
+    await hass.async_block_till_done()
+
+    # 2. stats_coordinator.data is None and no restored total (970->973)
+    stats_coord = MagicMock()
+    stats_coord.data = None
+    stats_coord.async_request_refresh = AsyncMock()
+    mock_coordinator.data = status_running
+    _register_limescale_listener(hass, entry, mock_coordinator, stats_coord)
+    mock_coordinator.data = status_finished
+    listener_cb()
+    await hass.async_block_till_done()
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 100
+
+    # 3. total (40) < current_baseline (100) logs warning (lines 987-988)
+    stats_coord.data = WashingMachineStatistics(40, 0, 0, 0)
+    mock_coordinator.data = status_running
+    _register_limescale_listener(hass, entry, mock_coordinator, stats_coord)
+    mock_coordinator.data = status_finished
+    with patch("custom_components.candy._LOGGER.warning") as mock_warn:
+        listener_cb()
+        await hass.async_block_till_done()
+    assert any(
+        "Ignoring cycle count %s lower than current baseline %s" in call[0][0]
+        for call in mock_warn.call_args_list
+    )
+
+
+_STATUS_OFF = _STATUS_IDLE.replace('"MachMd": "1"', '"MachMd": "0"')
+
+
+async def test_update_statistics_transient_reading_with_baseline(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Verify update_statistics handles transient low readings against stored baselines."""
+    # Case 1: last_known_statistics is None initially, but stats_coordinator.data has 100 cycles.
+    # Reading returns 50 cycles < baseline 80. Returns cached 100 cycles with warning.
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 80,
+        },
+    )
+    entry.add_to_hass(hass)
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json?encrypted=0", text=_STATUS_OFF)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    main_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    main_coordinator.data.machine_state = MachineState.RUNNING
+
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
+    stats_coordinator.async_set_updated_data(
+        WashingMachineStatistics(
+            total_cycles=100,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        )
+    )
+
+    with patch(
+        "custom_components.candy.client.CandyClient.statistics_with_retry",
+        AsyncMock(
+            return_value=WashingMachineStatistics(
+                total_cycles=50,
+                total_drying_cycles=0,
+                drying_cotton_cycles=0,
+                drying_synthetic_cycles=0,
+            )
+        ),
+    ):
+        await stats_coordinator.async_request_refresh()
+        await hass.async_block_till_done()
+
+    assert stats_coordinator.data.total_cycles == 100
+    assert stats_coordinator.last_update_success is True
+
+    # Machine OFF with cached statistics returns cached value immediately (lines 504-505)
+    main_coordinator.data.machine_state = MachineState.OFF
+    await stats_coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert stats_coordinator.data.total_cycles == 100
+
+    # Case 2: stats_coordinator.data is None, last_known is None, reading 50 < baseline 80.
+    # Raises UpdateFailed and marks update failed.
+    entry2 = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP: 80,
+        },
+    )
+    entry2.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry2.entry_id)
+    await hass.async_block_till_done()
+
+    main_coordinator2 = hass.data[DOMAIN][entry2.entry_id][DATA_KEY_COORDINATOR]
+    main_coordinator2.data.machine_state = MachineState.RUNNING
+
+    stats_coordinator2 = hass.data[DOMAIN][entry2.entry_id][DATA_KEY_STATS_COORDINATOR]
+    assert stats_coordinator2.data is None
+
+    with (
+        patch(
+            "custom_components.candy.client.CandyClient.statistics_with_retry",
+            AsyncMock(
+                return_value=WashingMachineStatistics(
+                    total_cycles=50,
+                    total_drying_cycles=0,
+                    drying_cotton_cycles=0,
+                    drying_synthetic_cycles=0,
+                )
+            ),
+        ),
+        pytest.raises(UpdateFailed, match="ignoring transient reading"),
+    ):
+        await stats_coordinator2._async_update_data()
+
+    # Case 3: stats.total_cycles == 0, max_baseline == 0, last_known is None.
+    # Lines 540-558 accepts 0 cycles without baseline error.
+    entry3 = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+        },
+    )
+    entry3.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry3.entry_id)
+    await hass.async_block_till_done()
+
+    main_coordinator3 = hass.data[DOMAIN][entry3.entry_id][DATA_KEY_COORDINATOR]
+    main_coordinator3.data.machine_state = MachineState.RUNNING
+
+    stats_coordinator3 = hass.data[DOMAIN][entry3.entry_id][DATA_KEY_STATS_COORDINATOR]
+    assert stats_coordinator3.data is None
+
+    with patch(
+        "custom_components.candy.client.CandyClient.statistics_with_retry",
+        AsyncMock(
+            return_value=WashingMachineStatistics(
+                total_cycles=0,
+                total_drying_cycles=0,
+                drying_cotton_cycles=0,
+                drying_synthetic_cycles=0,
+            )
+        ),
+    ):
+        await stats_coordinator3.async_request_refresh()
+        await hass.async_block_till_done()
+
+    assert stats_coordinator3.data.total_cycles == 0
+    assert stats_coordinator3.last_update_success is True

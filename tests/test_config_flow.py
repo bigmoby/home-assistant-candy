@@ -133,7 +133,12 @@ def _statistics_probe():
     with patch(
         "custom_components.candy.config_flow.CandyClient.statistics_with_retry",
         new_callable=AsyncMock,
-        return_value=WashingMachineStatistics(total_cycles=388),
+        return_value=WashingMachineStatistics(
+            total_cycles=388,
+            total_drying_cycles=0,
+            drying_cotton_cycles=0,
+            drying_synthetic_cycles=0,
+        ),
     ):
         yield
 
@@ -1246,7 +1251,7 @@ async def test_options_flow_maintenance_settings(
     assert result["step_id"] == "maintenance_baselines"
 
     # stats coordinator not available in this test (setup bypassed) → total_cycles=0
-    # last_reset = max(0, 0 - (threshold - remaining)) = 0 for any positive remaining
+    # last_reset = total - (threshold - remaining) preserves virtual historical baseline
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={
@@ -1259,9 +1264,9 @@ async def test_options_flow_maintenance_settings(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     updated = hass.config_entries.async_get_entry(entry.entry_id)
     assert updated.data[CONF_KEY_WATER_HARDNESS] == 5
-    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 0
-    assert updated.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == 0
-    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == 0
+    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == -50
+    assert updated.data[CONF_KEY_MAINTENANCE_LAST_LIMESCALE] == -45
+    assert updated.data[CONF_KEY_MAINTENANCE_LAST_FILTER] == -40
 
 
 async def test_options_flow_maintenance_settings_disable(
@@ -2158,8 +2163,9 @@ async def test_full_control_dualtech_skips_counter_types_when_maintenance_enable
 
 def test_remaining_to_last_reset_and_current_remaining_cycles(hass):
     """Test helper functions in config_flow."""
-    # 1. total == 0 returns 0 (line 164)
-    assert _remaining_to_last_reset(50, 0, 100) == 0
+    # 1. total == 0 calculates virtual baseline properly
+    assert _remaining_to_last_reset(50, 0, 100) == -50
+    assert _remaining_to_last_reset(100, 0, 100) == 0
 
     # 2. total > 0 calculates properly, including negative values
     assert _remaining_to_last_reset(80, 10, 100) == -10
@@ -2305,7 +2311,12 @@ async def test_options_flow_maintenance_baselines_with_stats_data_and_checkup(ha
 
     # Provide stats coordinator data with total_cycles > 0 (line 426)
     mock_stats_coord = MagicMock()
-    mock_stats_coord.data = WashingMachineStatistics(total_cycles=150)
+    mock_stats_coord.data = WashingMachineStatistics(
+        total_cycles=150,
+        total_drying_cycles=0,
+        drying_cotton_cycles=0,
+        drying_synthetic_cycles=0,
+    )
     hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})[
         DATA_KEY_STATS_COORDINATOR
     ] = mock_stats_coord
@@ -2974,7 +2985,7 @@ async def test_modern_dishwasher_config_flow_settings_pacing(hass):
             }
         )
         assert res["step_id"] == "maintenance"
-        assert mock_client.interface_type == "BRAVA_BI_DIGIT_OD"
+        assert mock_client_cls.call_args.kwargs["interface_type"] == "BRAVA_BI_DIGIT_OD"
         mock_client.set_dishwasher_water_hardness.assert_awaited_once_with(4)
         mock_client.set_dishwasher_buzzer.assert_awaited_once_with(True)
         mock_client.set_dishwasher_remember_last_cycle.assert_awaited_once_with(True)

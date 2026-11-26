@@ -310,6 +310,9 @@
       "wash_total_cycles": {
         "name": "Total wash cycles"
       },
+      "wash_dry_total_cycles": {
+        "name": "Total drying cycles"
+      },
       "wash_maint_full_checkup": {
         "name": "Check-up maintenance remaining cycles"
       },

@@ -73,7 +73,7 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 | Hoover AXI / H-WASH 700 | Washing Machine / Washer-Dryer | `red_devil_axi*`, `hwash700` | Yes | Reference hardware (`AWMPD 410LH8/1-S` and `AWDPD4138LHR/1`). |
 | Candy & Hoover DualTech / One-Fi | Washing Machine / Washer-Dryer | `3D_DUAL`, `4D_DUAL`, `DUALTECH` | Yes | Tested on `3D_DUAL` hardware (`HBDOS 695TAME-80`). Remote pause is unsupported by hardware. |
 | Candy Bianca | Washing Machine / Washer-Dryer | `BIANCA`, `BWD` series | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by hardware. |
-| Candy Smart Pro / Hoover H-WASH 300 / X-Care | Washing Machine | `SMARTPRO`, `HWASH300`, `XCARE` | No | Implemented from protocol specifications. |
+| Candy Smart Pro / Hoover H-WASH 300 / X-Care | Washing Machine | `SMARTPRO`, `HWASH300`, `XCARE` | No | Implemented from protocol specifications. Uses `GetStat=1` for cycle statistics. |
 
 #### Tumble Dryers
 

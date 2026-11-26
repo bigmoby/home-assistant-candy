@@ -233,3 +233,53 @@ def test_run_stats_dishwasher_counter_summary() -> None:
     captured = stdout_buf.getvalue()
     assert "Dishwasher Program Cycles: 15 total (Program buckets: s1..s21)" in captured
     assert "Temperature Buckets: 15 total" in captured
+
+
+def test_fetch_new_statistics_json() -> None:
+    """Test fetch_new_statistics_json parses valid statusCounters payload."""
+    with patch(
+        "simplyfi.send_write_command_payload",
+        return_value='{"statusCounters": {"Program1": "10"}}',
+    ):
+        result = simplyfi.fetch_new_statistics_json("192.168.1.50", 80, "key", True, 5)
+        assert result == {"statusCounters": {"Program1": "10"}}
+
+
+def test_fetch_new_statistics_json_encrypted_hex() -> None:
+    """Test fetch_new_statistics_json decrypts hex-encoded XOR ciphertext."""
+    plaintext = '{"statusCounters": {"Program1": "25", "Temp0to30": "10"}}'
+    key = "testkey12345678"
+    hex_ciphertext = simplyfi.xor_encrypt_string(plaintext, key)
+
+    with patch(
+        "simplyfi.send_write_command_payload",
+        return_value=hex_ciphertext,
+    ):
+        result = simplyfi.fetch_new_statistics_json("192.168.1.50", 80, key, True, 5)
+        assert result == {"statusCounters": {"Program1": "25", "Temp0to30": "10"}}
+
+
+def test_run_stats_falls_back_to_getstat() -> None:
+    """Test run_stats probes GetStat=1 when legacy handshake fails."""
+    stdout_buf = io.StringIO()
+    with (
+        patch(
+            "simplyfi.fetch_or_discover_telemetry",
+            return_value=({"statusLavatrice": {}}, "key", True),
+        ),
+        patch("time.sleep"),
+        patch(
+            "simplyfi.fetch_statistics_json",
+            side_effect=simplyfi.CandyProtocolError("Legacy disconnected"),
+        ),
+        patch(
+            "simplyfi.fetch_new_statistics_json",
+            return_value={"statusCounters": {"Program1": "15"}},
+        ),
+        contextlib.redirect_stdout(stdout_buf),
+    ):
+        simplyfi.run_stats("192.168.1.50", 80, "key", 5)
+
+    captured = stdout_buf.getvalue()
+    assert "Legacy statistics handshake failed" in captured
+    assert "Protocol: Modern Write (GetStat=1)" in captured

@@ -325,6 +325,9 @@
       "wash_total_cycles": {
         "name": "Cicli totali"
       },
+      "wash_dry_total_cycles": {
+        "name": "Cicli di asciugatura totali"
+      },
       "washer_dryer": {
         "name": "Lavasciuga"
       }

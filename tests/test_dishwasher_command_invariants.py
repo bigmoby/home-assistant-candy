@@ -235,8 +235,8 @@ async def test_water_hardness_routing_and_bounds_validation(
         device_ip=TEST_IP,
         encryption_key="",
         use_encryption=False,
+        interface_type="BRAVA_BI_DIGIT_OD",
     )
-    client.interface_type = "BRAVA_BI_DIGIT_OD"
 
     # Range validation
     with pytest.raises(ValueError, match="Invalid dishwasher water hardness: -1"):

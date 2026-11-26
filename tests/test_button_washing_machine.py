@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_fixture
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
@@ -16,9 +17,11 @@ from custom_components.candy.const import (
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
     CONF_KEY_MODE,
     CONF_KEY_WATER_HARDNESS,
+    DATA_KEY_COORDINATOR,
     DATA_KEY_STATS_COORDINATOR,
     MAINTENANCE_FULL_CHECKUP_THRESHOLD,
     MODE_FULL_CONTROL,
+    UNIQUE_ID_WASH_TOTAL_CYCLES,
 )
 
 from .common import TEST_IP
@@ -249,13 +252,13 @@ async def test_reset_idempotent_when_already_at_max(
     ).state == str(MAINTENANCE_FULL_CHECKUP_THRESHOLD)
 
 
-async def test_reset_when_stats_coordinator_data_unavailable(
+async def test_reset_when_stats_coordinator_data_unavailable_uses_restored_stats(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    """When stats data is None at press time, reset stores 0 in config entry."""
+    """When stats data is None at press time, reset recovers baseline from restored sensor."""
     entry = await _init(hass, aioclient_mock, _MAINTENANCE_CONFIG)
 
-    # Force stats coordinator data to None
+    # Force stats coordinator data to None (e.g. appliance is off)
     stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
     stats_coordinator.data = None
 
@@ -267,8 +270,8 @@ async def test_reset_when_stats_coordinator_data_unavailable(
     )
     await hass.async_block_till_done()
 
-    # last_reset stored as 0 (total unknown)
-    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 0
+    # Baseline is set to 388 (recovered total cycles from sensor state), not corrupted to 0
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 388
     # sensor returns unknown because coordinator.data is None and no restored value
     assert (
         hass.states.get(
@@ -276,3 +279,53 @@ async def test_reset_when_stats_coordinator_data_unavailable(
         ).state
         == "unknown"
     )
+
+
+async def test_reset_when_stats_and_sensor_unavailable_preserves_baseline(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """When both stats data and total cycles sensor are unavailable, existing baseline is preserved."""
+    entry = await _init(hass, aioclient_mock, _MAINTENANCE_CONFIG)
+
+    # Force stats coordinator data to None
+    stats_coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_STATS_COORDINATOR]
+    stats_coordinator.data = None
+
+    # Clear sensor state to simulate no prior recorded total cycles
+    total_sensor_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, UNIQUE_ID_WASH_TOTAL_CYCLES.format(entry.entry_id)
+    )
+    assert total_sensor_id is not None
+    hass.states.async_set(total_sensor_id, "unknown")
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": _FULL_CHECKUP_BTN},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    # Baseline is preserved at previous value (348), avoiding corruption to 0
+    assert entry.data[CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP] == 348
+
+
+async def test_reset_button_available_when_offline(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    """Reset buttons must remain available even when the main coordinator is offline."""
+    entry = await _init(hass, aioclient_mock, _MAINTENANCE_CONFIG)
+
+    btn_state = hass.states.get(_FULL_CHECKUP_BTN)
+    assert btn_state is not None
+    assert btn_state.state != "unavailable"
+
+    # Simulate main coordinator reporting update failure
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    coordinator.last_update_success = False
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+
+    btn_state = hass.states.get(_FULL_CHECKUP_BTN)
+    assert btn_state is not None
+    assert btn_state.state != "unavailable"

@@ -1114,12 +1114,35 @@ def load_downloadable_programs(cloud_raw: list[dict]) -> list[DownloadableProgra
     return result
 
 
+_COTTON_DRY_KEYS = (
+    "DryCotton30",
+    "DryCotton60",
+    "DryCotton90",
+    "DryCotton120",
+    "DryCottonExtra",
+    "DryCottonPA",
+    "DryCottonPS",
+)
+_SYNTHETIC_DRY_KEYS = (
+    "DrySynt30",
+    "DrySynt60",
+    "DrySynt90",
+    "DrySynt120",
+    "DrySyntExtra",
+    "DrySyntPA",
+    "DrySyntPS",
+)
+
+
 @dataclass
 class WashingMachineStatistics:
     total_cycles: int
+    total_drying_cycles: int
+    drying_cotton_cycles: int
+    drying_synthetic_cycles: int
 
     @classmethod
-    def from_json(cls, json):
+    def from_json(cls, json: dict[str, Any]) -> WashingMachineStatistics:
         # Program1..21 are 8-bit device counters that wrap at 256, which would
         # periodically collapse total_cycles by 256. Temp0to30/Temp40/Temp60to90
         # are wider counters tracking the same events (confirmed equal to the
@@ -1131,7 +1154,18 @@ class WashingMachineStatistics:
             for k, v in json.items()
             if k in ("Temp0to30", "Temp40", "Temp60to90") and v.isdigit()
         )
-        return cls(total_cycles=total)
+        cotton_dry = sum(
+            int(v) for k, v in json.items() if k in _COTTON_DRY_KEYS and v.isdigit()
+        )
+        synthetic_dry = sum(
+            int(v) for k, v in json.items() if k in _SYNTHETIC_DRY_KEYS and v.isdigit()
+        )
+        return cls(
+            total_cycles=total,
+            total_drying_cycles=cotton_dry + synthetic_dry,
+            drying_cotton_cycles=cotton_dry,
+            drying_synthetic_cycles=synthetic_dry,
+        )
 
 
 @dataclass
