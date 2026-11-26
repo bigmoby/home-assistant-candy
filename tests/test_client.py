@@ -928,3 +928,31 @@ async def test_fetch_all_endpoints_statistics_with_settling_delay(hass, aioclien
         assert endpoints["http-getStatistics.json"] == stats_payload
         assert mock_sleep.call_count == 1
         mock_sleep.assert_called_once_with(15.0)
+
+
+async def test_fetch_statistics_empty_counters_on_dishwasher_without_interface_type(
+    hass, aioclient_mock
+):
+    """Verify fetch_statistics returns DishwasherStatistics when status() identified a dishwasher."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json",
+        json={"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json={"statusCounters": {}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+    )
+    await client.status()
+    with patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 0):
+        stats = await client.fetch_statistics()
+    assert isinstance(stats, DishwasherStatistics)
+    assert stats.total_cycles == 0

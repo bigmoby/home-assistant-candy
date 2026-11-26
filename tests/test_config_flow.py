@@ -3852,3 +3852,40 @@ async def test_config_flow_cloud_step_washing_machine_with_encryption_and_malfor
             user_input={"email": "user@example.com", "password": "pass"},
         )
         assert result["step_id"] == "language"
+
+
+async def test_axi_bi_led_dishwasher_skips_maintenance_in_onboarding_and_options(
+    hass,
+) -> None:
+    """Verify AXI_BI_LED skips maintenance in Full Control onboarding and OptionsFlow."""
+    flow = ConfigFlow()
+    flow.hass = hass
+    flow._ip_address = "192.168.0.88"
+    flow._is_dishwasher = True
+    flow._config_data = {
+        CONF_IP_ADDRESS: "192.168.0.88",
+        CONF_KEY_MODE: MODE_FULL_CONTROL,
+        CONF_KEY_IS_DISHWASHER: True,
+        CONF_KEY_INTERFACE_TYPE: "AXI_BI_LED",
+    }
+
+    res = await flow.async_step_dishwasher_settings(
+        user_input={
+            CONF_KEY_WATER_HARDNESS: "2",
+            CONF_KEY_DISHWASHER_BUZZER: True,
+            CONF_KEY_DISHWASHER_REMEMBER_LAST_CYCLE: True,
+        }
+    )
+    assert res["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=flow._config_data,
+        entry_id="axi_bi_led_opts_test",
+    )
+    entry.add_to_hass(hass)
+    opts_res = await hass.config_entries.options.async_init(entry.entry_id)
+    assert opts_res["type"] == data_entry_flow.FlowResultType.FORM
+    selector_opts = opts_res["data_schema"].schema["next_step"].config["options"]
+    assert "dishwasher_settings" in selector_opts
+    assert "maintenance_settings" not in selector_opts

@@ -181,6 +181,7 @@ def _make_off_status(
         off_status = copy.copy(last_status)
         off_status.machine_state = MachineState.OFF
         off_status.remaining_minutes = 0
+        off_status.remote_control = False
     elif isinstance(last_status, OvenStatus):
         off_status = copy.copy(last_status)
         off_status.machine_state = OvenState.IDLE

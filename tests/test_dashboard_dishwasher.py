@@ -419,3 +419,22 @@ async def test_dishwasher_maintenance_card_outputs(hass: HomeAssistant) -> None:
     assert "Filter Due" in rendered
     assert tmpl_badge_icon.async_render().strip() == "mdi:alert-circle"
     assert tmpl_badge_color.async_render().strip() == "red"
+
+
+def test_dishwasher_dashboard_start_stop_check_button_availability() -> None:
+    """Verify Start and Stop conditional cards check button availability."""
+    parsed = yaml.safe_load(DASHBOARD_FILE.read_text(encoding="utf-8"))
+    controls_card = parsed["cards"][5]
+    cards = controls_card["card"]["cards"]
+    start_conds = cards[0]["conditions"]
+    stop_conds = cards[3]["conditions"]
+    assert {
+        "condition": "state",
+        "entity": "button.<machine_name>_start",
+        "state_not": "unavailable",
+    } in start_conds
+    assert {
+        "condition": "state",
+        "entity": "button.<machine_name>_stop",
+        "state_not": "unavailable",
+    } in stop_conds

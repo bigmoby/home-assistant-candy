@@ -14,7 +14,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_fixture
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.candy import DOMAIN
+from custom_components.candy import DOMAIN, _make_off_status
 from custom_components.candy.button import DishwasherMaintResetButton
 from custom_components.candy.client import (
     LegacyTouchDishwasherCommandBuilder,
@@ -855,3 +855,40 @@ async def test_dishwasher_start_wash_button_status_program_parse_fallback(
 
     assert "Program=P5" in qs
     assert "w1=5" in qs
+
+
+async def test_dishwasher_buttons_unavailable_when_off(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify start, check-up, and remote control become unavailable/off when _make_off_status runs."""
+    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    coord = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+
+    start_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON)
+    checkup_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
+    assert hass.states.get(start_id).state != "unavailable"
+    assert hass.states.get(checkup_id).state != "unavailable"
+
+    off_status = _make_off_status(coord.data)
+    coord.async_set_updated_data(off_status)
+    await hass.async_block_till_done()
+
+    assert off_status.remote_control is False
+    assert hass.states.get(start_id).state == "unavailable"
+    assert hass.states.get(checkup_id).state == "unavailable"
+
+
+async def test_dishwasher_checkup_button_unavailable_when_door_open(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify check-up button is unavailable when the dishwasher door is open."""
+    entry = await init_integration(hass, aioclient_mock, _fixture(_READY, OpenDoor="1"))
+    checkup_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
+    assert hass.states.get(checkup_id).state == "unavailable"
+
+
+def test_dishwasher_status_missing_open_door_and_eco_default_false() -> None:
+    """Verify missing OpenDoor or Eco keys default to False instead of True."""
+    status = DishwasherStatus.from_json({"StatoDWash": "2"})
+    assert status.door_open is False
+    assert status.eco_mode is False

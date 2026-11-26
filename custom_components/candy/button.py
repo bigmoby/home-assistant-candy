@@ -1507,6 +1507,7 @@ class CandyDishwasherButtonBase(CoordinatorEntity, ButtonEntity):
             and self.hass.data[DOMAIN][self.config_id].get(DATA_KEY_WRITE_PENDING, 0)
             == 0
             and remote_control_enabled(self.coordinator.data)
+            and self.status.machine_state != MachineState.OFF
         )
 
     async def _send_command_and_refresh(self, query_string: str) -> None:
@@ -1787,7 +1788,9 @@ class CandyDishwasherCheckUpButton(CandyDishwasherButtonBase):
 
     @property
     def available(self) -> bool:
-        return super().available and not self.status.running
+        return (
+            super().available and not self.status.running and not self.status.door_open
+        )
 
     async def async_press(self) -> None:
         builder = get_dishwasher_command_builder(

@@ -29,6 +29,7 @@ from .client import (
     discover_devices,
     is_legacy_dishwasher,
     parse_wash_programs,
+    supports_dishwasher_statistics,
 )
 from .client.cloud import SimplyFiCloudError, fetch_appliance_data
 from .client.decryption import Encryption
@@ -424,7 +425,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             interface_type = self.config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
             if is_dishwasher and not is_legacy_dishwasher(interface_type):
                 options.append("dishwasher_settings")
-                options.append("maintenance_settings")
+                if supports_dishwasher_statistics(interface_type):
+                    options.append("maintenance_settings")
             elif is_washing_machine:
                 options.append("maintenance_settings")
             if supports_scheduled_checkup(interface_type, is_dryer):
@@ -1489,7 +1491,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                     err,
                 )
 
-        return await self.async_step_maintenance()
+        interface_type = self._config_data.get(CONF_KEY_INTERFACE_TYPE, "")
+        if supports_dishwasher_statistics(interface_type):
+            return await self.async_step_maintenance()
+        return self.async_create_entry(
+            title=CONF_INTEGRATION_TITLE, data=self._config_data
+        )
 
     async def async_step_maintenance(
         self, user_input: dict[str, Any] | None = None

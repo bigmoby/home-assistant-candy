@@ -144,6 +144,7 @@ class CandyClient:
         self.encryption_key = encryption_key
         self.use_encryption = use_encryption
         self.interface_type: str = ""
+        self.is_dishwasher: bool = False
         self._lock = asyncio.Lock()
 
     @backoff.on_exception(
@@ -298,6 +299,7 @@ class CandyClient:
         elif "statusForno" in resp_json:
             status = OvenStatus.from_json(resp_json["statusForno"])
         elif "statusDWash" in resp_json:
+            self.is_dishwasher = True
             status = DishwasherStatus.from_json(resp_json["statusDWash"])
         elif "statusWCool" in resp_json:
             status = WineCoolerStatus.from_json(resp_json["statusWCool"])
@@ -397,8 +399,10 @@ class CandyClient:
             )
 
         counters = resp_json["statusCounters"]
-        if is_modern_dishwasher(self.interface_type) or any(
-            k.startswith("s") and k[1:].isdigit() for k in counters
+        if (
+            self.is_dishwasher
+            or is_modern_dishwasher(self.interface_type)
+            or any(k.startswith("s") and k[1:].isdigit() for k in counters)
         ):
             return DishwasherStatistics.from_json(counters)
         return WashingMachineStatistics.from_json(counters)

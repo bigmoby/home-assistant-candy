@@ -389,7 +389,7 @@ cards:
     card:
       type: horizontal-stack
       cards:
-        # Start button (shown when idle / stopped / delay active)
+        # Start button (shown when idle / stopped)
         - type: conditional
           conditions:
             - condition: state
@@ -406,6 +406,9 @@ cards:
                 - Sending command
                 - sending command
                 - sending_command
+            - condition: state
+              entity: button.<machine_name>_start
+              state_not: unavailable
           card:
             type: custom:mushroom-template-card
             primary: Start
@@ -476,6 +479,9 @@ cards:
                 - Sending command
                 - sending command
                 - sending_command
+            - condition: state
+              entity: button.<machine_name>_stop
+              state_not: unavailable
           card:
             type: custom:mushroom-template-card
             primary: Stop

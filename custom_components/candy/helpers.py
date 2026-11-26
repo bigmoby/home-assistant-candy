@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 
-from .client import is_legacy_dishwasher, parse_wash_programs
+from .client import is_legacy_dishwasher, is_modern_dishwasher, parse_wash_programs
 from .client.dryer_commands import is_dualtech_dryer_interface
 from .client.model import (
     _PROGRAM_NAMES,
@@ -83,16 +83,6 @@ def is_dualtech(interface_type: str | None) -> bool:
 def is_dualtech_dryer(interface_type: str | None) -> bool:
     """Return True if the interface_type belongs to a DualTech tumble dryer."""
     return is_dualtech_dryer_interface(interface_type)
-
-
-def is_modern_dishwasher(interface_type: str | None) -> bool:
-    """Return True if the interface_type belongs to Family 2 (Brava) or Family 3 (AXI)."""
-    if not interface_type or is_legacy_dishwasher(interface_type):
-        return False
-    up = interface_type.upper()
-    if "_AD" in up or "RED_DEVIL" in up:
-        return False
-    return any(term in up for term in ("BRAVA", "DW_WIFI", "AXI", "SMOOTH"))
 
 
 def is_dishwasher_digit_or_smooth_interface(interface_type: str | None) -> bool:
