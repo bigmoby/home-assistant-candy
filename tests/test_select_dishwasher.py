@@ -14,10 +14,12 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from custom_components.candy import DOMAIN
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
     DISHWASHER_PROGRAMS,
+    MODE_FULL_CONTROL,
     UNIQUE_ID_DISHWASHER_PROGRAM_SELECT,
 )
 from custom_components.candy.select import CandyDishwasherProgramSelect
@@ -48,7 +50,12 @@ async def test_select_fallback_options_when_no_catalog(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """When no catalog programs are provided in config, fallback to DISHWASHER_PROGRAMS."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
 
     state = hass.states.get(select_id)
@@ -68,6 +75,7 @@ async def test_select_with_authentic_catalog_programs_english(
         aioclient_mock,
         load_fixture(_READY),
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
             CONF_KEY_PROGRAM_LANGUAGE: "en",
@@ -114,6 +122,7 @@ async def test_select_unavailable_when_running(
         aioclient_mock,
         load_fixture(_RUNNING),
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
         },
@@ -130,7 +139,12 @@ async def test_select_program_resolution_and_selected_program_property(
 ) -> None:
     """Test selected_program property in both catalog and fallback modes."""
     # 1. Fallback mode
-    entry_fb = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry_fb = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     select_id_fb = _entity_id(
         hass, entry_fb, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT
     )
@@ -156,6 +170,7 @@ async def test_select_program_resolution_and_selected_program_property(
         aioclient_mock,
         load_fixture(_READY),
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
             CONF_KEY_PROGRAM_LANGUAGE: "en",

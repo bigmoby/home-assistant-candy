@@ -43,13 +43,13 @@ async def async_setup_entry(
     ]
     client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
 
+    if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
+        return
+
     if isinstance(coordinator.data, DishwasherStatus):
         async_add_entities(
             [CandyDishwasherDelayNumber(coordinator, config_entry, client)]
         )
-        return
-
-    if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
     if isinstance(coordinator.data, WashingMachineStatus):

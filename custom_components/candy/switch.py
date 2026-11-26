@@ -68,6 +68,9 @@ async def async_setup_entry(
         DATA_KEY_COORDINATOR
     ]
 
+    if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
+        return
+
     if isinstance(coordinator.data, DishwasherStatus):
         raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
         dish_programs = (
@@ -89,9 +92,6 @@ async def async_setup_entry(
             )
 
         async_add_entities(switches)
-        return
-
-    if config_entry.data.get(CONF_KEY_MODE) != MODE_FULL_CONTROL:
         return
 
     if not isinstance(coordinator.data, WashingMachineStatus):

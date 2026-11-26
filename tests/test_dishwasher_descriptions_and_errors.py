@@ -17,10 +17,12 @@ from custom_components.candy.client import parse_dish_programs
 from custom_components.candy.client.model import DishwasherProgram, TumbleDryerProgram
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_PROGRAMS,
     DEFAULT_DISHWASHER_PROGRAMS,
     DISHWASHER_PROGRAM_PANEL,
+    MODE_FULL_CONTROL,
     NOTIF_ID_DISHWASHER_ERROR,
     NOTIF_ID_DISHWASHER_RINSE,
     NOTIF_ID_DISHWASHER_SALT,
@@ -219,6 +221,7 @@ async def test_program_description_sensor_with_catalog(
         load_fixture(_READY),
         statistics_response='{"statusCounters": {"Program1": "10"}}',
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
             CONF_KEY_PROGRAM_LANGUAGE: "en",

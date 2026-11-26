@@ -15,8 +15,10 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 from custom_components.candy import DOMAIN
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_PROGRAMS,
+    MODE_FULL_CONTROL,
     UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
     UNIQUE_ID_DISHWASHER_ECO_SWITCH,
     UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH,
@@ -64,7 +66,10 @@ async def test_switches_toggle_and_state(
         hass,
         aioclient_mock,
         load_fixture(_READY),
-        extra_config_data={"interface_type": "BRAVA_BI_DIGIT_OD"},
+        extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            "interface_type": "BRAVA_BI_DIGIT_OD",
+        },
     )
 
     eco_id = _entity_id(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH)
@@ -134,7 +139,10 @@ async def test_switches_unavailable_when_running(
         hass,
         aioclient_mock,
         load_fixture(_RUNNING),
-        extra_config_data={"interface_type": "BRAVA_BI_DIGIT_OD"},
+        extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            "interface_type": "BRAVA_BI_DIGIT_OD",
+        },
     )
     eco_id = _entity_id(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH)
     assert hass.states.get(eco_id).state == "unavailable"
@@ -151,6 +159,7 @@ async def test_switch_availability_gated_by_program_options(
         aioclient_mock,
         load_fixture(_READY),
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: catalog["interface_type"],
             CONF_KEY_PROGRAM_LANGUAGE: "en",

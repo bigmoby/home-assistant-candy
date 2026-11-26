@@ -117,8 +117,8 @@ _LIMITER = AsyncLimiter(max_rate=1, time_period=3)
 DEFAULT_CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=5.0, connect=2.0, sock_read=3.0)
 
 # Mandatory settling delay between http-prepareStatistics.json and http-getStatistics.json
-# Confirmed via it.candyhoover.core.dishwasher.nautilus.manager.StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15
-STATISTICS_PREPARATION_DELAY = 15.0
+# Reduced from APK StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15 to 10s to limit _lock hold time
+STATISTICS_PREPARATION_DELAY = 10.0
 
 
 def _parse_json_safe(text: str | bytes) -> dict[str, Any]:

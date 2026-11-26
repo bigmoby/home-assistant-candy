@@ -171,35 +171,37 @@ async def async_setup_entry(
     ]
     client: CandyClient = hass.data[DOMAIN][config_id][DATA_KEY_CLIENT]
 
-    # Dishwashers need no cloud data: remote start/stop only requires the local
-    # key, and the machine itself gates commands with its remote control switch.
     if isinstance(coordinator.data, DishwasherStatus):
-        raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
-        dish_programs = (
-            parse_dish_programs(raw_programs)
-            if raw_programs
-            else parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
-        )
-        interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        dish_buttons: list[ButtonEntity] = []
+        if config_entry.data.get(CONF_KEY_MODE) == MODE_FULL_CONTROL:
+            raw_programs = config_entry.data.get(CONF_KEY_PROGRAMS, [])
+            dish_programs = (
+                parse_dish_programs(raw_programs)
+                if raw_programs
+                else parse_dish_programs(DEFAULT_DISHWASHER_PROGRAMS)
+            )
+            interface_type = config_entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
 
-        dish_buttons: list[ButtonEntity] = [
-            CandyDishwasherStartButton(
-                coordinator, config_entry, client, dish_programs
-            ),
-            CandyDishwasherStopButton(coordinator, config_entry, client),
-            CandyDishwasherPauseButton(coordinator, config_entry, client),
-            CandyDishwasherResumeButton(coordinator, config_entry, client),
-        ]
-        if not is_legacy_dishwasher(interface_type) and (
-            coordinator.data.r15 > 0 if coordinator.data else True
-        ):
-            dish_buttons.append(
-                CandyDishwasherCheckUpButton(coordinator, config_entry, client)
+            dish_buttons.extend(
+                [
+                    CandyDishwasherStartButton(
+                        coordinator, config_entry, client, dish_programs
+                    ),
+                    CandyDishwasherStopButton(coordinator, config_entry, client),
+                    CandyDishwasherPauseButton(coordinator, config_entry, client),
+                    CandyDishwasherResumeButton(coordinator, config_entry, client),
+                ]
             )
-        if is_open_door_supported(interface_type):
-            dish_buttons.append(
-                CandyDishwasherOpenDoorButton(coordinator, config_entry, client)
-            )
+            if not is_legacy_dishwasher(interface_type) and (
+                coordinator.data.r15 > 0 if coordinator.data else True
+            ):
+                dish_buttons.append(
+                    CandyDishwasherCheckUpButton(coordinator, config_entry, client)
+                )
+            if is_open_door_supported(interface_type):
+                dish_buttons.append(
+                    CandyDishwasherOpenDoorButton(coordinator, config_entry, client)
+                )
 
         stats_coordinator = hass.data[DOMAIN][config_id].get(DATA_KEY_STATS_COORDINATOR)
         if stats_coordinator is not None and config_entry.data.get(

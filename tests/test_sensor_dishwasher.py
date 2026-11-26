@@ -11,9 +11,11 @@ from custom_components.candy.client.model import DishwasherStatistics, Dishwashe
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
+    CONF_KEY_MODE,
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_WRITE_PENDING,
     DOMAIN,
+    MODE_FULL_CONTROL,
 )
 from custom_components.candy.sensor import (
     CandyDishwasherBuzzerSensor,
@@ -64,6 +66,7 @@ async def test_program_sensor_idle(
         aioclient_mock,
         load_fixture("dishwasher/idle.json"),
         statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     state = hass.states.get("sensor.dishwasher_program")
@@ -90,6 +93,7 @@ async def test_program_description_updates_on_select(
         aioclient_mock,
         load_fixture("dishwasher/idle.json"),
         statistics_response='{"statusCounters": {"Program1": "10"}}',
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     desc_sensor = hass.states.get("sensor.dishwasher_program_description")
     assert desc_sensor

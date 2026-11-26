@@ -221,6 +221,7 @@ async def test_panel_push_button_start_quirk(
         aioclient_mock,
         load_fixture(_READY),
         statistics_response=_STATS,
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
     main_sensor_id = _entity_id(hass, entry, "sensor", UNIQUE_ID_DISHWASHER)
@@ -258,6 +259,7 @@ async def test_stale_duration_at_cycle_end_quirk(
         aioclient_mock,
         load_fixture(_READY),
         statistics_response=_STATS,
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
     rem_time_id = _entity_id(hass, entry, "sensor", UNIQUE_ID_DISHWASHER_REMAINING_TIME)
@@ -288,6 +290,7 @@ async def test_stale_remote_start_stop_at_cycle_end_quirk(
         aioclient_mock,
         load_fixture(_READY),
         statistics_response=_STATS,
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
     main_sensor_id = _entity_id(hass, entry, "sensor", UNIQUE_ID_DISHWASHER)
@@ -319,6 +322,7 @@ async def test_door_opened_during_wash_phase(
         aioclient_mock,
         load_fixture(_READY),
         statistics_response=_STATS,
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
     door_id = _entity_id(hass, entry, "binary_sensor", UNIQUE_ID_DISHWASHER_DOOR)
@@ -437,6 +441,7 @@ async def test_error_reporting_and_automatic_recovery(
         aioclient_mock,
         load_fixture(_READY),
         statistics_response=_STATS,
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
     main_sensor_id = _entity_id(hass, entry, "sensor", UNIQUE_ID_DISHWASHER)

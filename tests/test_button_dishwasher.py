@@ -29,8 +29,11 @@ from custom_components.candy.client.model import (
 )
 from custom_components.candy.const import (
     CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_MODE,
     CONF_KEY_PROGRAM_LANGUAGE,
     CONF_KEY_PROGRAMS,
+    MODE_FULL_CONTROL,
+    MODE_READ_ONLY,
     UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH,
     UNIQUE_ID_DISHWASHER_BUZZER,
     UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
@@ -131,7 +134,58 @@ async def _press(hass: HomeAssistant, entry: MockConfigEntry, unique_id: str) ->
 async def test_entities_created_in_read_only_mode(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_READ_ONLY},
+    )
+
+    for domain, unique_id in [
+        ("binary_sensor", UNIQUE_ID_DISHWASHER_SALT_EMPTY),
+        ("binary_sensor", UNIQUE_ID_DISHWASHER_RINSE_AID_EMPTY),
+        ("binary_sensor", UNIQUE_ID_DISHWASHER_DOOR),
+        ("binary_sensor", UNIQUE_ID_DISHWASHER_REMOTE_CONTROL),
+        ("binary_sensor", UNIQUE_ID_DISHWASHER_MAINT_CLEAN),
+        ("sensor", UNIQUE_ID_DISHWASHER_ERROR),
+        ("sensor", UNIQUE_ID_DISHWASHER_CYCLE_STATUS),
+        ("sensor", UNIQUE_ID_DISHWASHER_WATER_HARDNESS),
+        ("sensor", UNIQUE_ID_DISHWASHER_BUZZER),
+        ("sensor", UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES),
+    ]:
+        _entity_id(hass, entry, domain, unique_id)
+
+    registry = er.async_get(hass)
+    for domain, unique_id in [
+        ("button", UNIQUE_ID_DISHWASHER_START_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_STOP_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_PAUSE_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_RESUME_BUTTON),
+        ("button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON),
+        ("select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT),
+        ("switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH),
+        ("switch", UNIQUE_ID_DISHWASHER_THREE_IN_ONE_SWITCH),
+        ("switch", UNIQUE_ID_DISHWASHER_HALF_LOAD_SWITCH),
+        ("switch", UNIQUE_ID_DISHWASHER_EXTRA_DRY_SWITCH),
+        ("number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER),
+    ]:
+        assert (
+            registry.async_get_entity_id(
+                domain, DOMAIN, unique_id.format(entry.entry_id)
+            )
+            is None
+        )
+
+
+async def test_entities_created_in_full_control_mode(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+):
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     for domain, unique_id in [
         ("button", UNIQUE_ID_DISHWASHER_START_BUTTON),
@@ -201,6 +255,7 @@ async def test_settings_default_to_panel(
         hass,
         aioclient_mock,
         _fixture(_READY, TreinUno="1", MetaCarico="1", ExtraDry="0"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     assert _state(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT) == "panel"
@@ -221,7 +276,12 @@ async def test_settings_default_to_panel(
 async def test_start_available_when_ready(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) != (
         "unavailable"
@@ -236,7 +296,10 @@ async def test_start_available_with_stale_delay(
 ):
     """DelayStart keeps its last value after a stop: only StartStop matters."""
     entry = await init_integration(
-        hass, aioclient_mock, _fixture(_READY, DelayStart="60")
+        hass,
+        aioclient_mock,
+        _fixture(_READY, DelayStart="60"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) != (
@@ -252,7 +315,10 @@ async def test_start_available_with_stale_start_stop(
 ):
     """StartStop can stay 1 on a ready machine: it must not block Start."""
     entry = await init_integration(
-        hass, aioclient_mock, _fixture(_READY, StartStop="1", StatoDWash="2", r2="0")
+        hass,
+        aioclient_mock,
+        _fixture(_READY, StartStop="1", StatoDWash="2", r2="0"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) != (
@@ -271,6 +337,7 @@ async def test_cycle_started_from_panel(
         hass,
         aioclient_mock,
         _fixture(_READY, StatoDWash="3", StartStop="0", r2="2", RemTime="115"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     assert hass.states.get("sensor.dishwasher").state == "Running"
@@ -294,7 +361,10 @@ async def test_buttons_unavailable_without_remote_control(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     entry = await init_integration(
-        hass, aioclient_mock, _fixture(_READY, StatoWiFi="0")
+        hass,
+        aioclient_mock,
+        _fixture(_READY, StatoWiFi="0"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) == (
@@ -312,7 +382,12 @@ async def test_buttons_unavailable_without_remote_control(
 async def test_start_unavailable_when_door_open(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, _fixture(_READY, OpenDoor="1"))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, OpenDoor="1"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) == (
         "unavailable"
@@ -320,7 +395,12 @@ async def test_start_unavailable_when_door_open(
 
 
 async def test_running(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_RUNNING))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_RUNNING),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     assert _state(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON) == (
         "unavailable"
@@ -341,7 +421,12 @@ async def test_running(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker)
 async def test_start_with_panel_settings(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     assert await _press_start(hass, entry) == _PANEL_START
 
@@ -349,7 +434,12 @@ async def test_start_with_panel_settings(
 async def test_start_with_chosen_settings(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, _fixture(_READY, TreinUno="1"))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, TreinUno="1"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     select = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
     eco = _entity_id(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH)
     three_in_one = _entity_id(
@@ -374,7 +464,12 @@ async def test_start_with_chosen_settings(
 async def test_stop_sends_reset(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_RUNNING))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_RUNNING),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_STOP_BUTTON) == "Reset=1"
 
@@ -386,6 +481,7 @@ async def test_pause_and_resume(
         hass,
         aioclient_mock,
         _fixture(_READY, StatoDWash="3", StartStop="1", r2="2"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
 
     assert await _press(hass, entry, UNIQUE_ID_DISHWASHER_PAUSE_BUTTON) == "Pa=1"
@@ -403,7 +499,12 @@ async def test_pause_and_resume(
 
 
 async def test_checkup_button(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     assert (
         await _press(hass, entry, UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
@@ -418,7 +519,10 @@ async def test_open_door_button_on_od_interface(
         hass,
         aioclient_mock,
         _fixture(_READY, StatoDWash="5", r2="5"),
-        extra_config_data={"interface_type": "BRAVA_BI_DIGIT_OD"},
+        extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            "interface_type": "BRAVA_BI_DIGIT_OD",
+        },
     )
     assert _state(hass, entry, "switch", UNIQUE_ID_DISHWASHER_AUTO_DOOR_SWITCH) == (
         "off"
@@ -436,7 +540,12 @@ async def test_failed_command_releases_buttons(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ):
     """A failed command is raised, and the buttons are not left blocked."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
 
     with (
         patch(
@@ -605,7 +714,12 @@ async def test_dishwasher_checkup_button_diagnostic_category(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Verify check-up button has DIAGNOSTIC entity category."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     registry = er.async_get(hass)
     btn_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
 
@@ -626,6 +740,7 @@ async def test_panel_start_resolves_w1_from_catalog(
         aioclient_mock,
         _fixture(_READY, Program="P16", r1="5"),
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
         },
@@ -643,6 +758,7 @@ async def test_panel_start_resolves_w1_from_r1_fallback(
         hass,
         aioclient_mock,
         _fixture(_READY, Program="P99", r1="3"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     qs = await _press(hass, entry, UNIQUE_ID_DISHWASHER_START_BUTTON)
     assert "w1=3" in qs
@@ -663,6 +779,7 @@ async def test_start_masks_disallowed_options(
         aioclient_mock,
         load_fixture(_READY),
         extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_PROGRAMS: catalog["programs"],
             CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
             CONF_KEY_PROGRAM_LANGUAGE: "en",
@@ -710,7 +827,10 @@ async def test_checkup_button_hidden_on_legacy_dishwasher(
         hass,
         aioclient_mock,
         load_fixture(_READY),
-        extra_config_data={CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeFSTouch"},
+        extra_config_data={
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
+            CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeFSTouch",
+        },
     )
     registry = er.async_get(hass)
     assert (
@@ -732,7 +852,12 @@ async def test_start_with_fallback_program_resolves_selector_position(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Selecting a fallback program option (night_55) resolves w1=3 from DEFAULT_DISHWASHER_PROGRAMS, not w1=17."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
     await hass.services.async_call(
         "select",
@@ -786,7 +911,12 @@ async def test_dishwasher_start_wash_button_corrupt_number_and_unknown_switches(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Verify start wash button handles corrupted delay number and unknown switch states."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     delay_id = _entity_id(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)
     eco_id = _entity_id(hass, entry, "switch", UNIQUE_ID_DISHWASHER_ECO_SWITCH)
 
@@ -804,7 +934,12 @@ async def test_dishwasher_start_wash_button_missing_registry_entities(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Verify start wash button handles missing select and number entity registrations."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     registry = er.async_get(hass)
     select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
     number_id = _entity_id(hass, entry, "number", UNIQUE_ID_DISHWASHER_DELAY_NUMBER)
@@ -820,7 +955,12 @@ async def test_dishwasher_start_wash_button_direct_dishwasher_programs_fallback(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Verify start button resolves program code from DISHWASHER_PROGRAMS when not in parsed list."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     select_id = _entity_id(hass, entry, "select", UNIQUE_ID_DISHWASHER_PROGRAM_SELECT)
     hass.states.async_set(select_id, "intensive_75")
 
@@ -842,6 +982,7 @@ async def test_dishwasher_start_wash_button_status_program_parse_fallback(
         hass,
         aioclient_mock,
         _fixture(_READY, Program="P5", PrCode="P5"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
     )
     coord = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     status = coord.data
@@ -861,7 +1002,12 @@ async def test_dishwasher_buttons_unavailable_when_off(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Verify start, check-up, and remote control become unavailable/off when _make_off_status runs."""
-    entry = await init_integration(hass, aioclient_mock, load_fixture(_READY))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        load_fixture(_READY),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     coord = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
     start_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_START_BUTTON)
@@ -882,7 +1028,12 @@ async def test_dishwasher_checkup_button_unavailable_when_door_open(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """Verify check-up button is unavailable when the dishwasher door is open."""
-    entry = await init_integration(hass, aioclient_mock, _fixture(_READY, OpenDoor="1"))
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _fixture(_READY, OpenDoor="1"),
+        extra_config_data={CONF_KEY_MODE: MODE_FULL_CONTROL},
+    )
     checkup_id = _entity_id(hass, entry, "button", UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON)
     assert hass.states.get(checkup_id).state == "unavailable"
 

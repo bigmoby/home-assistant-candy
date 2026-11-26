@@ -20,8 +20,10 @@ from custom_components.candy.const import (
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
     CONF_KEY_MAINTENANCE_LAST_LIMESCALE,
     CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED,
+    CONF_KEY_MODE,
     CONF_KEY_WATER_HARDNESS,
     DATA_KEY_STATS_COORDINATOR,
+    MODE_FULL_CONTROL,
     UNIQUE_ID_DISHWASHER_CHECKUP_BUTTON,
     UNIQUE_ID_DISHWASHER_LIFETIME_CYCLES,
     UNIQUE_ID_DISHWASHER_MAINT_FILTER,
@@ -253,6 +255,7 @@ async def test_modern_dishwasher_checkup_button_and_completion_listener(
         status_ready,
         stats,
         {
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
             CONF_KEY_IS_DISHWASHER: True,
             CONF_KEY_MAINTENANCE_ENABLED: True,
@@ -347,6 +350,7 @@ async def test_dishwasher_device_triggers(
         status,
         stats,
         {
+            CONF_KEY_MODE: MODE_FULL_CONTROL,
             CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
             CONF_KEY_IS_DISHWASHER: True,
             CONF_KEY_MAINTENANCE_ENABLED: True,
