@@ -778,12 +778,11 @@
   "issues": {
     "dishwasher_full_control_required": {
       "title": "I controlli della lavastoviglie richiedono la modalità Controllo Completo ({entry_title})",
-      "description": "In questa versione, le entità di controllo della lavastoviglie (avvio, arresto, programma, ritardo, eco, 3-in-1) richiedono la modalità Controllo Completo per scaricare da Simply-Fi il catalogo programmi e l'interfaccia hardware.\n\nSeleziona Correggi per accedere con Simply-Fi e ripristinare i controlli, oppure mantieni la modalità Solo Lettura rimuovendo le vecchie entità di controllo.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Modalità di controllo lavastoviglie",
-            "description": "Scegli come aggiornare {entry_title}.",
+            "description": "In questa versione, le entità di controllo della lavastoviglie (avvio, arresto, programma, ritardo, eco, 3-in-1) richiedono la modalità Controllo Completo per scaricare da Simply-Fi il catalogo programmi e l'interfaccia hardware.\n\nScegli come aggiornare {entry_title}.",
             "menu_options": {
               "switch_to_full_control": "Passa a Controllo Completo (accesso Simply-Fi)",
               "keep_read_only": "Mantieni Solo Lettura (rimuovi vecchie entità di controllo)"

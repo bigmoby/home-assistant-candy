@@ -786,12 +786,11 @@
   "issues": {
     "dishwasher_full_control_required": {
       "title": "Dishwasher controls require Full Control mode ({entry_title})",
-      "description": "In this release, dishwasher control entities (start, stop, program, delay, eco, 3-in-1) require Full Control mode so the integration can load your machine's program catalog and hardware interface from Simply-Fi.\n\nSelect Fix to sign in with Simply-Fi and restore controls, or keep Read-Only mode and clean up the old control entities.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Dishwasher control mode",
-            "description": "Choose how to update {entry_title}.",
+            "description": "In this release, dishwasher control entities (start, stop, program, delay, eco, 3-in-1) require Full Control mode so the integration can load your machine's program catalog and hardware interface from Simply-Fi.\n\nChoose how to update {entry_title}.",
             "menu_options": {
               "switch_to_full_control": "Switch to Full Control (Simply-Fi login)",
               "keep_read_only": "Keep Read-Only (remove old control entities)"
