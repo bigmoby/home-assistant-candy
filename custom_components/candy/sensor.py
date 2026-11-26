@@ -80,6 +80,7 @@ from .const import (
     DEVICE_NAME_OVEN,
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WINE_COOLER,
+    DEVICE_TRANSLATION_KEYS,
     DISHWASHER_HARDNESS_THRESHOLDS_LED,
     DISHWASHER_HARDNESS_THRESHOLDS_SMOOTH,
     DISHWASHER_MAINTENANCE_FILTER_THRESHOLD,
@@ -416,6 +417,7 @@ class CandyBaseSensor(CoordinatorEntity, SensorEntity):
         info = DeviceInfo(
             identifiers={(DOMAIN, self.config_id)},
             name=self.device_name(),
+            translation_key=DEVICE_TRANSLATION_KEYS[self.device_name()],
             manufacturer=manufacturer,
             suggested_area=self.suggested_area(),
         )

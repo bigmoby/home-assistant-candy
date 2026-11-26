@@ -630,6 +630,26 @@
       }
     }
   },
+  "device": {
+    "washing_machine": {
+      "name": "Lavatrice"
+    },
+    "washer_dryer": {
+      "name": "Lavasciuga"
+    },
+    "tumble_dryer": {
+      "name": "Asciugatrice"
+    },
+    "oven": {
+      "name": "Forno"
+    },
+    "dishwasher": {
+      "name": "Lavastoviglie"
+    },
+    "wine_cooler": {
+      "name": "Cantinetta vino"
+    }
+  },
   "title": "Candy",
   "options": {
     "step": {

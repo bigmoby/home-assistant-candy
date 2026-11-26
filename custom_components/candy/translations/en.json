@@ -726,6 +726,26 @@
       }
     }
   },
+  "device": {
+    "washing_machine": {
+      "name": "Washing machine"
+    },
+    "washer_dryer": {
+      "name": "Washer dryer"
+    },
+    "tumble_dryer": {
+      "name": "Tumble dryer"
+    },
+    "oven": {
+      "name": "Oven"
+    },
+    "dishwasher": {
+      "name": "Dishwasher"
+    },
+    "wine_cooler": {
+      "name": "Wine cooler"
+    }
+  },
   "selector": {
     "next_step": {
       "options": {

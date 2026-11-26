@@ -34,6 +34,7 @@ from .const import (
     DEVICE_NAME_TUMBLE_DRYER,
     DEVICE_NAME_WASHER_DRYER,
     DEVICE_NAME_WASHING_MACHINE,
+    DEVICE_TRANSLATION_KEYS,
     DISHWASHER_PROGRAM_NAME_KEYS,
     DISHWASHER_PROGRAM_PANEL,
     DISHWASHER_PROGRAMS,
@@ -209,6 +210,7 @@ def _device_info(
     info = DeviceInfo(
         identifiers={(DOMAIN, config_entry.entry_id)},
         name=name,
+        translation_key=DEVICE_TRANSLATION_KEYS[name],
         manufacturer=manufacturer,
         suggested_area=suggested_area,
     )
@@ -233,6 +235,7 @@ def dryer_device_info(config_entry: ConfigEntry) -> DeviceInfo:
     info = DeviceInfo(
         identifiers={(DOMAIN, config_entry.entry_id)},
         name=DEVICE_NAME_TUMBLE_DRYER,
+        translation_key=DEVICE_TRANSLATION_KEYS[DEVICE_NAME_TUMBLE_DRYER],
         manufacturer=manufacturer,
         suggested_area=SUGGESTED_AREA_BATHROOM,
     )
