@@ -431,6 +431,9 @@
           "medium": "Medium",
           "hard": "Hard"
         }
+      },
+      "wash_program_description": {
+        "name": "Descrizione programma"
       }
     },
     "number": {

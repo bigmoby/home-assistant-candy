@@ -573,6 +573,9 @@
           "rapid_24": "Rapid 24' 50°C",
           "prewash": "Prewash"
         }
+      },
+      "wash_program_description": {
+        "name": "Program description"
       }
     },
     "number": {
