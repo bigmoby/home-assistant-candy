@@ -12,7 +12,7 @@ body:
     id: versions
     attributes:
       label: Integration & Home Assistant Versions
-      placeholder: "e.g. Candy vX.Y.Z (HACS/Marketplace), Home Assistant 2025.x.x"
+      placeholder: "e.g. Candy vX.Y.Z (HACS/Marketplace), Home Assistant 2026.x.x"
     validations:
       required: true
 
