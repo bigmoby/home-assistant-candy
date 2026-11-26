@@ -337,3 +337,52 @@ async def test_removing_entry_deletes_repair_issue(
     await hass.async_block_till_done()
 
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_repair_flow_aborts_when_entry_missing(hass: HomeAssistant) -> None:
+    """Every step aborts with entry_not_found if the config entry disappears."""
+    flow = DishwasherFullControlRepairFlow("missing-entry")
+    flow.hass = hass
+
+    for step in (
+        flow.async_step_init(),
+        flow.async_step_switch_to_full_control(),
+        flow.async_step_language(),
+        flow.async_step_keep_read_only(),
+    ):
+        result = await step
+        assert result["type"] == data_entry_flow.FlowResultType.ABORT
+        assert result["reason"] == "entry_not_found"
+
+
+async def test_repair_flow_unexpected_cloud_error(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Unexpected exceptions during cloud fetch surface cloud_auth error on the form."""
+    _mock_dishwasher_endpoints(aioclient_mock)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="dw-unexpected-err",
+        data={
+            CONF_IP_ADDRESS: TEST_IP,
+            CONF_KEY_USE_ENCRYPTION: False,
+            CONF_PASSWORD: "",
+            CONF_KEY_MODE: MODE_READ_ONLY,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    flow = DishwasherFullControlRepairFlow(entry.entry_id)
+    flow.hass = hass
+
+    with patch(
+        "custom_components.candy.repairs.fetch_appliance_data",
+        new=AsyncMock(side_effect=RuntimeError("unexpected")),
+    ):
+        result = await flow.async_step_switch_to_full_control(
+            {"email": "a@b.com", "password": "secret"}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "switch_to_full_control"
+    assert result["errors"] == {"base": "cloud_auth"}
