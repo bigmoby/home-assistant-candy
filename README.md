@@ -73,21 +73,21 @@ Untested or unlisted appliances families may not behave correctly. If such cases
 | Hoover AXI / H-WASH 700 | Washing Machine / Washer-Dryer | `red_devil_axi*`, `hwash700` | Yes | Reference hardware (`AWMPD 410LH8/1-S` and `AWDPD4138LHR/1`). |
 | Candy & Hoover DualTech / One-Fi | Washing Machine / Washer-Dryer | `3D_DUAL`, `4D_DUAL`, `DUALTECH` | Yes | Tested on `3D_DUAL` hardware (`HBDOS 695TAME-80`). Remote pause is unsupported by hardware. |
 | Candy Bianca | Washing Machine / Washer-Dryer | `BIANCA`, `BWD` series | No | Implemented from cloud catalog and protocol specifications. Remote pause/resume is unsupported by hardware. |
-| Candy Smart Pro / Hoover H-WASH 300 / X-Care | Washing Machine | `SMARTPRO`, `HWASH300`, `XCARE` | No | Implemented from protocol specifications. Uses `GetStat=1` for cycle statistics. |
+| Candy Smart Pro / Hoover H-WASH 300 / X-Care | Washing Machine | `SMARTPRO`, `HWASH300`, `XCARE` | No | Implemented from protocol specifications. |
 
 #### Tumble Dryers
 
 | Series / Platform | Interface / Family | Tested | Notes |
 |---|---|---|---|
-| Candy & Hoover DualTech | `TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL` | Yes | Reference hardware (`GVS H9A2TCE-80` / `GVSH9A2DCE-80`, also verified on `GVSF H10A2TCE-19`). |
+| Candy & Hoover DualTech | `TD_DIGIT_*`, `TD_LED_*`, `3D_DUAL` | Yes | Reference hardware `GVS H9A2TCE-80`, `GVSH9A2DCE-80`, `GVSF H10A2TCE-19`. |
 
 #### Dishwashers
 
 | Series / Platform | Interface / Family | Tested | Notes |
 |---|---|---|---|
-| Candy Brava / Hoover H-DISH 300 & 500 | `DW_WIFI_*`, `BRAVA_*` | Yes | Reference hardware (`CDIN 1D360PB`, verified with `CDPN 4D620PX` and `HDIN 2L360PB`). Supports interactive hardware user settings (8 hardness levels, buzzer, program memo). |
-| Hoover AXI / H-DISH 700 | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT`, `AXI_BI_LED` | Yes | Supports interactive hardware user settings (6 levels for LED, 8 levels for Smooth/Digit, buzzer, program memo). |
-| Legacy Touch & Built-in | `DishwasherInterfaceTypeFSTouch`, `DishwasherInterfaceTypeBuiltIn`, `DW_NFC_DIGIT_FS` | No | Implemented from protocol specifications (`CandyDishWasherCommand`). Hardware settings and diagnostic self-tests unsupported by hardware. |
+| Candy Brava / Hoover H-DISH 300 & 500 | `DW_WIFI_*`, `BRAVA_*` | Yes | Reference hardware `CDIN 1D360PB`, `CDPN 4D620PX` and `HDIN 2L360PB`. |
+| Hoover AXI / H-DISH 700 | `AXI_FS_SMOOTH_OD`, `AXI_FS_SMOOTH`, `AXI_HI_DIGIT`, `AXI_BI_LED` | Yes | Statistics are not supported by `AXI_BI_LED`. |
+| Legacy Touch & Built-in | `DishwasherInterfaceTypeFSTouch`, `DishwasherInterfaceTypeBuiltIn`, `DW_NFC_DIGIT_FS` | No | Implemented from protocol specifications (`CandyDishWasherCommand`). Hardware settings and diagnostic self-tests are not supported. |
 
 ---
 
