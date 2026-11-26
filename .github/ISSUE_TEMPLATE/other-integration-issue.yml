@@ -1,0 +1,63 @@
+name: Other Integration Issue
+description: Report general integration issues (setup/options flow, Home Assistant compatibility, UI/services, or multi-device bugs).
+title: "[Integration Issue]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for general integration problems not tied to a single appliance's telemetry (e.g., setup/reconfigure/options flow errors, Home Assistant Core compatibility, translation issues, or service/dashboard errors).
+
+  - type: input
+    id: versions
+    attributes:
+      label: Integration & Home Assistant Versions
+      placeholder: "e.g. Candy vX.Y.Z, Home Assistant 2025.x.x"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      options:
+        - Setup / Config Flow / Options Flow
+        - Home Assistant Core Update Compatibility
+        - Multi-Appliance / Coordinator
+        - Notifications / Maintenance / Repairs
+        - Translations / Dashboard
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description & Steps to Reproduce
+      description: Describe the issue clearly, including what you expected to happen and how to reproduce it.
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### Required Logs & Diagnostics
+        * **Home Assistant Diagnostics:** Go to **Settings → Devices & Services → Candy → `⋮` → Download diagnostics** (or **Download diagnostics** on the integration entry) and drag & drop the `.json` file below. *(If setup failed before an entry was created, note that and attach `python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose` output instead.)*
+        * **Home Assistant Logs:** Paste relevant errors/tracebacks from **Settings → System → Logs** (ideally with `custom_components.candy: debug` enabled).
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (.json or simplyfi.py output)
+      description: Drag & drop your HA diagnostics `.json` file here, or paste `simplyfi.py diagnose` output if setup failed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant Logs
+      description: Paste any relevant log entries or tracebacks.
+      render: text
+    validations:
+      required: true

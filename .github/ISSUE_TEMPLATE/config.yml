@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Remote Control & Dial Readiness Guide
+    url: https://github.com/bigmoby/home-assistant-candy/blob/main/docs/remote-control.md
+    about: Check hardware prerequisites, dial positions, and safety gating rules for Full Control.
+  - name: Network Discovery & simplyfi.py Diagnostic Tool
+    url: https://github.com/bigmoby/home-assistant-candy#readme
+    about: Learn how to find your appliance IP and run tools/simplyfi.py locally.

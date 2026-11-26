@@ -1,0 +1,88 @@
+name: Bug Report (Existing Device)
+description: Report a bug with an already-supported appliance (wrong sensors, broken entities, or remote control failures).
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for issues with an already-supported appliance (e.g., incorrect sensor readings, missing entities, Full Control command failures, or maintenance/fault notification bugs).
+
+  - type: input
+    id: versions
+    attributes:
+      label: Integration & Home Assistant Versions
+      placeholder: "e.g. Candy vX.Y.Z, Home Assistant 2025.x.x"
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Appliance Type & Model
+      placeholder: "e.g. Washing Machine - Candy RO41274DWMSE/1-S"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Integration Mode
+      options:
+        - Full Control (with Simply-Fi cloud sign-in)
+        - Read-Only (local API only)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description & Steps to Reproduce
+      description: Describe what happened, what you expected to happen, and the steps to reproduce it.
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### Required Diagnostics & Logs
+        1. **Home Assistant Diagnostics:** Go to **Settings → Devices & Services → Candy → `⋮` → Download diagnostics** and drag & drop the `.json` file below.
+        2. **Home Assistant Logs:** Paste relevant errors/tracebacks from **Settings → System → Logs**. Debug logging can be enabled by adding:
+           ```yaml
+           logger:
+             logs:
+               custom_components.candy: debug
+           ```
+        3. **`simplyfi.py` (recommended for telemetry or remote control issues):**
+           ```bash
+           python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> diagnose
+           # Or for remote control / dial readiness checks:
+           python3 tools/simplyfi.py <YOUR_APPLIANCE_IP> remote
+           ```
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: HA Diagnostics (.json) and/or simplyfi.py Output
+      description: Drag & drop your HA diagnostics `.json` file here, or paste the output from `tools/simplyfi.py`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant Logs
+      description: Paste any relevant log entries or tracebacks.
+      render: text
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I restarted Home Assistant after installing/updating the integration.
+          required: true
+        - label: The appliance is powered on and reachable on the local network.
+          required: true

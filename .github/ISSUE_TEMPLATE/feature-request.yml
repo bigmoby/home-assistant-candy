@@ -1,0 +1,40 @@
+name: Feature Request / Enhancement
+description: Suggest a new feature, entity, dashboard improvement, or enhancement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      options:
+        - Entities / Sensors
+        - Remote Control
+        - Maintenance / Notifications
+        - Dashboard / Documentation
+        - Translations / Localization
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this solve, or what workflow are you trying to enable?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe how you would like this to work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context (Optional)
+      description: Include appliance model, screenshots, or official Simply-Fi app behavior if relevant.
