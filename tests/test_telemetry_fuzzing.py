@@ -20,7 +20,8 @@ from custom_components.candy import DOMAIN
 from custom_components.candy.client.model import (
     CheckUpResult,
     CheckUpState,
-    DishwasherState,
+    DishwasherProgram,
+    DishwasherProgramPhase,
     DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
@@ -314,7 +315,7 @@ def test_dishwasher_parser_resilience() -> None:
     """Dishwasher parser must handle variations in OpzProg and non-numeric fields."""
     payload = copy.deepcopy(BASE_DISHWASHER_JSON)
     status_base = DishwasherStatus.from_json(payload)
-    assert status_base.machine_state == DishwasherState.IDLE
+    assert status_base.machine_state == MachineState.IDLE
     assert status_base.program == "P1"
 
     payload["OpzProg"] = "p"
@@ -323,6 +324,132 @@ def test_dishwasher_parser_resilience() -> None:
     assert DishwasherStatus.from_json(payload).program == "P1-"
     del payload["OpzProg"]
     assert DishwasherStatus.from_json(payload).program == "P1"
+
+
+def test_dishwasher_telemetry_fuzzing_all_registers() -> None:
+    """Fuzz all modern dishwasher registers with corrupt, invalid, and edge-case values."""
+    payload = copy.deepcopy(BASE_DISHWASHER_JSON)
+    payload.update(
+        {
+            "r1": "corrupt_pos",
+            "r2": "2",
+            "r6": "corrupt_buzzer",
+            "r7": "corrupt_hardness",
+            "r8": "corrupt_counter",
+            "r9": "NULL",
+            "r15": "corrupt_unit",
+            "RemTime": "corrupt_time",
+            "DelayStart": "corrupt_delay",
+            "CheckUp": "corrupt_checkup",
+            "DisTestRes": "corrupt_result",
+            "StatoDWash": "corrupt_mode",
+        }
+    )
+
+    # Must parse without throwing exceptions
+    status = DishwasherStatus.from_json(payload)
+    assert status.machine_state == MachineState.IDLE
+    assert status.remaining_minutes == 0
+    assert status.delayed_start_minutes is None
+    assert status.selector_position is None
+    assert status.buzzer_level is None
+    assert status.buzzer is None
+    assert status.water_hardness is None
+    assert status.last_cycle_counter is None
+    assert status.remember_last_cycle is None
+    assert status.auto_clean_warning is False
+    assert status.checkup_state is None
+    assert status.checkup_result is None
+
+    # Valid values test
+    payload.update(
+        {
+            "r1": "3",
+            "r6": "2",
+            "r7": "5",
+            "r8": "1",
+            "r9": "H_CLEAN_REQUIRED",
+            "r15": "1",
+            "CheckUp": "2",
+            "DisTestRes": "0",
+            "OpenDoorOpt": "1",
+            "DelayStart": "45",
+            "StatoDWash": "3",
+            "RemTime": "90",
+        }
+    )
+    status_valid = DishwasherStatus.from_json(payload)
+    assert status_valid.selector_position == 3
+    assert status_valid.buzzer_level == 2
+    assert status_valid.buzzer is True
+    assert status_valid.water_hardness == 5
+    assert status_valid.last_cycle_counter == 1
+    assert status_valid.remember_last_cycle is True
+    assert status_valid.auto_clean_warning is True
+    assert status_valid.checkup_state == CheckUpState.COMPLETED
+    assert status_valid.checkup_result == CheckUpResult.NOT_RUN
+    assert status_valid.door_open_allowed is True
+    assert status_valid.delayed_start_minutes == 45
+    assert status_valid.remaining_minutes == 90
+
+
+def test_dishwasher_status_legacy_machine_state_and_phase() -> None:
+    """Test legacy dishwashers lacking register r2 for state and phase deduction."""
+    legacy_finished = {"StatoDWash": "5", "Reset": "0"}
+    assert (
+        DishwasherStatus.parse_machine_state(legacy_finished) == MachineState.FINISHED1
+    )
+
+    legacy_error = {"StatoDWash": "6", "Reset": "0"}
+    assert DishwasherStatus.parse_machine_state(legacy_error) == MachineState.ERROR
+
+    legacy_unknown = {"StatoDWash": "99", "Reset": "0"}
+    assert DishwasherStatus.parse_machine_state(legacy_unknown) == MachineState.IDLE
+
+    # Phase deduction without r2
+    assert DishwasherStatus.parse_program_phase({"StatoDWash": "0"}) is None
+    assert (
+        DishwasherStatus.parse_program_phase({"StatoDWash": "2"})
+        == DishwasherProgramPhase.WASH
+    )
+    # Phase deduction with r2 but invalid value
+    assert DishwasherStatus.parse_program_phase({"r2": "99"}) is None
+
+
+def test_dishwasher_program_from_dict_and_display_name() -> None:
+    """Test DishwasherProgram.from_dict parameter variants and display_name."""
+    # 1. command_parameters as dict
+    raw_dict = {
+        "position": "2",
+        "name": "DW_ECO",
+        "command_parameters": {
+            "cycle_name": "5",
+            "temp": "55",
+            "available_options": "3",
+        },
+    }
+    prog_dict = DishwasherProgram.from_dict(raw_dict)
+    assert prog_dict.cycle_id == 5
+    assert prog_dict.temperature == 55
+    assert prog_dict.available_options == 3
+    assert prog_dict.display_name is not None
+
+    # 2. command_parameters as list with nested command_parameter dict
+    raw_list = {
+        "position": "3",
+        "name": "DW_RAPID",
+        "command_parameters": [
+            {
+                "command_parameter": {
+                    "name": "cycle_name",
+                    "validation": 20,
+                }
+            }
+        ],
+    }
+    prog_list = DishwasherProgram.from_dict(raw_list)
+    assert prog_list.cycle_id == 20
+    assert prog_list.display_name is not None
 
 
 def test_oven_parser_resilience() -> None:

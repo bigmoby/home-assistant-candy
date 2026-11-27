@@ -12,6 +12,7 @@ from custom_components.candy.client.cloud import (
     SimplyFiCloudError,
     _authenticate,
     _fetch_appliances,
+    _fetch_dishwasher_downloadable_programs,
     _fetch_downloadable_programs,
     _generate_pkce_pair,
     _match_appliance,
@@ -77,7 +78,7 @@ def _appliance_entry(ip=None, key="secret-key", programs=None):
 
 def test_match_appliance_by_ip():
     appliances = [_appliance_entry(ip="10.0.0.1"), _appliance_entry(ip="10.0.0.2")]
-    result = _match_appliance(appliances, "10.0.0.1", [])
+    result = _match_appliance(appliances, "10.0.0.1", [], [])
     assert isinstance(result, CloudApplianceData)
     assert result.mac_address == "AA:BB:CC:DD:EE:FF"
     assert result.encryption_key == "secret-key"
@@ -88,7 +89,7 @@ def test_match_appliance_by_ip():
 
 def test_match_appliance_single_fallback():
     appliances = [_appliance_entry(ip=None)]
-    result = _match_appliance(appliances, "192.168.1.100", [{"id": 99}])
+    result = _match_appliance(appliances, "192.168.1.100", [{"id": 99}], [])
     assert isinstance(result, CloudApplianceData)
     assert result.downloadable_programs == [{"id": 99}]
 
@@ -97,32 +98,40 @@ def test_match_appliance_washer_dryer_hoover():
     entry = _appliance_entry(ip="10.0.0.1")
     entry["appliance"]["brand"] = "hoover"
     entry["appliance"]["appliance_type"] = "washer_dryer"
-    result = _match_appliance([entry], "10.0.0.1", [])
+    result = _match_appliance([entry], "10.0.0.1", [], [])
     assert result.brand == "hoover"
     assert result.appliance_type == "washer_dryer"
+
+
+def test_match_appliance_dishwasher():
+    entry = _appliance_entry(ip="10.0.0.1")
+    entry["appliance"]["appliance_type"] = "dishwasher"
+    result = _match_appliance([entry], "10.0.0.1", [], [{"id": 42}])
+    assert result.appliance_type == "dishwasher"
+    assert result.downloadable_programs == [{"id": 42}]
 
 
 def test_match_appliance_no_match_multiple():
     appliances = [_appliance_entry(ip="10.0.0.1"), _appliance_entry(ip="10.0.0.2")]
     with pytest.raises(SimplyFiCloudError, match="No Simply-Fi appliance matched"):
-        _match_appliance(appliances, "10.0.0.99", [])
+        _match_appliance(appliances, "10.0.0.99", [], [])
 
 
 def test_match_appliance_missing_encryption_key():
     """Missing or empty encryption_key in cloud data is allowed (local transport governs)."""
     appliances = [_appliance_entry(ip="10.0.0.1", key="")]
-    result = _match_appliance(appliances, "10.0.0.1", [])
+    result = _match_appliance(appliances, "10.0.0.1", [], [])
     assert result.encryption_key == ""
 
     appliances_none = [_appliance_entry(ip="10.0.0.1", key=None)]
-    result_none = _match_appliance(appliances_none, "10.0.0.1", [])
+    result_none = _match_appliance(appliances_none, "10.0.0.1", [], [])
     assert result_none.encryption_key == ""
 
 
 def test_match_appliance_missing_programs():
     appliances = [_appliance_entry(ip="10.0.0.1", programs=[])]
     with pytest.raises(SimplyFiCloudError, match="missing programs"):
-        _match_appliance(appliances, "10.0.0.1", [])
+        _match_appliance(appliances, "10.0.0.1", [], [])
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +300,35 @@ async def test_fetch_downloadable_programs_non_200():
     session = _make_session(get_resps=[_make_resp(403, text="Forbidden")])
     with pytest.raises(SimplyFiCloudError, match="downloadable programs fetch failed"):
         await _fetch_downloadable_programs(session, _TOKENS)
+
+
+async def test_fetch_dw_downloadable_programs_dict_and_list_format():
+    dict_payload = {
+        "dw_nfc_download_programs": [
+            {
+                "dw_nfc_download_program": {
+                    "id": "dw-prog-1",
+                    "name": "DW_DL_SANITIZE",
+                }
+            }
+        ]
+    }
+    session_dict = _make_session(get_resps=[_make_resp(200, dict_payload)])
+    res_dict = await _fetch_dishwasher_downloadable_programs(session_dict, _TOKENS)
+    assert res_dict == [{"id": "dw-prog-1", "name": "DW_DL_SANITIZE"}]
+
+    list_payload = [{"id": "dw-prog-2", "name": "DW_DL_CRYSTAL"}]
+    session_list = _make_session(get_resps=[_make_resp(200, list_payload)])
+    res_list = await _fetch_dishwasher_downloadable_programs(session_list, _TOKENS)
+    assert res_list == [{"id": "dw-prog-2", "name": "DW_DL_CRYSTAL"}]
+
+
+async def test_fetch_dw_downloadable_programs_errors():
+    session_404 = _make_session(get_resps=[_make_resp(404, text="Not Found")])
+    assert await _fetch_dishwasher_downloadable_programs(session_404, _TOKENS) == []
+
+    session_err = _make_session(get_resps=[_make_resp(200, text="not-valid-json")])
+    assert await _fetch_dishwasher_downloadable_programs(session_err, _TOKENS) == []
 
 
 # ---------------------------------------------------------------------------

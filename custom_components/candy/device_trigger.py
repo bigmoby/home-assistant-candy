@@ -14,13 +14,17 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 import voluptuous as vol
 
+from .client import is_legacy_dishwasher
 from .client.model import (
+    DishwasherStatistics,
+    DishwasherStatus,
     MachineState,
     TumbleDryerStatus,
     WashingMachineStatistics,
     WashingMachineStatus,
 )
 from .const import (
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FILTER,
@@ -43,6 +47,8 @@ TRIGGER_TYPES = frozenset(
         "washing_completed",
         "drying_started",
         "drying_completed",
+        "dishwashing_started",
+        "dishwashing_completed",
         "clean_filter_needed",
         "water_tank_full",
         "error_reported",
@@ -99,7 +105,7 @@ async def async_get_triggers(
         hass.data.get(DOMAIN, {}).get(config_entry_id, {}).get(DATA_KEY_COORDINATOR)
     )
     if coordinator is None or not isinstance(
-        coordinator.data, (WashingMachineStatus, TumbleDryerStatus)
+        coordinator.data, (WashingMachineStatus, TumbleDryerStatus, DishwasherStatus)
     ):
         return []
 
@@ -108,6 +114,23 @@ async def async_get_triggers(
         CONF_DOMAIN: DOMAIN,
         CONF_DEVICE_ID: device_id,
     }
+
+    if isinstance(coordinator.data, DishwasherStatus):
+        triggers = [
+            {**base, CONF_TYPE: "dishwashing_started"},
+            {**base, CONF_TYPE: "dishwashing_completed"},
+            {**base, CONF_TYPE: "error_reported"},
+        ]
+        interface_type = entry.data.get(CONF_KEY_INTERFACE_TYPE, "")
+        if not is_legacy_dishwasher(interface_type) and entry.data.get(
+            CONF_KEY_MAINTENANCE_ENABLED
+        ):
+            triggers.append({**base, CONF_TYPE: "maintenance_full_checkup_due"})
+            if entry.data.get(CONF_KEY_MAINTENANCE_LIMESCALE_ENABLED, True):
+                triggers.append({**base, CONF_TYPE: "maintenance_limescale_due"})
+            if entry.data.get(CONF_KEY_MAINTENANCE_FILTER_ENABLED, True):
+                triggers.append({**base, CONF_TYPE: "maintenance_filter_due"})
+        return triggers
 
     if isinstance(coordinator.data, TumbleDryerStatus):
         return [
@@ -176,6 +199,8 @@ async def async_attach_trigger(
         "washing_completed",
         "drying_started",
         "drying_completed",
+        "dishwashing_started",
+        "dishwashing_completed",
         "error_reported",
     }:
         return _attach_state_trigger(
@@ -191,7 +216,9 @@ async def async_attach_trigger(
     if stats_coordinator is None:
         return lambda: None
 
-    return _attach_maintenance_trigger(stats_coordinator, entry, trigger_type, _fire)
+    return _attach_maintenance_trigger(
+        stats_coordinator, entry, trigger_type, _fire, coordinator
+    )
 
 
 def _attach_state_trigger(
@@ -201,21 +228,45 @@ def _attach_state_trigger(
     trigger_variables: dict[str, Any],
     job: HassJob,
 ) -> CALLBACK_TYPE:
-    initial = cast(WashingMachineStatus | TumbleDryerStatus | None, coordinator.data)
-    prev_state: list[MachineState | None] = [
-        initial.machine_state if initial is not None else None
+    initial = coordinator.data
+    prev_state: list[Any] = [
+        getattr(initial, "machine_state", None) if initial is not None else None
+    ]
+    prev_error: list[Any] = [
+        getattr(initial, "error_code", None) if initial is not None else None
     ]
 
     @callback
     def _on_update() -> None:
-        status = cast(WashingMachineStatus | TumbleDryerStatus | None, coordinator.data)
+        status = coordinator.data
         if status is None:
             return
-        curr = status.machine_state
+        curr = getattr(status, "machine_state", None)
         prev = prev_state[0]
         prev_state[0] = curr
 
-        if trigger_type in {"washing_started", "drying_started"}:
+        curr_err = getattr(status, "error_code", None)
+        p_err = prev_error[0]
+        prev_error[0] = curr_err
+
+        if isinstance(status, DishwasherStatus):
+            if trigger_type == "dishwashing_started":
+                should_fire = curr == MachineState.RUNNING and prev not in {
+                    MachineState.RUNNING,
+                    MachineState.PAUSED,
+                }
+            elif trigger_type == "dishwashing_completed":
+                should_fire = curr in {
+                    MachineState.FINISHED1,
+                    MachineState.FINISHED2,
+                } and prev not in {MachineState.FINISHED1, MachineState.FINISHED2}
+            else:  # error_reported
+                should_fire = curr_err not in (None, "0", "E0") and p_err in (
+                    None,
+                    "0",
+                    "E0",
+                )
+        elif trigger_type in {"washing_started", "drying_started"}:
             should_fire = curr == MachineState.RUNNING and prev not in {
                 MachineState.RUNNING,
                 MachineState.PAUSED,
@@ -269,8 +320,16 @@ def _attach_maintenance_trigger(
     config_entry: ConfigEntry,
     trigger_type: str,
     fire: Callable[[], None],
+    coordinator: DataUpdateCoordinator[Any],
 ) -> CALLBACK_TYPE:
-    hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
+    status = coordinator.data
+    hardness = getattr(status, "water_hardness", None)
+    if (
+        hardness is None
+        or hardness < 0
+        or hardness >= len(MAINTENANCE_HARDNESS_THRESHOLDS)
+    ):
+        hardness = config_entry.data.get(CONF_KEY_WATER_HARDNESS, 2)
     threshold_by_type = {
         "maintenance_full_checkup_due": MAINTENANCE_FULL_CHECKUP_THRESHOLD,
         "maintenance_limescale_due": MAINTENANCE_HARDNESS_THRESHOLDS[hardness],
@@ -285,14 +344,19 @@ def _attach_maintenance_trigger(
     threshold = threshold_by_type[trigger_type]
 
     def _current_remaining() -> int | None:
-        stats = cast(WashingMachineStatistics | None, stats_coordinator.data)
+        stats = cast(
+            WashingMachineStatistics | DishwasherStatistics | None,
+            stats_coordinator.data,
+        )
         if stats is None:
             return None
         # Re-read last from config_entry.data so counter resets are reflected
         last = config_entry.data.get(last_key, 0)
         return cycles_remaining(stats.total_cycles, last, threshold)
 
-    initial_stats = cast(WashingMachineStatistics | None, stats_coordinator.data)
+    initial_stats = cast(
+        WashingMachineStatistics | DishwasherStatistics | None, stats_coordinator.data
+    )
     prev_remaining: list[int | None] = [
         _current_remaining() if initial_stats is not None else None
     ]

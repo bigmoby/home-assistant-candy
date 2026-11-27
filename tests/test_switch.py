@@ -20,6 +20,7 @@ from custom_components.candy.client import (
     parse_wash_programs,
 )
 from custom_components.candy.client.model import (
+    DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
     MachineState,
@@ -628,3 +629,51 @@ async def test_autodose_switches_detergent_and_softener(
     mock_client.set_autodose.reset_mock()
     await soft_switch.async_turn_off()
     mock_client.set_autodose.assert_called_with(False, False)
+
+    # Test resolve target from coordinator data when desired is None
+    coord.data = replace(_BASE_WM_STATUS, detergent_on=1, softener_on=1)
+    coord._desired_detergent = None
+    coord._desired_softener = None
+    mock_client.set_autodose.reset_mock()
+    await det_switch.async_turn_off()
+    mock_client.set_autodose.assert_called_with(False, True)
+
+    coord.data = replace(_BASE_WM_STATUS, detergent_on=1, softener_on=1)
+    coord._desired_detergent = None
+    coord._desired_softener = None
+    mock_client.set_autodose.reset_mock()
+    await soft_switch.async_turn_off()
+    mock_client.set_autodose.assert_called_with(True, False)
+
+    # Test autodose rejected on non-washing machine appliance
+    coord.data = DishwasherStatus(
+        machine_state=MachineState.IDLE,
+        program_phase=None,
+        program="P1",
+        remaining_minutes=0,
+        delayed_start_minutes=None,
+        door_open=False,
+        door_open_allowed=None,
+        eco_mode=False,
+        remote_control=True,
+        salt_empty=False,
+        rinse_aid_empty=False,
+        running=False,
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=None,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        remember_last_cycle=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        checkup_result=None,
+        r15=0,
+        selector_position=None,
+    )
+    with pytest.raises(
+        ValueError, match="Autodose is only supported for washing machines"
+    ):
+        await coord.async_set_detergent_autodose(True)

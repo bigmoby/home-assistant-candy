@@ -15,14 +15,23 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.candy import DOMAIN, SCAN_INTERVAL_ACTIVE, SCAN_INTERVAL_RESTING
+from custom_components.candy import (
+    DOMAIN,
+    SCAN_INTERVAL_ACTIVE,
+    SCAN_INTERVAL_RESTING,
+    SCAN_INTERVAL_RESTING_DISHWASHER,
+)
 from custom_components.candy.client.model import (
-    DishwasherState,
     MachineState,
     OvenState,
     WineCoolerState,
 )
-from custom_components.candy.const import DATA_KEY_COORDINATOR
+from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
+    CONF_KEY_MAINTENANCE_ENABLED,
+    DATA_KEY_COORDINATOR,
+    DATA_KEY_WRITE_PENDING,
+)
 
 from .common import TEST_IP, init_integration
 
@@ -147,7 +156,7 @@ async def test_dishwasher_3_strike_timeout(
     entry = await init_integration(hass, aioclient_mock, _STATUS_DW_IDLE)
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
 
-    assert coordinator.data.machine_state == DishwasherState.IDLE
+    assert coordinator.data.machine_state == MachineState.IDLE
 
     with patch(
         "custom_components.candy.client.CandyClient.status", side_effect=TimeoutError
@@ -156,9 +165,19 @@ async def test_dishwasher_3_strike_timeout(
             await coordinator.async_refresh()
             await hass.async_block_till_done()
 
-    assert coordinator.data.machine_state == DishwasherState.IDLE
+    assert coordinator.data.machine_state == MachineState.OFF
     assert coordinator.data.remaining_minutes == 0
-    assert coordinator.update_interval == SCAN_INTERVAL_RESTING
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING_DISHWASHER
+
+    # 4th timeout while already in OFF retains SCAN_INTERVAL_RESTING_DISHWASHER
+    with patch(
+        "custom_components.candy.client.CandyClient.status", side_effect=TimeoutError
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert coordinator.data.machine_state == MachineState.OFF
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING_DISHWASHER
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +325,85 @@ async def test_connection_flapping_jitter_resets_counter(
     assert coordinator.data.machine_state == MachineState.IDLE
 
 
+async def test_coordinator_write_pending_inhibits_polling(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """When DATA_KEY_WRITE_PENDING is active, coordinator refresh must skip network calls and retain state."""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        _STATUS_WASH_IDLE,
+        statistics_response=_STATS_MOCK,
+    )
+    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
+    assert coordinator.data.machine_state == MachineState.IDLE
+
+    # Set write pending
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 1
+
+    # Clear mock requests; if coordinator tries to hit network, it will fail
+    aioclient_mock.clear_requests()
+
+    # Coordinator refresh should safely return last_known_status without network error
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.last_update_success
+    assert coordinator.data.machine_state == MachineState.IDLE
+    assert aioclient_mock.call_count == 0
+
+    # Clear write pending
+    hass.data[DOMAIN][entry.entry_id][DATA_KEY_WRITE_PENDING] = 0
+
+
+async def test_dishwasher_statistics_write_pending_inhibit(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Verify that update_dw_statistics sets DATA_KEY_WRITE_PENDING during the fetch."""
+    dw_status = """{
+      "statusDWash": {
+        "StatoWiFi": "1", "StatoDWash": "3", "CodiceErrore": "0", "Program": "P8",
+        "OpzProg": "0", "RemTime": "60", "DelayStart": "0", "OpenDoor": "0",
+        "OpenDoorOpt": "0", "Eco": "0", "MissSalt": "0", "MissRinse": "0", "r2": "2"
+      }
+    }"""
+    stats_payload = """{"statusCounters": {"s1": 5, "s2": 10}}"""
+    entry = await init_integration(
+        hass,
+        aioclient_mock,
+        dw_status,
+        statistics_response=stats_payload,
+        extra_config_data={
+            CONF_KEY_INTERFACE_TYPE: "BRAVA_BI_DIGIT_OD",
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+        },
+    )
+
+    observed_pending: list[int] = []
+    real_statistics_retry = hass.data[DOMAIN][entry.entry_id][
+        "client"
+    ].statistics_with_retry
+
+    async def _inspect_pending():
+        observed_pending.append(
+            hass.data[DOMAIN][entry.entry_id].get(DATA_KEY_WRITE_PENDING, 0)
+        )
+        return await real_statistics_retry()
+
+    with patch.object(
+        hass.data[DOMAIN][entry.entry_id]["client"],
+        "statistics_with_retry",
+        side_effect=_inspect_pending,
+    ):
+        dw_stats_coordinator = hass.data[DOMAIN][entry.entry_id]["stats_coordinator"]
+        await dw_stats_coordinator.async_refresh()
+
+    assert len(observed_pending) == 1
+    assert observed_pending[0] == 1
+    # After completion, DATA_KEY_WRITE_PENDING must be 0
+    assert hass.data[DOMAIN][entry.entry_id].get(DATA_KEY_WRITE_PENDING, 0) == 0
+
+
 # ---------------------------------------------------------------------------
 # Test 7: Dishwasher Finished to Synthetic IDLE (Off)
 # ---------------------------------------------------------------------------
@@ -318,7 +416,7 @@ async def test_dishwasher_finished_3_strike_timeout(
     entry = await init_integration(hass, aioclient_mock, _STATUS_DW_FINISHED)
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_KEY_COORDINATOR]
 
-    assert coordinator.data.machine_state == DishwasherState.FINISHED
+    assert coordinator.data.machine_state == MachineState.FINISHED
 
     with patch(
         "custom_components.candy.client.CandyClient.status", side_effect=TimeoutError
@@ -327,9 +425,9 @@ async def test_dishwasher_finished_3_strike_timeout(
             await coordinator.async_refresh()
             await hass.async_block_till_done()
 
-    assert coordinator.data.machine_state == DishwasherState.IDLE
+    assert coordinator.data.machine_state == MachineState.OFF
     assert coordinator.data.remaining_minutes == 0
-    assert coordinator.update_interval == SCAN_INTERVAL_RESTING
+    assert coordinator.update_interval == SCAN_INTERVAL_RESTING_DISHWASHER
 
 
 # ---------------------------------------------------------------------------

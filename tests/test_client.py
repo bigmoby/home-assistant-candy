@@ -1,18 +1,23 @@
+from unittest.mock import patch
+
 import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
 from pytest_homeassistant_custom_component.common import load_fixture
 
 from custom_components.candy.client import (
+    DEFAULT_CLIENT_TIMEOUT,
     CandyClient,
     Encryption,
     _xor_encrypt,
     detect_encryption,
     discover_devices,
+    is_legacy_dishwasher,
     is_new_statistics_interface,
 )
 from custom_components.candy.client.decryption import decrypt
 from custom_components.candy.client.model import (
+    DishwasherStatistics,
     DishwasherStatus,
     MachineState,
     WashingMachineStatus,
@@ -21,6 +26,7 @@ from custom_components.candy.client.model import (
     WineCoolerState,
     WineCoolerStatus,
 )
+from custom_components.candy.helpers import is_modern_dishwasher
 
 from .common import (
     TEST_ENCRYPTED_HEX_RESPONSE,
@@ -605,6 +611,385 @@ async def test_discover_devices_non_200_probe(hass, aioclient_mock):
     aioclient_mock.get("http://192.168.0.1/http-read.json?encrypted=0", status=404)
     result = await discover_devices(async_get_clientsession(hass), "192.168.0.0")
     assert "192.168.0.1" not in result
+
+
+def test_dishwasher_statistics_from_json():
+    """Test DishwasherStatistics parses program counters and temperature fallback."""
+    # Program counters s1..s21
+    data = {f"s{i}": str(i) for i in range(1, 22)}
+    data["s22"] = (
+        "100"  # temp bucket, should not be double-counted when s1..s21 present
+    )
+    stats = DishwasherStatistics.from_json(data)
+    # Sum of 1..21 = 21 * 22 / 2 = 231
+    assert stats.total_cycles == 231
+
+    # Non-digit values ignored
+    partial_data = {"s1": "5", "s2": "invalid", "s3": "10"}
+    assert DishwasherStatistics.from_json(partial_data).total_cycles == 15
+
+    # Fallback to temperature buckets when s1..s21 are absent
+    temp_only = {"s22": "10", "s23": "20", "s24": "30"}
+    assert DishwasherStatistics.from_json(temp_only).total_cycles == 60
+
+
+def test_is_legacy_and_modern_dishwasher():
+    """Test interface family classification helpers for dishwashers."""
+    # Family 1 (Legacy)
+    for iface in (
+        "DishwasherInterfaceTypeBuiltIn",
+        "DishwasherInterfaceTypeFSTouch",
+        "DW_NFC_DIGIT_FS",
+    ):
+        assert is_legacy_dishwasher(iface) is True
+        assert is_modern_dishwasher(iface) is False
+
+    # Family 2 (Brava / Nautilus)
+    for iface in (
+        "BRAVA_BI_DIGIT_OD",
+        "DW_WIFI_FS_OD",
+        "DW_WIFI_FS",
+        "DW_WIFI_BI_OD",
+        "DW_WIFI_BI",
+        "DW_WIFI_HI_OD",
+        "DW_WIFI_HI",
+    ):
+        assert is_legacy_dishwasher(iface) is False
+        assert is_modern_dishwasher(iface) is True
+
+    # Family 3 (AXI / Smooth)
+    for iface in ("AXI_FS_SMOOTH_OD", "AXI_FS_SMOOTH", "AXI_HI_DIGIT"):
+        assert is_legacy_dishwasher(iface) is False
+        assert is_modern_dishwasher(iface) is True
+
+    # Edge cases
+    assert is_legacy_dishwasher(None) is False
+    assert is_legacy_dishwasher("") is False
+    assert is_modern_dishwasher(None) is False
+    assert is_modern_dishwasher("") is False
+
+
+async def test_fetch_statistics_dishwasher(hass, aioclient_mock):
+    """Test fetch_statistics parses DishwasherStatistics when statusCounters uses s1..s21."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        json={"response": "SUCCESS"},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        json={"statusCounters": {"s1": "12", "s2": "8", "s3": "5"}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    stats = await client.fetch_statistics()
+    assert isinstance(stats, DishwasherStatistics)
+    assert stats.total_cycles == 25
+
+
+async def test_fetch_statistics_modern_dishwasher_empty_counters(hass, aioclient_mock):
+    """Test fetch_statistics parses DishwasherStatistics when modern dishwasher returns empty counters."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json?encrypted=0",
+        json={"response": "SUCCESS"},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json?encrypted=0",
+        json={"statusCounters": {}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="BRAVA_BI_DIGIT_OD",
+    )
+    stats = await client.fetch_statistics()
+    assert isinstance(stats, DishwasherStatistics)
+    assert stats.total_cycles == 0
+
+
+async def test_fetch_all_endpoints_modern_vs_legacy_dishwasher(hass, aioclient_mock):
+    """Test fetch_all_endpoints probes statistics for modern dishwashers but skips legacy."""
+    telemetry = {"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}}
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json",
+        json={"response": "SUCCESS"},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json={"statusCounters": {"s1": "14"}},
+    )
+
+    # Modern Brava (Family 2) -> fetches statistics
+    modern_client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="BRAVA_BI_DIGIT_OD",
+    )
+    endpoints = await modern_client.fetch_all_endpoints()
+    assert endpoints["http-read.json"] == telemetry
+    assert endpoints["http-getStatistics.json"] == {"statusCounters": {"s1": "14"}}
+
+    # Legacy Built-in (Family 1) -> skips statistics
+    legacy_client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="DishwasherInterfaceTypeBuiltIn",
+    )
+    endpoints_legacy = await legacy_client.fetch_all_endpoints()
+    assert endpoints_legacy["http-read.json"] == telemetry
+    assert (
+        "not supported for legacy"
+        in endpoints_legacy["http-getStatistics.json"]["status"]
+    )
+
+    # Unsupported statistics interface (AXI_BI_LED) -> skips statistics
+    axi_led_client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="AXI_BI_LED",
+    )
+    endpoints_axi_led = await axi_led_client.fetch_all_endpoints()
+    assert endpoints_axi_led["http-read.json"] == telemetry
+    assert (
+        "not supported for this dishwasher interface"
+        in endpoints_axi_led["http-getStatistics.json"]["status"]
+    )
+
+
+async def test_set_dishwasher_water_hardness(hass, aioclient_mock):
+    """Test set_dishwasher_water_hardness sends HL command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&HL=3",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    await client.set_dishwasher_water_hardness(3)
+    assert aioclient_mock.call_count == 1
+
+
+async def test_set_dishwasher_water_hardness_invalid(hass):
+    """Test set_dishwasher_water_hardness validates range 0..7."""
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    with pytest.raises(ValueError, match="Invalid dishwasher water hardness"):
+        await client.set_dishwasher_water_hardness(-1)
+    with pytest.raises(ValueError, match="Invalid dishwasher water hardness"):
+        await client.set_dishwasher_water_hardness(8)
+
+
+async def test_set_dishwasher_buzzer(hass, aioclient_mock):
+    """Test set_dishwasher_buzzer sends BM command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&BM=1",
+        text='{"response":"OK"}',
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&BM=0",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    await client.set_dishwasher_buzzer(True)
+    await client.set_dishwasher_buzzer(False)
+    assert aioclient_mock.call_count == 2
+
+
+async def test_set_dishwasher_remember_last_cycle(hass, aioclient_mock):
+    """Test set_dishwasher_remember_last_cycle sends LC command."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&LC=1",
+        text='{"response":"OK"}',
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&LC=0",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    await client.set_dishwasher_remember_last_cycle(True)
+    await client.set_dishwasher_remember_last_cycle(False)
+    assert aioclient_mock.call_count == 2
+
+
+async def test_set_water_hardness_routes_to_dishwasher_hl(hass, aioclient_mock):
+    """Test set_water_hardness sends HL rather than SetHard for modern dishwashers."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&HL=2",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="AXI_BI_LED",
+    )
+    await client.set_water_hardness(2)
+    assert aioclient_mock.call_count == 1
+    for call in aioclient_mock.mock_calls:
+        assert "SetHard" not in str(call[1])
+
+
+async def test_client_mutex_and_connection_headers(hass, aioclient_mock):
+    """Test client has mutual exclusion lock and sends Connection: close headers."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json?encrypted=0",
+        text=load_fixture("washing_machine/idle.json"),
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-write.json?encrypted=0&HL=2",
+        text='{"response":"OK"}',
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    assert hasattr(client, "_lock")
+    assert not client._lock.locked()
+
+    # Test status fetch sends Connection: close
+    await client.status()
+    assert not client._lock.locked()
+
+    # Test send_command sends Connection: close
+    await client.send_command("HL=2")
+    assert not client._lock.locked()
+
+    assert aioclient_mock.call_count == 2
+    for call in aioclient_mock.mock_calls:
+        # call is a tuple of (method, url, data, headers)
+        headers = call[3] if len(call) > 3 else {}
+        assert headers.get("Connection") == "close"
+
+
+async def test_client_statistics_settling_delay(hass, aioclient_mock):
+    """Test fetch_raw_statistics enforces 15-second settling delay between prepare and get."""
+    stats_payload = {"statusCounters": {"Program1": "10"}}
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json=stats_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    with (
+        patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 15.0),
+        patch("custom_components.candy.client.asyncio.sleep") as mock_sleep,
+    ):
+        data = await client.fetch_raw_statistics()
+        assert data == stats_payload
+        assert mock_sleep.call_count == 1
+        mock_sleep.assert_called_once_with(15.0)
+
+
+async def test_client_default_timeout_constants():
+    """Verify DEFAULT_CLIENT_TIMEOUT parameters for Espressif socket safety."""
+    assert DEFAULT_CLIENT_TIMEOUT.total == 5.0
+    assert DEFAULT_CLIENT_TIMEOUT.connect == 2.0
+    assert DEFAULT_CLIENT_TIMEOUT.sock_read == 3.0
+
+
+async def test_fetch_all_endpoints_statistics_with_settling_delay(hass, aioclient_mock):
+    """Test fetch_all_endpoints succeeds when statistics settling delay is active."""
+    telemetry = {"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}}
+    stats_payload = {"statusCounters": {"s1": 5}}
+    aioclient_mock.get(f"http://{TEST_IP}/http-read.json", json=telemetry)
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json=stats_payload,
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="BRAVA_BI_DIGIT_OD",
+    )
+    with (
+        patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 15.0),
+        patch("custom_components.candy.client.asyncio.sleep") as mock_sleep,
+    ):
+        endpoints = await client.fetch_all_endpoints()
+        assert endpoints["http-read.json"] == telemetry
+        assert endpoints["http-getStatistics.json"] == stats_payload
+        assert mock_sleep.call_count == 1
+        mock_sleep.assert_called_once_with(15.0)
+
+
+async def test_fetch_statistics_empty_counters_on_dishwasher_without_interface_type(
+    hass, aioclient_mock
+):
+    """Verify fetch_statistics returns DishwasherStatistics when status() identified a dishwasher."""
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-read.json",
+        json={"statusDWash": {"StatoWiFi": "1", "StatoDWash": "2"}},
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-prepareStatistics.json", text='{"response":"OK"}'
+    )
+    aioclient_mock.get(
+        f"http://{TEST_IP}/http-getStatistics.json",
+        json={"statusCounters": {}},
+    )
+    client = CandyClient(
+        async_get_clientsession(hass),
+        device_ip=TEST_IP,
+        encryption_key=TEST_ENCRYPTION_KEY_EMPTY,
+        use_encryption=False,
+        interface_type="",
+    )
+    await client.status()
+    with patch("custom_components.candy.client.STATISTICS_PREPARATION_DELAY", 0):
+        stats = await client.fetch_statistics()
+    assert isinstance(stats, DishwasherStatistics)
+    assert stats.total_cycles == 0
 
 
 def test_is_new_statistics_interface():

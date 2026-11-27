@@ -265,6 +265,24 @@ def decode_registers(
             "4": "Drying",
             "5": "Cycle Finished",
         }
+        r2_phase_map = {
+            "0": "Idle",
+            "1": "Pre-wash",
+            "2": "Main Wash",
+            "3": "Rinse",
+            "4": "Drying",
+            "5": "Cycle Finished",
+        }
+        buzzer_map = {
+            "0": "Muted",
+            "1": "Low volume",
+            "2": "High volume",
+        }
+        checkup_map = {
+            "0": "Idle / Inactive",
+            "1": "Check-up running",
+            "2": "Check-up finished",
+        }
 
         for k, v in data.items():
             val = str(v)
@@ -312,7 +330,11 @@ def decode_registers(
             elif k == "ExtraDry":
                 desc = "Extra dry active" if is_truthy_value(val) else "Extra dry off"
             elif k == "DelayStart":
-                desc = f"{val} hours delayed start countdown"
+                r15_unit = str(data.get("r15", "0"))
+                unit_str = "minutes" if r15_unit in ("1", "true") else "hours"
+                desc = f"{val} {unit_str} delayed start countdown"
+            elif k == "StartStop":
+                desc = "Cycle running" if is_truthy_value(val) else "Cycle stopped"
             elif k == "StatoWiFi":
                 desc = (
                     "Remote Control ENABLED"
@@ -321,6 +343,48 @@ def decode_registers(
                 )
             elif k in ("Err", "CodiceErrore"):
                 desc = "No fault" if val in ("0", "E0") else f"Fault code {val}"
+            elif k == "r1":
+                desc = f"Dial selector position {val}"
+            elif k == "r2":
+                desc = r2_phase_map.get(val, f"Phase {val}")
+            elif k == "r6":
+                desc = buzzer_map.get(val, f"Volume level {val}")
+            elif k == "r7":
+                desc = f"Water hardness level {val}"
+            elif k == "r8":
+                desc = (
+                    "Remember last cycle: Enabled"
+                    if val == "1"
+                    else (
+                        "Remember last cycle: Disabled"
+                        if val == "0"
+                        else f"Cycle counter {val}"
+                    )
+                )
+            elif k == "r9":
+                desc = (
+                    "Auto-clean filter/tub maintenance required"
+                    if val.startswith("H_")
+                    else (
+                        "Maintenance clean OK"
+                        if val in ("0", "")
+                        else f"Maintenance code {val}"
+                    )
+                )
+            elif k == "r15":
+                desc = (
+                    "Delay unit: Minutes"
+                    if val == "1"
+                    else ("Delay unit: Hours" if val == "0" else f"Delay flag {val}")
+                )
+            elif k == "CheckUp":
+                desc = checkup_map.get(val, f"Check-up state {val}")
+            elif k == "DisTestRes":
+                desc = (
+                    "Check-up PASSED (All components OK)"
+                    if val == "0"
+                    else f"Check-up component failure code {val}"
+                )
 
             results.append({"register": k, "value": val, "meaning": desc})
 

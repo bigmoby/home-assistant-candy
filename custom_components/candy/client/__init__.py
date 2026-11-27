@@ -12,6 +12,16 @@ import async_timeout
 import backoff
 
 from .decryption import Encryption, decrypt, find_key
+from .dishwasher_commands import (
+    DishwasherCommandBuilder as DishwasherCommandBuilder,
+    LegacyTouchDishwasherCommandBuilder as LegacyTouchDishwasherCommandBuilder,
+    ModernDishwasherCommandBuilder as ModernDishwasherCommandBuilder,
+    get_dishwasher_command_builder as get_dishwasher_command_builder,
+    is_legacy_dishwasher as is_legacy_dishwasher,
+    is_modern_dishwasher as is_modern_dishwasher,
+    is_open_door_supported as is_open_door_supported,
+    supports_dishwasher_statistics as supports_dishwasher_statistics,
+)
 from .dryer_commands import (
     DryerCommandBuilder as DryerCommandBuilder,
     DualTechDryerCommandBuilder as DualTechDryerCommandBuilder,
@@ -19,6 +29,9 @@ from .dryer_commands import (
     is_dualtech_dryer_interface as is_dualtech_dryer_interface,
 )
 from .model import (
+    DishwasherProgram as DishwasherProgram,
+    DishwasherProgramPhase as DishwasherProgramPhase,
+    DishwasherStatistics as DishwasherStatistics,
     DishwasherStatus,
     DownloadableProgram as DownloadableProgram,
     OvenStatus,
@@ -52,6 +65,12 @@ def parse_wash_programs(raw: list[dict]) -> list[WashingMachineWashProgram]:
 def parse_dryer_programs(raw: list[dict]) -> list[TumbleDryerProgram]:
     """Parse and filter the raw dryer program list stored in a config entry."""
     programs = [TumbleDryerProgram.from_dict(p) for p in raw]
+    return [p for p in programs if p.position != 0]
+
+
+def parse_dish_programs(raw: list[dict]) -> list[DishwasherProgram]:
+    """Parse and filter the raw dishwasher program list stored in a config entry."""
+    programs = [DishwasherProgram.from_dict(p) for p in raw]
     return [p for p in programs if p.position != 0]
 
 
@@ -94,6 +113,13 @@ def resolve_downloadable_programs(
 # https://github.com/ofalvai/home-assistant-candy/issues/61
 _LIMITER = AsyncLimiter(max_rate=1, time_period=3)
 
+# Timeout for local appliance HTTP communications (Espressif lwIP socket safety)
+DEFAULT_CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=5.0, connect=2.0, sock_read=3.0)
+
+# Mandatory settling delay between http-prepareStatistics.json and http-getStatistics.json
+# Reduced from APK StatisticsManager.PREPARATION_INTERVAL_SECONDS = 15 to 10s to limit _lock hold time
+STATISTICS_PREPARATION_DELAY = 10.0
+
 
 def _parse_json_safe(text: str | bytes) -> dict[str, Any]:
     """Safely decode and parse JSON, stripping leading/trailing whitespace and null bytes."""
@@ -132,6 +158,8 @@ class CandyClient:
         self.encryption_key = encryption_key
         self.use_encryption = use_encryption
         self.interface_type = interface_type
+        self.is_dishwasher: bool = False
+        self._lock = asyncio.Lock()
 
     @backoff.on_exception(
         backoff.expo, aiohttp.ClientError, max_tries=3, logger=__name__
@@ -148,9 +176,16 @@ class CandyClient:
     ):
         return await self.status()
 
-    async def _fetch_and_decode_endpoint(self, url: str) -> dict[str, Any]:
-        """Fetch an endpoint URL, decrypt if needed, and parse JSON payload."""
-        async with _LIMITER, self.session.get(url) as resp:
+    async def _fetch_and_decode_endpoint_unlocked(self, url: str) -> dict[str, Any]:
+        """Fetch an endpoint URL, decrypt if needed, and parse JSON payload (assumes lock held)."""
+        async with (
+            _LIMITER,
+            self.session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             if resp.status != 200:
                 text = await resp.text()
                 raise ValueError(
@@ -172,24 +207,40 @@ class CandyClient:
             text = await resp.text()
             return _parse_json_safe(text)
 
+    async def _fetch_and_decode_endpoint(self, url: str) -> dict[str, Any]:
+        """Fetch an endpoint URL with mutual exclusion serialization."""
+        async with self._lock:
+            return await self._fetch_and_decode_endpoint_unlocked(url)
+
     async def fetch_raw_status(self) -> dict[str, Any]:
         """Fetch raw JSON telemetry payload from /http-read.json."""
         url = _status_url(self.device_ip, self.use_encryption)
         return await self._fetch_and_decode_endpoint(url)
 
     async def _fetch_legacy_raw_statistics(self) -> dict[str, Any]:
-        """Fetch statistics via legacy prepareStatistics -> getStatistics handshake."""
-        prepare_url = _prepare_statistics_url(self.device_ip, self.use_encryption)
-        try:
-            async with _LIMITER, self.session.get(prepare_url) as resp:
-                await resp.read()
-        except Exception as err:
-            _LOGGER.debug(
-                "prepareStatistics handshake failed or not supported: %s", err
-            )
+        """Fetch statistics via legacy prepareStatistics -> getStatistics handshake atomically."""
+        async with self._lock:
+            prepare_url = _prepare_statistics_url(self.device_ip, self.use_encryption)
+            try:
+                async with (
+                    _LIMITER,
+                    self.session.get(
+                        prepare_url,
+                        headers={"Connection": "close"},
+                        timeout=DEFAULT_CLIENT_TIMEOUT,
+                    ) as resp,
+                ):
+                    await resp.read()
+            except Exception as err:
+                _LOGGER.debug(
+                    "prepareStatistics handshake failed or not supported: %s", err
+                )
 
-        url = _statistics_url(self.device_ip, self.use_encryption)
-        return await self._fetch_and_decode_endpoint(url)
+            if STATISTICS_PREPARATION_DELAY > 0:
+                await asyncio.sleep(STATISTICS_PREPARATION_DELAY)
+
+            url = _statistics_url(self.device_ip, self.use_encryption)
+            return await self._fetch_and_decode_endpoint_unlocked(url)
 
     async def _fetch_new_raw_statistics(self) -> dict[str, Any]:
         """Fetch statistics via modern GetStat=1 command on /http-write.json."""
@@ -238,13 +289,18 @@ class CandyClient:
             return endpoints
 
         # 2. Statistics counters (/http-getStatistics.json)
+        is_dw = "statusDWash" in telemetry
+        is_legacy_dw = is_dw and is_legacy_dishwasher(self.interface_type)
+        is_unsupported_dw = is_dw and not supports_dishwasher_statistics(
+            self.interface_type
+        )
         has_stats_support = any(
             k in telemetry
             for k in ("statusLavatrice", "statusWD", "statusWM", "statusTD")
-        )
+        ) or (is_dw and not is_unsupported_dw)
         if has_stats_support:
             try:
-                async with async_timeout.timeout(7):
+                async with async_timeout.timeout(30):
                     stats_data = await self.fetch_raw_statistics()
                     endpoints["http-getStatistics.json"] = stats_data
             except Exception as err:
@@ -252,9 +308,17 @@ class CandyClient:
                     "error": f"Error fetching statistics: {err!r}"
                 }
         else:
-            endpoints["http-getStatistics.json"] = {
-                "status": "Statistics counters not supported for this appliance family"
-            }
+            if is_legacy_dw:
+                status_msg = "Statistics counters not supported for legacy dishwashers"
+            elif is_unsupported_dw:
+                status_msg = (
+                    "Statistics counters not supported for this dishwasher interface"
+                )
+            else:
+                status_msg = (
+                    "Statistics counters not supported for this appliance family"
+                )
+            endpoints["http-getStatistics.json"] = {"status": status_msg}
 
         return endpoints
 
@@ -277,6 +341,7 @@ class CandyClient:
         elif "statusForno" in resp_json:
             status = OvenStatus.from_json(resp_json["statusForno"])
         elif "statusDWash" in resp_json:
+            self.is_dishwasher = True
             status = DishwasherStatus.from_json(resp_json["statusDWash"])
         elif "statusWCool" in resp_json:
             status = WineCoolerStatus.from_json(resp_json["statusWCool"])
@@ -299,9 +364,19 @@ class CandyClient:
         else:
             url = _write_url(self.device_ip, use_encryption=False, data=query_string)
 
-        async with async_timeout.timeout(5), self.session.get(url) as resp:
+        async with (
+            self._lock,
+            _LIMITER,
+            async_timeout.timeout(5),
+            self.session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
+            resp_bytes = await resp.read()
             if resp.status != 200:
-                text = await resp.text()
+                text = resp_bytes.decode("utf-8", errors="replace")
                 raise ValueError(
                     f"Write command failed (HTTP {resp.status}): {text[:200]}"
                 )
@@ -314,11 +389,30 @@ class CandyClient:
 
     async def set_water_hardness(self, hardness: int) -> None:
         """Send command to configure water hardness level (1..3)."""
+        if is_modern_dishwasher(self.interface_type):
+            await self.set_dishwasher_water_hardness(hardness)
+            return
         if hardness not in (1, 2, 3):
             raise ValueError(
                 f"Invalid water hardness level: {hardness}. Must be 1 (Soft), 2 (Medium), or 3 (Hard)."
             )
         await self.send_command(f"SetHard={hardness}")
+
+    async def set_dishwasher_water_hardness(self, hardness: int) -> None:
+        """Send command to configure dishwasher water hardness (0..5 or 0..7)."""
+        if hardness < 0 or hardness > 7:
+            raise ValueError(f"Invalid dishwasher water hardness: {hardness}")
+        await self.send_command(f"HL={hardness}")
+
+    async def set_dishwasher_buzzer(self, enabled: bool) -> None:
+        """Send command to configure dishwasher acoustic buzzer."""
+        val = 1 if enabled else 0
+        await self.send_command(f"BM={val}")
+
+    async def set_dishwasher_remember_last_cycle(self, enabled: bool) -> None:
+        """Send command to configure dishwasher last cycle memo."""
+        val = 1 if enabled else 0
+        await self.send_command(f"LC={val}")
 
     async def resume_good_night(self) -> None:
         """Send command to release Good Night rinse hold and finish with spin."""
@@ -329,10 +423,14 @@ class CandyClient:
     )
     @backoff.on_exception(backoff.expo, TimeoutError, max_tries=3, logger=__name__)
     @backoff.on_exception(backoff.expo, JSONDecodeError, max_tries=3, logger=__name__)
-    async def statistics_with_retry(self) -> WashingMachineStatistics:
+    async def statistics_with_retry(
+        self,
+    ) -> WashingMachineStatistics | DishwasherStatistics:
         return await self.fetch_statistics()
 
-    async def fetch_statistics(self) -> WashingMachineStatistics:
+    async def fetch_statistics(
+        self,
+    ) -> WashingMachineStatistics | DishwasherStatistics:
         resp_json = await self.fetch_raw_statistics()
         _LOGGER.debug(resp_json)
 
@@ -342,7 +440,14 @@ class CandyClient:
                 resp_json,
             )
 
-        return WashingMachineStatistics.from_json(resp_json["statusCounters"])
+        counters = resp_json["statusCounters"]
+        if (
+            self.is_dishwasher
+            or is_modern_dishwasher(self.interface_type)
+            or any(k.startswith("s") and k[1:].isdigit() for k in counters)
+        ):
+            return DishwasherStatistics.from_json(counters)
+        return WashingMachineStatistics.from_json(counters)
 
     async def set_wine_cooler_light(
         self, turn_on: bool, current_status: WineCoolerStatus
@@ -367,7 +472,14 @@ class CandyClient:
         else:
             url = f"http://{self.device_ip}/http-write.json?encrypted=0&{encoded_query}"
 
-        async with _LIMITER, self.session.get(url) as resp:
+        async with (
+            _LIMITER,
+            self.session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             resp.raise_for_status()
 
 
@@ -388,7 +500,14 @@ async def detect_encryption(
     try:
         _LOGGER.info("Trying to get a response without encryption (encrypted=0)...")
         url = _status_url(device_ip, use_encryption=False)
-        async with _LIMITER, session.get(url) as resp:
+        async with (
+            _LIMITER,
+            session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             text = await resp.text()
             resp_json = _parse_json_safe(text)
             assert resp_json.get("response") != "BAD REQUEST"
@@ -402,7 +521,14 @@ async def detect_encryption(
             "Failed to get a valid response without encryption, let's try with encrypted=1..."
         )
         url = _status_url(device_ip, use_encryption=True)
-        async with _LIMITER, session.get(url) as resp:
+        async with (
+            _LIMITER,
+            session.get(
+                url,
+                headers={"Connection": "close"},
+                timeout=DEFAULT_CLIENT_TIMEOUT,
+            ) as resp,
+        ):
             resp_hex = await resp.text()  # Response is hex encoded encrypted data
             resp_hex = resp_hex.strip().strip("\x00").strip()
             try:

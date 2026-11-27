@@ -57,6 +57,15 @@
           "maintenance_filter_enabled": "Filter cleaning"
         }
       },
+      "dishwasher_settings": {
+        "title": "Dishwasher settings",
+        "description": "Configure dishwasher hardware settings. These parameters will be sent directly to the machine over local Wi-Fi.",
+        "data": {
+          "water_hardness": "Water hardness",
+          "dishwasher_buzzer": "End-of-cycle acoustic signal (buzzer)",
+          "dishwasher_remember_last_cycle": "Remember last used program"
+        }
+      },
       "hardness": {
         "title": "Water hardness",
         "description": "Select your local water hardness. This determines how often the descale reminder fires.",
@@ -94,6 +103,15 @@
           "email": "Email",
           "password": "Password"
         }
+      },
+      "dishwasher_settings": {
+        "title": "Dishwasher settings",
+        "description": "Configure dishwasher hardware settings. These parameters will be sent directly to the machine over local Wi-Fi.",
+        "data": {
+          "water_hardness": "Water hardness",
+          "dishwasher_buzzer": "End-of-cycle acoustic signal (buzzer)",
+          "dishwasher_remember_last_cycle": "Remember last used program"
+        }
       }
     },
     "error": {
@@ -102,7 +120,8 @@
       "cloud_auth": "Failed to connect to Simply-Fi cloud. Check your credentials and try again."
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   },
   "options": {
@@ -177,6 +196,15 @@
           "maintenance_limescale_enabled": "Limescale cleaning",
           "maintenance_filter_enabled": "Filter cleaning"
         }
+      },
+      "dishwasher_settings": {
+        "title": "Dishwasher settings",
+        "description": "Configure dishwasher hardware settings. These parameters will be sent directly to the machine over local Wi-Fi.",
+        "data": {
+          "water_hardness": "Water hardness",
+          "dishwasher_buzzer": "End-of-cycle acoustic signal (buzzer)",
+          "dishwasher_remember_last_cycle": "Remember last used program"
+        }
       }
     },
     "error": {
@@ -210,13 +238,19 @@
         "name": "Softener low"
       },
       "dishwasher_salt_empty": {
-        "name": "Dishwasher salt empty"
+        "name": "Salt empty"
       },
       "dishwasher_rinse_aid_empty": {
-        "name": "Dishwasher rinse aid empty"
+        "name": "Rinse aid empty"
       },
       "dishwasher_door": {
-        "name": "Dishwasher door"
+        "name": "Door"
+      },
+      "dishwasher_maint_clean": {
+        "name": "Maintenance clean warning"
+      },
+      "dishwasher_remember_last_cycle": {
+        "name": "Remember last cycle"
       }
     },
     "sensor": {
@@ -357,10 +391,37 @@
         "name": "Dishwasher"
       },
       "dishwasher_program": {
-        "name": "Dishwasher program"
+        "name": "Program"
+      },
+      "dishwasher_program_description": {
+        "name": "Program description"
       },
       "dishwasher_remaining_time": {
-        "name": "Dishwasher remaining time"
+        "name": "Remaining time"
+      },
+      "dishwasher_cycle_status": {
+        "name": "Cycle status"
+      },
+      "dishwasher_water_hardness": {
+        "name": "Water hardness"
+      },
+      "dishwasher_buzzer": {
+        "name": "Buzzer volume"
+      },
+      "dishwasher_lifetime_cycles": {
+        "name": "Completed cycles"
+      },
+      "dishwasher_total_cycles": {
+        "name": "Total cycles"
+      },
+      "dishwasher_maint_full_checkup": {
+        "name": "Check-up maintenance remaining cycles"
+      },
+      "dishwasher_maint_limescale": {
+        "name": "Limescale maintenance remaining cycles"
+      },
+      "dishwasher_maint_filter": {
+        "name": "Filter maintenance remaining cycles"
       },
       "wine_cooler": {
         "name": "Wine cooler"
@@ -405,7 +466,7 @@
         "name": "Dryer delay start"
       },
       "dishwasher_error_code": {
-        "name": "Dishwasher error code"
+        "name": "Error code"
       }
     },
     "light": {
@@ -493,7 +554,7 @@
         }
       },
       "dishwasher_program_select": {
-        "name": "Dishwasher program to start",
+        "name": "Program",
         "state": {
           "panel": "As set on the panel",
           "eco_45": "ECO 45°C",
@@ -516,7 +577,7 @@
         "name": "Delay"
       },
       "dishwasher_delay_number": {
-        "name": "Dishwasher start delay"
+        "name": "Delay"
       }
     },
     "switch": {
@@ -560,10 +621,19 @@
         "name": "Extra dose"
       },
       "dishwasher_eco_switch": {
-        "name": "Dishwasher eco option"
+        "name": "Eco option"
       },
       "dishwasher_three_in_one_switch": {
-        "name": "Dishwasher 3in1 tablets"
+        "name": "3in1 tablets"
+      },
+      "dishwasher_half_load_switch": {
+        "name": "Half load"
+      },
+      "dishwasher_extra_dry_switch": {
+        "name": "Extra dry"
+      },
+      "dishwasher_auto_door_switch": {
+        "name": "Auto open door"
       }
     },
     "button": {
@@ -583,10 +653,31 @@
         "name": "Stop wash"
       },
       "dishwasher_start_button": {
-        "name": "Start dishwasher"
+        "name": "Start"
       },
       "dishwasher_stop_button": {
-        "name": "Stop dishwasher"
+        "name": "Stop"
+      },
+      "dishwasher_pause_button": {
+        "name": "Pause"
+      },
+      "dishwasher_resume_button": {
+        "name": "Resume"
+      },
+      "dishwasher_open_door_button": {
+        "name": "Open door"
+      },
+      "dishwasher_checkup_button": {
+        "name": "Check-up"
+      },
+      "dishwasher_maint_full_checkup_reset": {
+        "name": "Check-up maintenance reset"
+      },
+      "dishwasher_maint_limescale_reset": {
+        "name": "Limescale maintenance reset"
+      },
+      "dishwasher_maint_filter_reset": {
+        "name": "Filter maintenance reset"
       },
       "wash_full_checkup": {
         "name": "Full check-up"
@@ -631,6 +722,7 @@
       "options": {
         "update_cloud_data": "Update cloud data",
         "switch_to_read_only": "Switch to Read-Only",
+        "dishwasher_settings": "Dishwasher hardware settings",
         "maintenance_settings": "Maintenance counter settings",
         "checkup_settings": "Self check-up settings"
       }
@@ -643,6 +735,28 @@
         "3": "Moderately hard (12–16 °fH / 12–18 °dH)",
         "4": "Hard (17–22 °fH / 18–30 °dH)",
         "5": "Very hard (23–27 °fH / >30 °dH)"
+      }
+    },
+    "dishwasher_water_hardness_led": {
+      "options": {
+        "0": "Very soft (0–5 °fH / 0–3 °dH, No salt)",
+        "1": "Soft (6–15 °fH / 4–9 °dH)",
+        "2": "Medium hard (16–30 °fH / 10–16 °dH)",
+        "3": "Discreetly hard (31–45 °fH / 17–25 °dH)",
+        "4": "Hard (46–60 °fH / 26–33 °dH)",
+        "5": "Very hard (61–90 °fH / 34–50 °dH)"
+      }
+    },
+    "dishwasher_water_hardness_digit": {
+      "options": {
+        "0": "Extremely soft (0–5 °fH / 0–3 °dH, No salt)",
+        "1": "Very soft (6–10 °fH / 4–6 °dH)",
+        "2": "Soft (11–20 °fH / 7–11 °dH)",
+        "3": "Medium hard (21–30 °fH / 12–16 °dH)",
+        "4": "Discreetly hard (31–40 °fH / 17–22 °dH)",
+        "5": "Hard (41–50 °fH / 23–27 °dH)",
+        "6": "Very hard (51–60 °fH / 28–33 °dH)",
+        "7": "Extremely hard (61–90 °fH / 34–50 °dH)"
       }
     },
     "checkup_schedule": {
@@ -660,12 +774,56 @@
       "washing_completed": "Washing completed",
       "drying_started": "Drying started",
       "drying_completed": "Drying completed",
+      "dishwashing_started": "Dishwashing started",
+      "dishwashing_completed": "Dishwashing completed",
       "clean_filter_needed": "Filter cleaning reminder",
       "water_tank_full": "Water tank full reminder",
       "error_reported": "Error reported",
       "maintenance_full_checkup_due": "Full check-up reminder",
       "maintenance_limescale_due": "Limescale cleaning reminder",
       "maintenance_filter_due": "Filter cleaning reminder"
+    }
+  },
+  "issues": {
+    "dishwasher_full_control_required": {
+      "title": "Dishwasher controls require Full Control mode ({entry_title})",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Dishwasher control mode",
+            "description": "In this release, dishwasher control entities (start, stop, program, delay, eco, 3-in-1) require Full Control mode so the integration can load your machine's program catalog and hardware interface from Simply-Fi.\n\nChoose how to update {entry_title}.",
+            "menu_options": {
+              "switch_to_full_control": "Switch to Full Control (Simply-Fi login)",
+              "keep_read_only": "Keep Read-Only (remove old control entities)"
+            }
+          },
+          "switch_to_full_control": {
+            "title": "Simply-Fi account",
+            "description": "Enter your Simply-Fi / hOn credentials.\n\nCredentials are only used to download the machine data, then discarded. Your machine should already be registered with the Candy Simply-Fi service.",
+            "data": {
+              "email": "Email",
+              "password": "Password"
+            }
+          },
+          "language": {
+            "title": "Appliance language",
+            "description": "Choose the language for program names and appliance messages.",
+            "data": {
+              "program_language": "Language"
+            }
+          },
+          "keep_read_only": {
+            "title": "Keep Read-Only mode",
+            "description": "This will remove the unavailable control entities from Home Assistant and keep your dishwasher in Read-Only monitoring mode.\n\nYou can switch to Full Control later from the integration's Configure menu."
+          }
+        },
+        "error": {
+          "cloud_auth": "Failed to connect to Simply-Fi cloud. Check your credentials and try again."
+        },
+        "abort": {
+          "entry_not_found": "The dishwasher integration entry is no longer present."
+        }
+      }
     }
   }
 }

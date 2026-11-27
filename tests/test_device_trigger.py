@@ -6,6 +6,7 @@ from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_PLATFORM, CONF
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.candy.client.model import (
+    DishwasherStatus,
     DryerCycleState,
     DryerProgramState,
     MachineState,
@@ -15,6 +16,7 @@ from custom_components.candy.client.model import (
     WashProgramState,
 )
 from custom_components.candy.const import (
+    CONF_KEY_INTERFACE_TYPE,
     CONF_KEY_MAINTENANCE_ENABLED,
     CONF_KEY_MAINTENANCE_FILTER_ENABLED,
     CONF_KEY_MAINTENANCE_LAST_FULL_CHECKUP,
@@ -218,6 +220,64 @@ async def test_get_triggers_tumble_dryer(hass):
         "water_tank_full",
         "error_reported",
     }
+
+
+async def test_get_triggers_legacy_dishwasher_excludes_maintenance(hass):
+    """Legacy dishwashers return only state triggers, excluding checkup and limescale triggers."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="gt-legacy-dw",
+        data={
+            CONF_KEY_INTERFACE_TYPE: "DishwasherInterfaceTypeBuiltIn",
+            CONF_KEY_MAINTENANCE_ENABLED: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    status = DishwasherStatus(
+        machine_state=MachineState.IDLE,
+        program_phase=None,
+        program="P1",
+        remaining_minutes=0,
+        delayed_start_minutes=None,
+        door_open=False,
+        door_open_allowed=None,
+        eco_mode=False,
+        remote_control=True,
+        salt_empty=False,
+        rinse_aid_empty=False,
+        running=False,
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=None,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        remember_last_cycle=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        checkup_result=None,
+        r15=0,
+        selector_position=None,
+    )
+
+    coordinator = MagicMock()
+    coordinator.data = status
+    hass.data[DOMAIN] = {entry.entry_id: {DATA_KEY_COORDINATOR: coordinator}}
+
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = _mock_device(entry.entry_id)
+        result = await async_get_triggers(hass, device_id="dev-legacy-dw")
+
+    types = {t[CONF_TYPE] for t in result}
+    assert types == {
+        "dishwashing_started",
+        "dishwashing_completed",
+        "error_reported",
+    }
+    assert "maintenance_full_checkup_due" not in types
+    assert "maintenance_limescale_due" not in types
 
 
 # ---------------------------------------------------------------------------
@@ -572,6 +632,123 @@ async def test_state_trigger_drying_completed(hass):
 
         on_update()
         assert mock_job.call_count == 1
+
+
+def _make_dw_status(
+    state: MachineState, error_code: str | None = None
+) -> DishwasherStatus:
+    return DishwasherStatus(
+        machine_state=state,
+        program_phase=None,
+        program="P1",
+        remaining_minutes=0,
+        delayed_start_minutes=None,
+        door_open=False,
+        door_open_allowed=None,
+        eco_mode=False,
+        remote_control=True,
+        salt_empty=False,
+        rinse_aid_empty=False,
+        running=(state == MachineState.RUNNING),
+        half_load=False,
+        extra_dry=False,
+        three_in_one=False,
+        error_code=error_code,
+        buzzer_level=None,
+        water_hardness=None,
+        last_cycle_counter=None,
+        remember_last_cycle=None,
+        auto_clean_warning=False,
+        checkup_state=None,
+        checkup_result=None,
+        r15=0,
+        selector_position=None,
+    )
+
+
+async def _attach_dw_state_cb(hass, trigger_type, initial_state):
+    """Set up a dishwasher state trigger and return (coordinator, on_update callback)."""
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=f"scb-dw-{trigger_type}", data={})
+    entry.add_to_hass(hass)
+
+    coordinator = MagicMock()
+    coordinator.data = _make_dw_status(initial_state)
+    captured = []
+    coordinator.async_add_listener = lambda cb: captured.append(cb) or (lambda: None)
+
+    hass.data[DOMAIN] = {entry.entry_id: {DATA_KEY_COORDINATOR: coordinator}}
+
+    with patch("custom_components.candy.device_trigger.dr.async_get") as mock_reg:
+        mock_reg.return_value.async_get.return_value = _mock_device(entry.entry_id)
+        await async_attach_trigger(
+            hass, _trigger_config(trigger_type), MagicMock(), {"trigger_data": {}}
+        )
+
+    assert len(captured) == 1
+    return coordinator, captured[0]
+
+
+async def test_state_trigger_dishwashing_started(hass):
+    """dishwashing_started fires on IDLE->RUNNING but not RUNNING->RUNNING or PAUSED->RUNNING."""
+    coordinator, on_update = await _attach_dw_state_cb(
+        hass, "dishwashing_started", MachineState.IDLE
+    )
+
+    with patch.object(hass, "async_run_hass_job") as mock_job:
+        coordinator.data = _make_dw_status(MachineState.RUNNING)
+        on_update()
+        assert mock_job.call_count == 1
+
+        on_update()
+        assert mock_job.call_count == 1
+
+        coordinator.data = _make_dw_status(MachineState.PAUSED)
+        on_update()
+        coordinator.data = _make_dw_status(MachineState.RUNNING)
+        on_update()
+        assert mock_job.call_count == 1
+
+
+async def test_state_trigger_dishwashing_completed(hass):
+    """dishwashing_completed fires when entering FINISHED1 from non-finished state."""
+    coordinator, on_update = await _attach_dw_state_cb(
+        hass, "dishwashing_completed", MachineState.RUNNING
+    )
+
+    with patch.object(hass, "async_run_hass_job") as mock_job:
+        coordinator.data = _make_dw_status(MachineState.FINISHED1)
+        on_update()
+        assert mock_job.call_count == 1
+
+        on_update()
+        assert mock_job.call_count == 1
+
+
+async def test_state_trigger_dishwasher_error_reported(hass):
+    """error_reported fires on dishwasher error transition from 0/None/E0 to an active error."""
+    coordinator, on_update = await _attach_dw_state_cb(
+        hass, "error_reported", MachineState.IDLE
+    )
+
+    with patch.object(hass, "async_run_hass_job") as mock_job:
+        # Error reports E3 -> fires
+        coordinator.data = _make_dw_status(MachineState.IDLE, error_code="E3")
+        on_update()
+        assert mock_job.call_count == 1
+
+        # Still E3 -> does not fire again
+        on_update()
+        assert mock_job.call_count == 1
+
+        # Clears to E0 -> does not fire
+        coordinator.data = _make_dw_status(MachineState.IDLE, error_code="E0")
+        on_update()
+        assert mock_job.call_count == 1
+
+        # Transitions to E18 -> fires
+        coordinator.data = _make_dw_status(MachineState.IDLE, error_code="E18")
+        on_update()
+        assert mock_job.call_count == 2
 
 
 async def test_dryer_warning_trigger_clean_filter_needed(hass):

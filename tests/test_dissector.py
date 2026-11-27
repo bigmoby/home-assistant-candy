@@ -477,6 +477,71 @@ def test_decode_registers_dishwasher() -> None:
     assert regs_std_opz[0]["meaning"] == "Standard"
 
 
+def test_decode_registers_dishwasher_hardware_registers() -> None:
+    """Test modern dishwasher registers: r1, r2, r6, r7, r8, r9, r15, CheckUp, DisTestRes, StartStop."""
+    data = {
+        "r1": "3",
+        "r2": "2",
+        "r6": "2",
+        "r7": "4",
+        "r8": "1",
+        "r9": "H_01",
+        "r15": "1",
+        "DelayStart": "45",
+        "CheckUp": "1",
+        "DisTestRes": "0",
+        "StartStop": "1",
+    }
+    regs = {r["register"]: r["meaning"] for r in decode_registers("statusDWash", data)}
+    assert regs["r1"] == "Dial selector position 3"
+    assert regs["r2"] == "Main Wash"
+    assert regs["r6"] == "High volume"
+    assert regs["r7"] == "Water hardness level 4"
+    assert regs["r8"] == "Remember last cycle: Enabled"
+    assert regs["r9"] == "Auto-clean filter/tub maintenance required"
+    assert regs["r15"] == "Delay unit: Minutes"
+    assert regs["DelayStart"] == "45 minutes delayed start countdown"
+    assert regs["CheckUp"] == "Check-up running"
+    assert regs["DisTestRes"] == "Check-up PASSED (All components OK)"
+    assert regs["StartStop"] == "Cycle running"
+
+    # Alternative states
+    alt_data = {
+        "r2": "4",
+        "r6": "0",
+        "r8": "0",
+        "r9": "0",
+        "r15": "0",
+        "CheckUp": "2",
+        "DisTestRes": "12",
+        "StartStop": "0",
+    }
+    alt_regs = {
+        r["register"]: r["meaning"] for r in decode_registers("statusDWash", alt_data)
+    }
+    assert alt_regs["r2"] == "Drying"
+    assert alt_regs["r6"] == "Muted"
+    assert alt_regs["r8"] == "Remember last cycle: Disabled"
+    assert alt_regs["r9"] == "Maintenance clean OK"
+    assert alt_regs["r15"] == "Delay unit: Hours"
+    assert alt_regs["CheckUp"] == "Check-up finished"
+    assert alt_regs["DisTestRes"] == "Check-up component failure code 12"
+    assert alt_regs["StartStop"] == "Cycle stopped"
+
+    # Buzzer level 1 and legacy r8 cycle counter
+    extra_data = {
+        "r6": "1",
+        "r8": "42",
+        "CheckUp": "0",
+    }
+    extra_regs = {
+        r["register"]: r["meaning"] for r in decode_registers("statusDWash", extra_data)
+    }
+    assert extra_regs["r6"] == "Low volume"
+    assert extra_regs["r8"] == "Cycle counter 42"
+    assert extra_regs["CheckUp"] == "Idle / Inactive"
+
+
 # ---------------------------------------------------------------------------
 # Oven Register Decoding
 # ---------------------------------------------------------------------------

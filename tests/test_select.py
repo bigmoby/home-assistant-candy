@@ -35,6 +35,7 @@ from custom_components.candy.const import (
     DRY_LEVEL_TO_VALUE,
     DRY_TARGET_CUPBOARD_DRY,
     DRY_TARGET_NO_DRY,
+    DRY_TARGET_OPTIONS_FULL,
     DRY_TARGET_OPTIONS_ONLY_DRY,
     MODE_FULL_CONTROL,
     PROGRAM_TYPE_DRYING,
@@ -467,6 +468,13 @@ async def test_wash_dry_select_branches(
         dry_select._current_option = "INVALID_TARGET"
         dry_select.update_for_program_type("CUSTOM_TYPE")
         assert dry_select._current_option is None
+
+    # Line 408: options fallback to full when current_type is unknown and prog is None
+    with (
+        patch.object(dry_select, "_active_program_type", return_value="CUSTOM_TYPE"),
+        patch.object(dry_select, "_active_program", return_value=None),
+    ):
+        assert dry_select.options == list(DRY_TARGET_OPTIONS_FULL)
 
 
 async def test_wash_program_select_and_description_sensor_branches(
