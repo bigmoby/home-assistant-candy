@@ -346,6 +346,7 @@ async def test_wash_steam_switch_lifecycle(
 
     steam_switch = WashSteamSwitch(coord, entry, mock_client, programs)
     steam_switch.hass = hass
+    steam_switch.platform = MagicMock(platform_name=DOMAIN)
     steam_switch.entity_id = "switch.wash_steam"
 
     assert steam_switch.unique_id == UNIQUE_ID_WASH_STEAM_SWITCH.format(entry.entry_id)
@@ -399,6 +400,7 @@ async def test_nfc_special_programs_switch_lifecycle(
 
     nfc_switch = NfcSpecialProgramsSwitch(coord, entry, mock_client, programs)
     nfc_switch.hass = hass
+    nfc_switch.platform = MagicMock(platform_name=DOMAIN)
     nfc_switch.entity_id = "switch.nfc_special_programs"
 
     assert nfc_switch.unique_id == UNIQUE_ID_WASH_NFC_SWITCH.format(entry.entry_id)
@@ -442,6 +444,7 @@ async def test_wash_option_switch_lifecycle(
         name="Prewash",
     )
     opt_switch.hass = hass
+    opt_switch.platform = MagicMock(platform_name=DOMAIN)
     opt_switch.entity_id = "switch.wash_option_prewash"
 
     assert opt_switch.unique_id == f"{entry.entry_id}-{UNIQUE_ID_WASH_OPTION_PREWASH}"

@@ -141,6 +141,8 @@ async def async_setup_entry(
 
 
 class _WashSwitchBase(CoordinatorEntity, SwitchEntity):
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
@@ -222,7 +224,6 @@ class _WashSwitchBase(CoordinatorEntity, SwitchEntity):
 
 
 class WashSteamSwitch(_WashSwitchBase):
-    _attr_name = "Wash steam"
     _attr_translation_key = "wash_steam_switch"
     _attr_icon = "mdi:weather-fog"
 
@@ -274,7 +275,6 @@ class WashSteamSwitch(_WashSwitchBase):
 
 
 class NfcSpecialProgramsSwitch(_WashSwitchBase):
-    _attr_name = "Special programs"
     _attr_translation_key = "wash_nfc_switch"
     _attr_icon = "mdi:folder-star"
 
@@ -328,7 +328,6 @@ class WashOptionSwitch(_WashSwitchBase):
         super().__init__(coordinator, config_entry, client, programs)
         self._bitmask = bitmask
         self._attr_translation_key = translation_key
-        self._attr_name = name
         self._uid_suffix = uid_suffix
         self._is_on: bool = False
 

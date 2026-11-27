@@ -112,13 +112,13 @@ async def test_program_sensor_idle(
         hass, aioclient_mock, load_fixture("washing_machine/idle.json")
     )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washing_machine_wash_program")
 
     assert state
     assert state.state == "1"
     assert state.attributes == {
         "program_code": 136,
-        "friendly_name": "Wash program",
+        "friendly_name": "Washing machine Wash program",
         "icon": "mdi:washing-machine",
     }
 
@@ -186,7 +186,7 @@ async def test_program_sensor_standard_program(
             },
         )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washing_machine_wash_program")
     assert state
     assert state.state == "Rapid 30 Min."
     assert state.attributes.get("recipe_id") is None
@@ -217,7 +217,7 @@ async def test_program_sensor_special_program(
             },
         )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washing_machine_wash_program")
     assert state
     assert state.state == "New Clothes"
     assert state.attributes["recipe_id"] == "D_33"
@@ -248,7 +248,7 @@ async def test_program_sensor_special_program_numeric_recipe_id(
             },
         )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washing_machine_wash_program")
     assert state
     assert state.state == "New Clothes"
     assert state.attributes["recipe_id"] == "33"
@@ -279,7 +279,7 @@ async def test_program_sensor_special_program_unknown_recipe_id_fallback(
             },
         )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washing_machine_wash_program")
     assert state
     assert state.state == "Rapid 30 Min."
     assert state.attributes["recipe_id"] == "D_999"
@@ -309,7 +309,7 @@ async def test_program_sensor_legacy_downloadable_position_match(
             },
         )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washing_machine_wash_program")
     assert state
     assert state.state == "New Clothes"
 
@@ -321,12 +321,12 @@ async def test_cycle_sensor_idle(
         hass, aioclient_mock, load_fixture("washing_machine/idle.json")
     )
 
-    state = hass.states.get("sensor.wash_cycle_status")
+    state = hass.states.get("sensor.washing_machine_wash_cycle_status")
 
     assert state
     assert state.state == "Stopped"
     assert state.attributes == {
-        "friendly_name": "Wash cycle status",
+        "friendly_name": "Washing machine Wash cycle status",
         "icon": "mdi:washing-machine",
     }
 
@@ -338,13 +338,13 @@ async def test_remaining_time_sensor_wash(
         hass, aioclient_mock, load_fixture("washing_machine/running_wash.json")
     )
 
-    state = hass.states.get("sensor.wash_cycle_remaining_time")
+    state = hass.states.get("sensor.washing_machine_wash_cycle_remaining_time")
 
     assert state
     assert state.state == "8"
     assert state.attributes == {
         "device_class": "duration",
-        "friendly_name": "Wash cycle remaining time",
+        "friendly_name": "Washing machine Wash cycle remaining time",
         "icon": "mdi:progress-clock",
         "unit_of_measurement": "min",
     }
@@ -357,13 +357,13 @@ async def test_remaining_time_sensor_idle(
         hass, aioclient_mock, load_fixture("washing_machine/idle.json")
     )
 
-    state = hass.states.get("sensor.wash_cycle_remaining_time")
+    state = hass.states.get("sensor.washing_machine_wash_cycle_remaining_time")
 
     assert state
     assert state.state == "0"
     assert state.attributes == {
         "device_class": "duration",
-        "friendly_name": "Wash cycle remaining time",
+        "friendly_name": "Washing machine Wash cycle remaining time",
         "icon": "mdi:progress-clock",
         "unit_of_measurement": "min",
     }
@@ -444,8 +444,10 @@ async def test_sensors_device_info(
     device_reg = device_registry.async_get(hass)
 
     main_sensor = entity_reg.async_get("sensor.washing_machine")
-    cycle_sensor = entity_reg.async_get("sensor.wash_cycle_status")
-    time_sensor = entity_reg.async_get("sensor.wash_cycle_remaining_time")
+    cycle_sensor = entity_reg.async_get("sensor.washing_machine_wash_cycle_status")
+    time_sensor = entity_reg.async_get(
+        "sensor.washing_machine_wash_cycle_remaining_time"
+    )
 
     main_device = device_reg.async_get(main_sensor.device_id)
     cycle_device = device_reg.async_get(cycle_sensor.device_id)
@@ -467,12 +469,12 @@ async def test_total_cycles_sensor(
         statistics_response=load_fixture("washing_machine/statistics.json"),
     )
 
-    state = hass.states.get("sensor.total_wash_cycles")
+    state = hass.states.get("sensor.washing_machine_total_wash_cycles")
 
     assert state
     assert state.state == "388"
     assert state.attributes == {
-        "friendly_name": "Total wash cycles",
+        "friendly_name": "Washing machine Total wash cycles",
         "icon": "mdi:counter",
         "state_class": "total_increasing",
     }
@@ -485,7 +487,7 @@ async def test_total_cycles_sensor_absent_without_statistics(
         hass, aioclient_mock, load_fixture("washing_machine/idle.json")
     )
 
-    state = hass.states.get("sensor.total_wash_cycles")
+    state = hass.states.get("sensor.washing_machine_total_wash_cycles")
 
     assert state is None
 
@@ -585,12 +587,12 @@ async def test_soil_level_sensor_idle(
         hass, aioclient_mock, load_fixture("washing_machine/idle.json")
     )
 
-    state = hass.states.get("sensor.wash_stain_level")
+    state = hass.states.get("sensor.washing_machine_wash_stain_level")
 
     assert state
     assert state.state == "unknown"  # SLevel=0 has no label
     assert state.attributes == {
-        "friendly_name": "Wash stain level",
+        "friendly_name": "Washing machine Wash stain level",
         "icon": "mdi:water-opacity",
         "options": ["low", "normal", "high"],
         "device_class": "enum",
@@ -604,7 +606,7 @@ async def test_soil_level_sensor_running(
         hass, aioclient_mock, load_fixture("washing_machine/running_wash.json")
     )
 
-    state = hass.states.get("sensor.wash_stain_level")
+    state = hass.states.get("sensor.washing_machine_wash_stain_level")
 
     assert state
     assert state.state == "normal"  # SLevel=2
@@ -645,7 +647,7 @@ async def test_statistics_not_fetched_when_machine_is_off(
         await stats_coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    state = hass.states.get("sensor.total_wash_cycles")
+    state = hass.states.get("sensor.washing_machine_total_wash_cycles")
     assert state is not None
     assert state.state.isdigit()
 
@@ -1337,7 +1339,7 @@ async def test_program_sensor_disambiguation_multi_programs_same_selector(
         },
     )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washer_dryer_wash_program")
     assert state is not None
     assert state.state == "Low Heat Dry"
 
@@ -1355,7 +1357,7 @@ async def test_program_sensor_disambiguation_multi_programs_same_selector(
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washer_dryer_wash_program")
     assert state is not None
     assert state.state == "High Heat Dry"
 
@@ -1397,7 +1399,7 @@ async def test_wash_program_sensor_one_fi_extra(
         },
     )
 
-    state = hass.states.get("sensor.wash_program")
+    state = hass.states.get("sensor.washer_dryer_wash_program")
     assert state is not None
     assert state.state == "One-Fi Extra"
 

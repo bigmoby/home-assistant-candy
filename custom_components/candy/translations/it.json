@@ -136,7 +136,7 @@
         "name": "Livello acqua cesto"
       },
       "wash_error_code": {
-        "name": "Codice errore"
+        "name": "Codice di errore"
       },
       "wash_delay_start": {
         "name": "Ritardo partenza"
@@ -187,10 +187,10 @@
         "name": "Forno"
       },
       "oven_temperature": {
-        "name": "Temperatura forno"
+        "name": "Temperatura"
       },
       "oven_program": {
-        "name": "Programma forno"
+        "name": "Programma"
       },
       "dishwasher": {
         "name": "Lavastoviglie"
@@ -220,16 +220,16 @@
         "name": "Cantinetta vino"
       },
       "wine_cooler_program": {
-        "name": "Programma cantinetta vino"
+        "name": "Programma"
       },
       "wine_cooler_temperature": {
-        "name": "Temperatura target cantinetta vino"
+        "name": "Temperatura desiderata"
       },
       "wine_cooler_light": {
-        "name": "Luce cantinetta vino"
+        "name": "Luce"
       },
       "wine_cooler_error_code": {
-        "name": "Codice errore cantinetta vino"
+        "name": "Codice di errore"
       },
       "wash_scheduled_start": {
         "name": "Wash scheduled start"
@@ -238,7 +238,13 @@
         "name": "Wash scheduled finish"
       },
       "dishwasher_error_code": {
-        "name": "Codice errore"
+        "name": "Codice di errore"
+      },
+      "wine_cooler_lower_temperature": {
+        "name": "Temperatura desiderata zona inferiore"
+      },
+      "wine_cooler_lower_program": {
+        "name": "Programma zona inferiore"
       },
       "dishwasher_maint_filter": {
         "name": "Cicli pulizia filtro"
@@ -268,7 +274,7 @@
         }
       },
       "tumble_error": {
-        "name": "Codice errore asciugatrice"
+        "name": "Codice di errore asciugatrice"
       },
       "wash_checkup_result": {
         "name": "Risultato check-up",
@@ -425,6 +431,9 @@
           "medium": "Medium",
           "hard": "Hard"
         }
+      },
+      "wash_program_description": {
+        "name": "Descrizione programma"
       }
     },
     "number": {
@@ -619,6 +628,26 @@
       "water_tank_full": {
         "name": "Vaschetta acqua piena"
       }
+    }
+  },
+  "device": {
+    "washing_machine": {
+      "name": "Lavatrice"
+    },
+    "washer_dryer": {
+      "name": "Lavasciuga"
+    },
+    "tumble_dryer": {
+      "name": "Asciugatrice"
+    },
+    "oven": {
+      "name": "Forno"
+    },
+    "dishwasher": {
+      "name": "Lavastoviglie"
+    },
+    "wine_cooler": {
+      "name": "Cantinetta vino"
     }
   },
   "title": "Candy",

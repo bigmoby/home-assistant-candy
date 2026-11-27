@@ -21,6 +21,7 @@ from .const import (
     DATA_KEY_CLIENT,
     DATA_KEY_COORDINATOR,
     DEVICE_NAME_WINE_COOLER,
+    DEVICE_TRANSLATION_KEYS,
     DOMAIN,
     SUGGESTED_AREA_KITCHEN,
     UNIQUE_ID_WINE_COOLER_LIGHT_ENTITY,
@@ -51,7 +52,7 @@ class CandyWineCoolerLight(CoordinatorEntity[DataUpdateCoordinator[Any]], LightE
     _attr_supported_color_modes = {ColorMode.ONOFF}
     _attr_color_mode = ColorMode.ONOFF
     _attr_has_entity_name = True
-    _attr_name = "Light"
+    _attr_translation_key = "wine_cooler_light"
 
     def __init__(
         self,
@@ -69,6 +70,7 @@ class CandyWineCoolerLight(CoordinatorEntity[DataUpdateCoordinator[Any]], LightE
         return DeviceInfo(
             identifiers={(DOMAIN, self.config_id)},
             name=DEVICE_NAME_WINE_COOLER,
+            translation_key=DEVICE_TRANSLATION_KEYS[DEVICE_NAME_WINE_COOLER],
             manufacturer="Candy",
             suggested_area=SUGGESTED_AREA_KITCHEN,
         )

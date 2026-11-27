@@ -635,6 +635,16 @@ DEVICE_NAME_OVEN = "Oven"
 DEVICE_NAME_DISHWASHER = "Dishwasher"
 DEVICE_NAME_WINE_COOLER = "Wine cooler"
 
+# Translation keys for device names (translations: "device" section)
+DEVICE_TRANSLATION_KEYS = {
+    DEVICE_NAME_WASHING_MACHINE: "washing_machine",
+    DEVICE_NAME_WASHER_DRYER: "washer_dryer",
+    DEVICE_NAME_TUMBLE_DRYER: "tumble_dryer",
+    DEVICE_NAME_OVEN: "oven",
+    DEVICE_NAME_DISHWASHER: "dishwasher",
+    DEVICE_NAME_WINE_COOLER: "wine_cooler",
+}
+
 SUGGESTED_AREA_BATHROOM = "Bathroom"
 SUGGESTED_AREA_KITCHEN = "Kitchen"
 SUGGESTED_AREA_CELLAR = "Cellar"

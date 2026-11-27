@@ -209,6 +209,8 @@ async def async_setup_entry(
 
 
 class CandyWashSelectBase(CoordinatorEntity, SelectEntity):
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
@@ -262,7 +264,6 @@ class CandyWashSelectBase(CoordinatorEntity, SelectEntity):
 
 class CandyWashProgramTypeSelect(CandyWashSelectBase):
     _attr_has_entity_name = True
-    _attr_name = "Program type"
     _attr_translation_key = "wash_program_type"
     _attr_icon = "mdi:tune-vertical"
 
@@ -343,7 +344,6 @@ class CandyWashProgramTypeSelect(CandyWashSelectBase):
 
 class CandyWashDrySelect(CandyWashSelectBase):
     _attr_has_entity_name = True
-    _attr_name = "Dry setting"
     _attr_translation_key = "wash_dry_select"
     _attr_icon = "mdi:tumble-dryer"
 
@@ -491,7 +491,6 @@ class CandyWashDrySelect(CandyWashSelectBase):
 
 
 class WashProgramSelect(CandyWashSelectBase):
-    _attr_name = "Wash program"
     _attr_translation_key = "wash_program_select"
 
     def __init__(
@@ -677,7 +676,7 @@ class WashProgramSelect(CandyWashSelectBase):
 class CandyWashProgramDescriptionSensor(CoordinatorEntity, SensorEntity):
     """Read-only sensor showing the description of the selected downloadable program."""
 
-    _attr_name = "Program description"
+    _attr_has_entity_name = True
     _attr_translation_key = "wash_program_description"
     _attr_should_poll = False
     _description: str | None = None
@@ -768,7 +767,6 @@ class CandyWashProgramDescriptionSensor(CoordinatorEntity, SensorEntity):
 
 
 class WashTempSelect(CandyWashSelectBase):
-    _attr_name = "Wash temperature"
     _attr_translation_key = "wash_temp_select"
     _current_option: str | None = None
     _selected_program: WashingMachineWashProgram | None = None
@@ -847,7 +845,6 @@ class WashTempSelect(CandyWashSelectBase):
 
 
 class WashSpinSelect(CandyWashSelectBase):
-    _attr_name = "Wash spin speed"
     _attr_translation_key = "wash_spin_select"
     _current_option: str | None = None
     _selected_program: WashingMachineWashProgram | None = None
@@ -932,7 +929,6 @@ class WashSpinSelect(CandyWashSelectBase):
 
 
 class WashSoilSelect(CandyWashSelectBase):
-    _attr_name = "Wash stain level"
     _attr_translation_key = "wash_soil_select"
     _current_option: str | None = None
     _selected_program: WashingMachineWashProgram | None = None

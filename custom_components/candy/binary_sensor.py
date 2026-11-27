@@ -92,8 +92,8 @@ async def async_setup_entry(
 
 
 class CandyWashRemoteControlBinarySensor(CoordinatorEntity, BinarySensorEntity):
+    _attr_has_entity_name = True
     _attr_translation_key = "remote_control"
-    _attr_name = "Remote control"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:remote"
 
