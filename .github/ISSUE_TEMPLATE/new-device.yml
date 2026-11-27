@@ -1,0 +1,91 @@
+name: New / Unsupported Device
+description: Request support for a new appliance family, unrecognized model, or missing Full Control support.
+title: "[New Device]: "
+labels: ["new-device", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template if your Candy, Hoover, Haier, or Simply-Fi appliance is not supported yet, fails to decrypt during setup, or only exposes partial/read-only sensors.
+
+        > **Important:** Make sure the appliance is **powered on** and **connected to Wi-Fi** when collecting diagnostics.
+
+  - type: input
+    id: model
+    attributes:
+      label: Brand & Exact Model Number
+      description: Found on the appliance sticker or in the Simply-Fi / hOn app.
+      placeholder: "e.g. Candy RO41274DWMSE/1-S, Hoover AWMPD 410LH8/1-S"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: appliance_type
+    attributes:
+      label: Appliance Type
+      options:
+        - Washing Machine
+        - Washer-Dryer
+        - Tumble Dryer
+        - Dishwasher
+        - Oven
+        - Wine Cooler / Cellar
+        - Refrigerator / Freezer
+        - Kitchen Hood
+        - Induction / Gas Cooktop
+        - Robot Vacuum
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: current_behavior
+    attributes:
+      label: Current Integration Behavior
+      options:
+        - Fails during Home Assistant setup / decryption
+        - Integrates in Read-Only mode only (Full Control unavailable or broken)
+        - Detected, but programs or sensor values are wrong/missing
+        - Not recognized at all
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### How to Collect Diagnostic Information
+        Provide **either** the Home Assistant diagnostics file **or** the output of `tools/simplyfi.py`:
+
+        1. **Option A — Home Assistant Diagnostics** *(if the device is already added in HA)*:
+           Go to **Settings → Devices & Services → Candy → `⋮` → Download diagnostics**, then **drag & drop** the `.json` file into the box below.
+        2. **Option B — `simplyfi.py` Diagnostic Tool** *(if setup fails or the device is not in HA yet)*:
+           Download [`tools/simplyfi.py`](https://github.com/bigmoby/home-assistant-candy/blob/main/tools/simplyfi.py) (standalone Python 3 script, no external dependencies) and run it on a machine on the same local network as the appliance (output is sanitized by default):
+           ```bash
+           python3 simplyfi.py <YOUR_APPLIANCE_IP> diagnose
+           ```
+           *(Not sure of the IP? See [Finding Your Appliance on the Network](https://github.com/bigmoby/home-assistant-candy#-finding-your-appliance-on-the-network).)*
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics Output (HA Diagnostics .json or simplyfi.py diagnose)
+      description: Drag & drop your HA diagnostics `.json` file here, or paste the Markdown output from `simplyfi.py diagnose`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: app_reference
+    attributes:
+      label: Official App / Physical Panel State (Optional)
+      description: What program, options, and state were shown in the Simply-Fi / hOn app (or on the physical dial) when you captured the diagnostics? This helps map unknown registers.
+      placeholder: "e.g. Dial set to Cotton 40°C, 1200 RPM, Prewash enabled"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: The appliance was powered on and connected to Wi-Fi when diagnostics were captured.
+          required: true
+        - label: I confirmed no unredacted Wi-Fi passwords or personal credentials are included.
+          required: true
