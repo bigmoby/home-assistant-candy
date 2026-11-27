@@ -136,7 +136,7 @@
         "name": "Livello acqua cesto"
       },
       "wash_error_code": {
-        "name": "Codice errore"
+        "name": "Codice di errore"
       },
       "wash_delay_start": {
         "name": "Ritardo partenza"
@@ -229,7 +229,7 @@
         "name": "Luce"
       },
       "wine_cooler_error_code": {
-        "name": "Codice errore"
+        "name": "Codice di errore"
       },
       "wash_scheduled_start": {
         "name": "Wash scheduled start"
@@ -238,7 +238,7 @@
         "name": "Wash scheduled finish"
       },
       "dishwasher_error_code": {
-        "name": "Codice errore"
+        "name": "Codice di errore"
       },
       "wine_cooler_lower_temperature": {
         "name": "Temperatura desiderata zona inferiore"
@@ -274,7 +274,7 @@
         }
       },
       "tumble_error": {
-        "name": "Codice errore asciugatrice"
+        "name": "Codice di errore asciugatrice"
       },
       "wash_checkup_result": {
         "name": "Risultato check-up",
